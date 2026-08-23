@@ -45,8 +45,8 @@ function buildHorarios(cfg: Config): string[] {
 
 export default function AgendadorTurnos() {
     // useQuery reemplaza a todos los useEffect manuales - tiene caché de 5 minutos
-    const { data: config = DEFAULT_CONFIG } = useQuery({ queryKey: ['config'], queryFn: fetchConfig })
-    const { data: servicios = [] } = useQuery({ queryKey: ['servicios'], queryFn: fetchServicios })
+    const { data: config = DEFAULT_CONFIG } = useQuery({ queryKey: ['config'], queryFn: fetchConfig, refetchInterval: 30000 })
+    const { data: servicios = [] } = useQuery({ queryKey: ['servicios'], queryFn: fetchServicios, refetchInterval: 15000 })
 
     const [horariosBase, setHorariosBase] = useState<string[]>([])
     const [ocupados, setOcupados] = useState<string[]>([])

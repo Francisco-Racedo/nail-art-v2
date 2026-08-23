@@ -5,8 +5,7 @@ import FullCalendar from '@fullcalendar/react'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import listPlugin from '@fullcalendar/list'
-// @ts-ignore
-import esLocale from '@fullcalendar/core/locales/es'
+// Locale eliminado por fallo de bundle
 import { Calendar as CalendarIcon, Clock, X, Trash2, CheckCircle2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
@@ -82,47 +81,51 @@ export default function AgendaCalendar({ initialReservas }: { initialReservas: R
         <div className="w-full relative">
             {/* Resumen Superior */}
             <div className="flex gap-4 overflow-x-auto pb-4 mb-2 snap-x hide-scrollbar">
-                <div className="snap-center shrink-0 w-64 bg-zinc-900 border border-zinc-800 text-white p-5 rounded-3xl shadow-lg relative overflow-hidden">
+                <div className="snap-center shrink-0 w-64 bg-[#0a1128]/80 border border-indigo-500/20 text-white p-5 rounded-3xl shadow-[0_10px_30px_rgba(79,70,229,0.15)] relative overflow-hidden backdrop-blur-md">
                     <div className="absolute top-0 right-0 p-4 opacity-10">
-                        <CalendarIcon className="w-16 h-16" />
+                        <CalendarIcon className="w-16 h-16 text-cyan-400" />
                     </div>
-                    <p className="text-zinc-400 text-sm font-medium mb-1">Total Confirmados</p>
-                    <div className="flex items-end gap-2 text-amber-400">
-                        <span className="text-4xl font-extrabold text-white">{initialReservas.length}</span>
+                    <div className="absolute -left-10 -bottom-10 w-32 h-32 bg-indigo-600/20 blur-3xl rounded-full pointer-events-none" />
+                    <p className="text-indigo-200 text-sm font-medium mb-1">Total Confirmados</p>
+                    <div className="flex items-end gap-2 text-cyan-400">
+                        <span className="text-4xl font-extrabold text-white drop-shadow-[0_0_15px_rgba(6,182,212,0.5)]">{initialReservas.length}</span>
                         <span className="mb-1 text-sm font-medium">Turnos</span>
                     </div>
                 </div>
             </div>
 
             {/* Calendario Contenedor Glassmorphic */}
-            <div className="bg-zinc-900/40 backdrop-blur-3xl md:rounded-[2rem] shadow-xl md:border md:border-zinc-800/80 p-2 md:p-6 mb-8 w-full overflow-hidden">
-                <FullCalendar
-                    plugins={[timeGridPlugin, interactionPlugin, listPlugin]}
-                    initialView={isMobile ? 'listWeek' : 'timeGridWeek'}
-                    locale={esLocale}
-                    firstDay={1} // Lunes
-                    hiddenDays={[0]} // Ocultar domingos
-                    allDaySlot={false}
-                    slotMinTime="08:00:00"
-                    slotMaxTime="21:00:00"
-                    headerToolbar={{
-                        left: 'prev,next today',
-                        center: 'title',
-                        right: isMobile ? '' : 'timeGridWeek,timeGridDay'
-                    }}
-                    events={eventos}
-                    eventClick={handleEventClick}
-                    eventColor="#d4af37"
-                    height="auto"
-                    dayHeaderFormat={{ weekday: 'short', day: 'numeric' }}
-                    // @ts-ignore
-                    buttonText={{
-                        today: 'Hoy',
-                        week: 'Semana',
-                        day: 'Día',
-                        list: 'Lista'
-                    }}
-                />
+            <div className="bg-[#050b14]/60 backdrop-blur-[40px] md:rounded-[2rem] shadow-[0_0_40px_rgba(0,0,0,0.5)] border border-indigo-500/10 p-2 md:p-6 mb-8 w-full overflow-hidden relative">
+                <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-cyan-500/5 pointer-events-none" />
+                <div className="relative z-10">
+                    <FullCalendar
+                        plugins={[timeGridPlugin, interactionPlugin, listPlugin]}
+                        initialView={isMobile ? 'listWeek' : 'timeGridWeek'}
+                        locale="es"
+                        firstDay={1} // Lunes
+                        hiddenDays={[0]} // Ocultar domingos
+                        allDaySlot={false}
+                        slotMinTime="08:00:00"
+                        slotMaxTime="21:00:00"
+                        headerToolbar={{
+                            left: 'prev,next today',
+                            center: 'title',
+                            right: isMobile ? '' : 'timeGridWeek,timeGridDay'
+                        }}
+                        events={eventos}
+                        eventClick={handleEventClick}
+                        eventColor="#0284c7" // sky-600
+                        height="auto"
+                        dayHeaderFormat={{ weekday: 'short', day: 'numeric' }}
+                        // @ts-ignore
+                        buttonText={{
+                            today: 'Hoy',
+                            week: 'Semana',
+                            day: 'Día',
+                            list: 'Lista'
+                        }}
+                    />
+                </div>
             </div>
 
             <style jsx global>{`
@@ -130,44 +133,53 @@ export default function AgendaCalendar({ initialReservas }: { initialReservas: R
             font-family: inherit;
             color: #d4d4d8;
         }
-        .fc-theme-standard .fc-scrollgrid { border-color: #27272a; }
-        .fc-theme-standard th, .fc-theme-standard td { border-color: #27272a; }
-        .fc-col-header-cell { padding: 12px 0; background: rgba(39, 39, 42, 0.3); }
+        .fc-theme-standard .fc-scrollgrid { border-color: rgba(99, 102, 241, 0.15); }
+        .fc-theme-standard th, .fc-theme-standard td { border-color: rgba(99, 102, 241, 0.15); }
+        .fc-col-header-cell { padding: 12px 0; background: rgba(5, 11, 20, 0.6); }
+        
+        /* FIX HOVER BLANCO EN NOMBRES DE LOS DÍAS */
+        .fc .fc-col-header-cell-cushion { padding: 4px 8px; border-radius: 4px; transition: all 0.2s; }
+        .fc .fc-col-header-cell-cushion:hover { background: rgba(99, 102, 241, 0.3) !important; color: #22d3ee !important; text-decoration: none; }
+        
+        /* FIX HIGHLIGHT (DÍA ACTUAL Y HOVER DE CELDAS) */
+        .fc .fc-highlight { background: rgba(6, 182, 212, 0.1) !important; }
+        .fc .fc-day-today { background: rgba(79, 70, 229, 0.1) !important; }
+
         .fc-event {
             border: none;
             border-radius: 8px;
             padding: 4px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
             transition: transform 0.1s;
             cursor: pointer;
         }
         .fc-event:active { transform: scale(0.97); }
-        .fc-event-main { font-weight: 600; font-size: 0.8rem; color: #18181b; }
+        .fc-event-main { font-weight: 600; font-size: 0.8rem; color: #ffffff; }
         .fc-timegrid-slot { height: 3em !important; }
         
         .fc-list {
-            border-color: #27272a !important;
+            border-color: rgba(99, 102, 241, 0.2) !important;
             border-radius: 16px;
             overflow: hidden;
-            background: rgba(39, 39, 42, 0.3);
+            background: rgba(5, 11, 20, 0.6);
         }
         .fc-list-day-cushion {
-            background: #18181b !important;
+            background: rgba(99, 102, 241, 0.1) !important;
             font-weight: 700;
             padding: 12px 16px !important;
         }
         .fc-list-event td {
             padding: 16px 16px !important;
-            border-bottom: 1px solid #27272a;
+            border-bottom: 1px solid rgba(99, 102, 241, 0.1);
         }
         .fc-list-event-title, .fc-list-event-time { color: #f4f4f5; font-weight: 600; }
-        .fc-list-event-dot { border-color: #d4af37 !important; }
+        .fc-list-event-dot { border-color: #0ea5e9 !important; }
 
         /* Botones de Toolbar */
         .fc .fc-button-primary {
-            background: #27272a !important;
-            border-color: #27272a !important;
-            color: #f4f4f5 !important;
+            background: rgba(30, 27, 75, 0.6) !important;
+            border-color: rgba(99, 102, 241, 0.3) !important;
+            color: #c7d2fe !important;
             text-transform: capitalize;
             border-radius: 10px;
         }

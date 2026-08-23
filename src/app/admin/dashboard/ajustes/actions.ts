@@ -57,3 +57,26 @@ export async function deleteServicio(id: number) {
     revalidatePath('/admin/dashboard/ajustes')
     return { success: true }
 }
+
+export async function editServicio(id: number, formData: FormData) {
+    const supabase = await createServerClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('No autorizado')
+
+    const data = {
+        categoria: formData.get('categoria') as string,
+        nombre: formData.get('nombre') as string,
+        subtitulo: formData.get('subtitulo') as string,
+        descripcion: formData.get('descripcion') as string,
+        precio: Number(formData.get('precio')),
+        icono: formData.get('icono') as string,
+        destacado: formData.get('destacado') === 'on' ? 1 : 0
+    }
+
+    const { error } = await supabase.from('servicios').update(data).eq('id', id)
+    if (error) throw new Error('Error editando servicio')
+
+    revalidatePath('/')
+    revalidatePath('/admin/dashboard/ajustes')
+    return { success: true }
+}

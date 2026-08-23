@@ -9,13 +9,16 @@ export async function updateConfig(formData: FormData) {
     if (!user) throw new Error('No autorizado')
 
     const configs = {
-        intervalo_minutos: formData.get('intervalo_minutos') as string,
+        intervalo_minutos: Number(formData.get('intervalo_minutos')),
         hora_inicio: formData.get('hora_inicio') as string,
         hora_fin: formData.get('hora_fin') as string
     }
 
-    const { error } = await supabase.from('config').upsert({ id: 1, ...configs })
-    if (error) throw new Error('Error guardando configuración')
+    const { error } = await supabase.from('config').update(configs).eq('id', 1)
+    if (error) {
+        console.error("Supabase Error Update Config:", error)
+        throw new Error('Error guardando configuración')
+    }
 
     revalidatePath('/')
     revalidatePath('/admin/dashboard/ajustes')

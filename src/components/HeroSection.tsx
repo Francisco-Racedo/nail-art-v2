@@ -37,7 +37,7 @@ export default function HeroSection() {
             <div className="relative w-full max-w-lg mb-8 flex justify-center items-center mt-6 px-4" style={{ height: 350 }}>
                 <div
                     className="absolute w-64 h-64 md:w-80 md:h-80 rounded-[2.5rem] shadow-2xl border-4 border-white left-2 md:left-8 flex items-center justify-center overflow-hidden"
-                    style={{ animation: isVisible ? 'slideInLeft 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards' : 'none', opacity: 0 }}
+                    style={{ animation: isVisible ? 'slideInLeft 4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards' : 'none', opacity: 0 }}
                 >
                     <img src="/img/hero.png" alt="Manos y uñas perfectas" className="w-full h-full object-cover" />
                 </div>
@@ -45,7 +45,7 @@ export default function HeroSection() {
                     className="absolute z-10 text-[3.2rem] md:text-7xl text-white text-right font-bold leading-[0.9] drop-shadow-2xl right-4 md:right-8"
                     style={{
                         fontFamily: 'serif',
-                        animation: isVisible ? 'slideInRight 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards' : 'none',
+                        animation: isVisible ? 'slideInRight 4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards' : 'none',
                         textShadow: '0px 4px 20px rgba(0,0,0,0.8), 0 2px 5px rgba(0,0,0,0.5)',
                         opacity: 0
                     }}

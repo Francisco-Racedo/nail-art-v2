@@ -654,3 +654,23 @@
 2026-08-23T02:39:10.693452Z  INFO get_globs: tailwindcss_oxide::scanner: enter
 2026-08-23T02:39:10.693480Z  INFO get_globs:discover_sources: tailwindcss_oxide::scanner: enter
 2026-08-23T02:39:10.693496Z  INFO get_globs:discover_sources: tailwindcss_oxide::scanner: exit
+2026-08-23T02:39:10.720514Z  INFO get_globs: tailwindcss_oxide::scanner: exit
+2026-08-23T03:58:53.246080Z  INFO discover_sources: tailwindcss_oxide::scanner: enter
+2026-08-23T03:58:53.247174Z  INFO discover_sources:walk_parallel: tailwindcss_oxide::scanner: enter
+2026-08-23T03:58:53.322256Z  INFO discover_sources:walk_parallel: tailwindcss_oxide::scanner: exit
+2026-08-23T03:58:53.323210Z  INFO discover_sources: tailwindcss_oxide::scanner: Reading "C:\\Users\\user\\.gemini\\antigravity\\scratch\\nail-art-v2\\src\\app\\api\\reservas\\route.ts"
+2026-08-23T03:58:53.323256Z  INFO discover_sources: tailwindcss_oxide::scanner: exit
+2026-08-23T03:58:53.323276Z  INFO extract_candidates: tailwindcss_oxide::scanner: enter
+2026-08-23T03:58:53.323290Z  INFO extract_candidates:parse_all_blobs: tailwindcss_oxide::scanner: enter
+2026-08-23T03:58:53.323304Z  INFO extract_candidates:parse_all_blobs:extract: tailwindcss_oxide::scanner: enter
+2026-08-23T03:58:53.327489Z  INFO extract_candidates:parse_all_blobs:extract: tailwindcss_oxide::scanner: exit
+2026-08-23T03:58:53.327536Z  INFO extract_candidates:parse_all_blobs: tailwindcss_oxide::scanner: exit
+2026-08-23T03:58:53.327609Z  INFO extract_candidates: tailwindcss_oxide::scanner: exit
+2026-08-23T03:58:53.331316Z  INFO get_files: tailwindcss_oxide::scanner: enter
+2026-08-23T03:58:53.331367Z  INFO get_files:discover_sources: tailwindcss_oxide::scanner: enter
+2026-08-23T03:58:53.331385Z  INFO get_files:discover_sources: tailwindcss_oxide::scanner: exit
+2026-08-23T03:58:53.331798Z  INFO get_files: tailwindcss_oxide::scanner: exit
+2026-08-23T03:58:53.334401Z  INFO get_globs: tailwindcss_oxide::scanner: enter
+2026-08-23T03:58:53.334445Z  INFO get_globs:discover_sources: tailwindcss_oxide::scanner: enter
+2026-08-23T03:58:53.334496Z  INFO get_globs:discover_sources: tailwindcss_oxide::scanner: exit
+2026-08-23T03:58:53.351383Z  INFO get_globs: tailwindcss_oxide::scanner: exit

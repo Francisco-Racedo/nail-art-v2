@@ -43,4 +43,5 @@ export default async function CMSCarouselPage() {
             <CMSGalleryClient initialPhotos={validPhotos} />
         </div>
     )
+
 }

@@ -14,7 +14,7 @@ export async function updateConfig(formData: FormData) {
         hora_fin: formData.get('hora_fin') as string
     }
 
-    const { error } = await supabase.from('config').update(configs).eq('id', 1)
+    const { error } = await supabase.from('config').upsert({ id: 1, ...configs })
     if (error) throw new Error('Error guardando configuración')
 
     revalidatePath('/')

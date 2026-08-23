@@ -149,10 +149,10 @@ export default function AgendadorTurnos() {
                                     disabled={ocupados.includes(h)}
                                     onClick={() => setHorario(h)}
                                     className={`py-2 text-sm font-medium rounded-lg border transition duration-200 ${ocupados.includes(h)
-                                            ? 'bg-gray-100 text-gray-400 line-through border-gray-200 cursor-not-allowed'
-                                            : horario === h
-                                                ? 'bg-gradient-to-r from-amber-500 to-amber-400 text-white border-transparent shadow'
-                                                : 'bg-zinc-50 text-zinc-700 border-zinc-200 hover:border-amber-400'
+                                        ? 'bg-gray-100 text-gray-400 line-through border-gray-200 cursor-not-allowed'
+                                        : horario === h
+                                            ? 'bg-gradient-to-r from-amber-500 to-amber-400 text-white border-transparent shadow'
+                                            : 'bg-zinc-50 text-zinc-700 border-zinc-200 hover:border-amber-400'
                                         }`}
                                 >
                                     {ocupados.includes(h) ? `${h} ❌` : h}
@@ -211,11 +211,17 @@ export default function AgendadorTurnos() {
                                         ))}
                                     </select>
                                 </div>
-                                <button type="submit" disabled={loading}
-                                    className="w-full mt-4 text-white font-bold py-4 rounded-xl hover:opacity-90 transition duration-300 shadow-md text-lg disabled:opacity-60"
-                                    style={{ background: 'linear-gradient(to right, #C59B27, #E5C158, #C59B27)' }}>
-                                    {loading ? 'Procesando...' : 'Confirmar Reserva'}
-                                </button>
+                                <div className="flex flex-col gap-3 mt-4">
+                                    <button type="submit" disabled={loading}
+                                        className="w-full text-white font-bold py-4 rounded-xl hover:opacity-90 transition duration-300 shadow-md text-lg disabled:opacity-60"
+                                        style={{ background: 'linear-gradient(to right, #C59B27, #E5C158, #C59B27)' }}>
+                                        {loading ? 'Procesando...' : 'Confirmar Reserva'}
+                                    </button>
+                                    <button type="button" onClick={() => { setFecha(''); setHorario(null); setNombre(''); setServicio('') }}
+                                        className="w-full bg-zinc-200 text-zinc-600 font-bold py-4 rounded-xl hover:bg-zinc-300 transition duration-300 text-lg">
+                                        Limpiar Formulario
+                                    </button>
+                                </div>
                             </form>
                         )}
                     </div>

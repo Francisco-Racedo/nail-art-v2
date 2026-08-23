@@ -41,12 +41,12 @@ export default function CarouselGaleria() {
                 centeredSlides
                 slidesPerView="auto"
                 coverflowEffect={{ rotate: 15, stretch: 0, depth: 100, modifier: 1, slideShadows: true }}
-                loop={fotos.length > 2}
+                loop={true}
                 autoplay={{ delay: 3000, disableOnInteraction: false }}
                 pagination={{ clickable: true }}
                 className="w-full px-6 py-8"
             >
-                {fotos.map((url, i) => (
+                {(fotos.length < 6 ? [...fotos, ...fotos, ...fotos] : fotos).map((url, i) => (
                     <SwiperSlide key={i} style={{ width: 280 }}>
                         <img
                             src={url}

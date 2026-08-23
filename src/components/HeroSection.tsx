@@ -14,12 +14,9 @@ export default function HeroSection() {
             <div className="relative w-full max-w-lg mb-8 flex justify-center items-center mt-6 px-4" style={{ height: 350 }}>
                 <div
                     className="absolute w-64 h-64 md:w-80 md:h-80 rounded-[2.5rem] shadow-2xl border-4 border-white left-2 md:left-8 flex items-center justify-center overflow-hidden"
-                    style={{
-                        background: 'linear-gradient(135deg, #fce7f3 0%, #fef3c7 50%, #fce7f3 100%)',
-                        animation: 'slideInLeft 2.7s cubic-bezier(0.2, 0.8, 0.2, 1) forwards'
-                    }}
+                    style={{ animation: 'slideInLeft 2.7s cubic-bezier(0.2, 0.8, 0.2, 1) forwards' }}
                 >
-                    <span style={{ fontSize: 120 }}>💅</span>
+                    <img src="/img/bg-inicio.jpg" alt="Manos y uñas perfectas" className="w-full h-full object-cover" />
                 </div>
                 <h1
                     className="absolute z-10 text-[3.2rem] md:text-7xl text-white text-right font-bold leading-[0.9] drop-shadow-2xl right-4 md:right-8"

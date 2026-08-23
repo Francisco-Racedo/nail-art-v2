@@ -57,6 +57,7 @@ export default function AgendadorTurnos() {
     const [loading, setLoading] = useState(false)
     const [submitted, setSubmitted] = useState(false)
     const [reservaId, setReservaId] = useState<number | null>(null)
+    const [domingoError, setDomingoError] = useState(false)
 
     const hoy = new Date().toISOString().split('T')[0]
 
@@ -70,7 +71,7 @@ export default function AgendadorTurnos() {
         const partes = val.split('-')
         const d = new Date(Number(partes[0]), Number(partes[1]) - 1, Number(partes[2]))
         if (d.getDay() === 0) {
-            alert('Los días domingo nos encontramos descansando. Por favor selecciona un día de Lunes a Sábado.')
+            setDomingoError(true)
             setFecha('')
             setOcupados([])
             return
@@ -137,28 +138,46 @@ export default function AgendadorTurnos() {
                             type="date"
                             value={fecha}
                             min={hoy}
-                            onChange={e => handleFechaChange(e.target.value)}
-                            className="w-full p-3 mb-6 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-800 focus:outline-none focus:ring-2 focus:ring-amber-400 transition"
+                            onChange={e => {
+                                setDomingoError(false)
+                                handleFechaChange(e.target.value)
+                            }}
+                            className={`w-full p-3 mb-2 bg-zinc-50 border ${domingoError ? 'border-rose-400 focus:ring-rose-400' : 'border-zinc-200 focus:ring-amber-400'} rounded-xl text-zinc-800 focus:outline-none focus:ring-2 transition`}
                         />
-                        <label className="block text-zinc-600 text-sm mb-2 font-medium">Horarios Disponibles</label>
-                        <div className="grid grid-cols-3 gap-2">
-                            {horariosBase.map(h => (
-                                <button
-                                    key={h}
-                                    type="button"
-                                    disabled={ocupados.includes(h)}
-                                    onClick={() => setHorario(h)}
-                                    className={`py-2 text-sm font-medium rounded-lg border transition duration-200 ${ocupados.includes(h)
-                                        ? 'bg-gray-100 text-gray-400 line-through border-gray-200 cursor-not-allowed'
-                                        : horario === h
-                                            ? 'bg-gradient-to-r from-amber-500 to-amber-400 text-white border-transparent shadow'
-                                            : 'bg-zinc-50 text-zinc-700 border-zinc-200 hover:border-amber-400'
-                                        }`}
-                                >
-                                    {ocupados.includes(h) ? `${h} ❌` : h}
-                                </button>
-                            ))}
-                        </div>
+                        {domingoError && (
+                            <div className="mb-4 bg-rose-50 border border-rose-200 text-rose-700 px-3 py-2 rounded-lg text-sm flex items-start gap-2 animate-pulse">
+                                <span>⛔</span>
+                                <div>
+                                    <strong>¡Descansamos los Domingos!</strong>
+                                    <p>Por favor selecciona un día entre Lunes y Sábado.</p>
+                                </div>
+                            </div>
+                        )}
+                        <label className="block text-zinc-600 text-sm mb-2 font-medium mt-4">Horarios Disponibles</label>
+                        {fecha && !domingoError ? (
+                            <div className="grid grid-cols-3 gap-2">
+                                {horariosBase.map(h => (
+                                    <button
+                                        key={h}
+                                        type="button"
+                                        disabled={ocupados.includes(h)}
+                                        onClick={() => setHorario(h)}
+                                        className={`py-2 text-sm font-medium rounded-lg border transition duration-200 ${ocupados.includes(h)
+                                            ? 'bg-gray-100 text-gray-400 line-through border-gray-200 cursor-not-allowed'
+                                            : horario === h
+                                                ? 'bg-gradient-to-r from-amber-500 to-amber-400 text-white border-transparent shadow'
+                                                : 'bg-zinc-50 text-zinc-700 border-zinc-200 hover:border-amber-400'
+                                            }`}
+                                    >
+                                        {ocupados.includes(h) ? `${h} ❌` : h}
+                                    </button>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="bg-zinc-100/80 border border-zinc-200 text-zinc-500 text-sm p-4 rounded-xl text-center italic">
+                                {domingoError ? 'Selecciona otro día para ver los horarios' : 'Ingresa una fecha para ver la disponibilidad'}
+                            </div>
+                        )}
                         <p className="text-xs text-zinc-400 mt-4 text-center">Solo mostramos horarios con disponibilidad para la fecha elegida.</p>
                     </div>
 
@@ -182,7 +201,7 @@ export default function AgendadorTurnos() {
                                         📅 Google Calendar
                                     </a>
                                 </div>
-                                <button onClick={() => { setSubmitted(false); setFecha(''); setHorario(null); setNombre(''); setServicio('') }}
+                                <button onClick={() => { setSubmitted(false); setFecha(''); setHorario(null); setNombre(''); setServicio(''); setDomingoError(false) }}
                                     className="mt-3 w-full text-zinc-500 text-sm hover:text-zinc-700 transition">
                                     Hacer otra reserva
                                 </button>
@@ -217,7 +236,7 @@ export default function AgendadorTurnos() {
                                         style={{ background: 'linear-gradient(to right, #C59B27, #E5C158, #C59B27)' }}>
                                         {loading ? 'Procesando...' : 'Confirmar Reserva'}
                                     </button>
-                                    <button type="button" onClick={() => { setFecha(''); setHorario(null); setNombre(''); setServicio('') }}
+                                    <button type="button" onClick={() => { setFecha(''); setHorario(null); setNombre(''); setServicio(''); setDomingoError(false) }}
                                         className="w-full bg-zinc-200 text-zinc-600 font-bold py-4 rounded-xl hover:bg-zinc-300 transition duration-300 text-lg">
                                         Limpiar Formulario
                                     </button>

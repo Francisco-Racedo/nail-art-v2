@@ -1,8 +1,31 @@
 'use client'
 
+import { useEffect, useState, useRef } from 'react'
+
 export default function HeroSection() {
+    const [isVisible, setIsVisible] = useState(true)
+    const headerRef = useRef<HTMLElement>(null)
+
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                // Remove the animation classes entirely and re-add them when visible
+                setIsVisible(entry.isIntersecting)
+            },
+            { threshold: 0.1 }
+        )
+
+        if (headerRef.current) {
+            observer.observe(headerRef.current)
+        }
+
+        return () => observer.disconnect()
+    }, [])
+
     return (
-        <header className="relative min-h-[100vh] flex flex-col items-center justify-center pt-28 pb-32 overflow-hidden"
+        <header
+            ref={headerRef}
+            className="relative min-h-[100vh] flex flex-col items-center justify-center pt-28 pb-32 overflow-hidden"
             style={{
                 backgroundColor: '#FDF8F5',
                 backgroundImage: 'radial-gradient(#d4af37 0.5px, transparent 0.5px), radial-gradient(#d4af37 0.5px, #FDF8F5 0.5px)',
@@ -14,7 +37,7 @@ export default function HeroSection() {
             <div className="relative w-full max-w-lg mb-8 flex justify-center items-center mt-6 px-4" style={{ height: 350 }}>
                 <div
                     className="absolute w-64 h-64 md:w-80 md:h-80 rounded-[2.5rem] shadow-2xl border-4 border-white left-2 md:left-8 flex items-center justify-center overflow-hidden"
-                    style={{ animation: 'slideInLeft 2.7s cubic-bezier(0.2, 0.8, 0.2, 1) forwards' }}
+                    style={{ animation: isVisible ? 'slideInLeft 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards' : 'none', opacity: 0 }}
                 >
                     <img src="/img/hero.png" alt="Manos y uñas perfectas" className="w-full h-full object-cover" />
                 </div>
@@ -22,8 +45,9 @@ export default function HeroSection() {
                     className="absolute z-10 text-[3.2rem] md:text-7xl text-white text-right font-bold leading-[0.9] drop-shadow-2xl right-4 md:right-8"
                     style={{
                         fontFamily: 'serif',
-                        animation: 'slideInRight 2.7s cubic-bezier(0.2, 0.8, 0.2, 1) forwards',
+                        animation: isVisible ? 'slideInRight 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards' : 'none',
                         textShadow: '0px 4px 20px rgba(0,0,0,0.8), 0 2px 5px rgba(0,0,0,0.5)',
+                        opacity: 0
                     }}
                 >
                     FRAN<br /><span className="text-amber-300">&amp;</span> ROMY<br />NAILS
@@ -32,7 +56,7 @@ export default function HeroSection() {
 
             {/* Subtítulo */}
             <div className="flex flex-col items-center text-center px-6 mt-4 z-10"
-                style={{ animation: 'fadeUp 1.5s ease forwards', animationDelay: '1.2s', opacity: 0 }}>
+                style={{ animation: isVisible ? 'fadeUp 1.2s ease forwards' : 'none', animationDelay: isVisible ? '0.4s' : '0s', opacity: 0 }}>
                 <span className="inline-block px-4 py-1 mb-4 text-xs font-semibold tracking-wider uppercase bg-rose-100 text-rose-800 rounded-full border border-rose-200 shadow-sm">
                     ✨ Zona Lules
                 </span>

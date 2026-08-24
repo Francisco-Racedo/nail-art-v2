@@ -3,10 +3,13 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState, useCallback, useEffect } from 'react'
 
+// M-05: Config ahora incluye nombre_negocio y whatsapp_numero desde la BD
 interface Config {
     hora_inicio: string
     hora_fin: string
     intervalo_minutos: string
+    nombre_negocio?: string
+    whatsapp_numero?: string
 }
 
 interface Servicio {
@@ -27,7 +30,13 @@ async function fetchServicios(): Promise<Servicio[]> {
     return res.json()
 }
 
-const DEFAULT_CONFIG: Config = { hora_inicio: '10:00', hora_fin: '20:00', intervalo_minutos: '90' }
+const DEFAULT_CONFIG: Config = {
+    hora_inicio: '10:00',
+    hora_fin: '20:00',
+    intervalo_minutos: '90',
+    nombre_negocio: 'Fran & Romy Nails',
+    whatsapp_numero: '5493813013850',
+}
 
 function buildHorarios(cfg: Config): string[] {
     const horarios: string[] = []
@@ -44,9 +53,10 @@ function buildHorarios(cfg: Config): string[] {
 }
 
 export default function AgendadorTurnos() {
-    // useQuery reemplaza a todos los useEffect manuales - tiene caché de 5 minutos
-    const { data: config = DEFAULT_CONFIG } = useQuery({ queryKey: ['config'], queryFn: fetchConfig, refetchInterval: 10000 })
-    const { data: servicios = [] } = useQuery({ queryKey: ['servicios'], queryFn: fetchServicios, refetchInterval: 5000 })
+    // O-01: Sin refetchInterval — config y servicios son datos casi estáticos.
+    // El staleTime de 5 min del QueryClient ya gestiona el caché correctamente.
+    const { data: config = DEFAULT_CONFIG } = useQuery({ queryKey: ['config'], queryFn: fetchConfig })
+    const { data: servicios = [] } = useQuery({ queryKey: ['servicios'], queryFn: fetchServicios })
 
     const [horariosBase, setHorariosBase] = useState<string[]>([])
     const [ocupados, setOcupados] = useState<string[]>([])
@@ -96,19 +106,25 @@ export default function AgendadorTurnos() {
         else alert(data.error || 'Error al reservar')
     }
 
+    // M-05 + O-04: WhatsApp usa nombre_negocio y whatsapp_numero de la config
     function getWhatsapp() {
-        const fechaLatam = fecha.split('-').reverse().join('-')
-        const msg = `*NUEVO TURNO - FRAN & ROMY NAILS*\n\nHola! Hice la reserva a través de la web.\n*Soy:* ${nombre}\n*Servicio:* ${servicio}\n*Día:* ${fechaLatam}\n*Horario:* ${horario}\n\n¿Confirmas turno? 💅`
-        return `https://wa.me/5493813013850?text=${encodeURIComponent(msg)}`
+        const negocio = config.nombre_negocio || DEFAULT_CONFIG.nombre_negocio
+        const numero = config.whatsapp_numero || DEFAULT_CONFIG.whatsapp_numero
+        const fechaLatam = fecha.split('-').reverse().join('/')
+        const msg = `*NUEVO TURNO - ${negocio!.toUpperCase()}*\n\nHola! Hice la reserva a través de la web.\n*Soy:* ${nombre}\n*Servicio:* ${servicio}\n*Día:* ${fechaLatam}\n*Horario:* ${horario}\n\n¿Confirmas turno? 💅`
+        return `https://wa.me/${numero}?text=${encodeURIComponent(msg)}`
     }
 
+    // O-04: Google Calendar usa el intervalo_minutos real de la config
     function getCalendar() {
         const [y, mo, d] = fecha.split('-')
         const [h, mi] = (horario ?? '10:00').split(':')
+        const intervalo = parseInt(config.intervalo_minutos) || 90
+        const negocio = config.nombre_negocio || DEFAULT_CONFIG.nombre_negocio
         const start = new Date(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi))
-        const end = new Date(start.getTime() + 90 * 60000)
+        const end = new Date(start.getTime() + intervalo * 60000)
         const fmt = (dt: Date) => dt.toISOString().replace(/-|:|\.\d{3}/g, '')
-        return `https://calendar.google.com/calendar/r/eventedit?text=Turno+Fran+%26+Romy+Nails&dates=${fmt(start)}/${fmt(end)}&details=${encodeURIComponent('Turno para ' + servicio)}&location=Lules,+Tucuman`
+        return `https://calendar.google.com/calendar/r/eventedit?text=Turno+${encodeURIComponent(negocio!)}&dates=${fmt(start)}/${fmt(end)}&details=${encodeURIComponent('Turno para ' + servicio)}&location=Lules,+Tucuman`
     }
 
     const grupos: Record<string, Servicio[]> = {}

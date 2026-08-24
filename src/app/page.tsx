@@ -5,10 +5,6 @@ import ListaDePrecios from '@/components/ListaDePrecios'
 import AgendadorTurnos from '@/components/AgendadorTurnos'
 import FloatingCTA from '@/components/FloatingCTA'
 
-export const metadata = {
-  title: 'Fran & Romy Nails | Manicuría Profesional en Lules, Tucumán',
-  description: 'Especialistas en Kapping, Uñas Esculpidas, Semipermanente y Pedi Spa en Lules. Reservá tu turno online.',
-}
 
 export default function HomePage() {
   return (

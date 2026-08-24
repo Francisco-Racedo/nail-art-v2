@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 
-// FASE 4: Esquema Zod de validación en el servidor
+// VALIDACIÓN SERVER-SIDE con Zod
 const ReservaSchema = z.object({
     nombre: z.string().min(2, 'El nombre es requerido'),
     servicio: z.string().min(1, 'El servicio es requerido'),
@@ -35,7 +35,18 @@ export async function POST(request: Request) {
             .select('id')
             .single()
 
-        if (error) throw error
+        if (error) {
+            // C-01: Manejar violación de UNIQUE CONSTRAINT (fecha, horario)
+            // Código de error de PostgreSQL para unique_violation
+            if (error.code === '23505') {
+                return NextResponse.json(
+                    { error: '¡Este horario acaba de ser tomado! Por favor, elegí otro.' },
+                    { status: 409 }
+                )
+            }
+            throw error
+        }
+
         return NextResponse.json({ id: data.id, success: true })
     } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'Error al guardar la reserva'

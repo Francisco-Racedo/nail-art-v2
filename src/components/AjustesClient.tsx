@@ -9,6 +9,9 @@ interface Config {
     intervalo_minutos: number
     hora_inicio: string
     hora_fin: string
+    // M-05: Datos del negocio ahora gestionables desde el panel
+    nombre_negocio?: string
+    whatsapp_numero?: string
 }
 
 interface Servicio {
@@ -85,7 +88,19 @@ export default function AjustesClient({ config, servicios }: { config: Config, s
                 <div className="absolute -left-10 -bottom-10 w-40 h-40 bg-indigo-600/10 blur-[80px] pointer-events-none rounded-full" />
 
                 <h2 className="text-xl md:text-2xl font-bold text-white mb-6 relative z-10 flex items-center gap-2"><Settings className="w-6 h-6 text-cyan-400" /> Ajustes Globales</h2>
-                <form action={handleSaveConfig} className="space-y-4 relative z-10 w-full max-w-sm">
+                <form action={handleSaveConfig} className="space-y-4 relative z-10 w-full max-w-md">
+                    {/* M-05: Datos del negocio */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="md:col-span-2">
+                            <label className="block text-sm font-semibold text-indigo-200 mb-1.5 uppercase tracking-wide">Nombre del Negocio</label>
+                            <input type="text" name="nombre_negocio" defaultValue={config?.nombre_negocio || 'Fran & Romy Nails'} maxLength={80} className="w-full bg-indigo-950/20 border border-indigo-500/20 rounded-xl p-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 shadow-inner" />
+                        </div>
+                        <div className="md:col-span-2">
+                            <label className="block text-sm font-semibold text-indigo-200 mb-1.5 uppercase tracking-wide">Número WhatsApp (solo dígitos, sin +)</label>
+                            <input type="text" name="whatsapp_numero" defaultValue={config?.whatsapp_numero || '5493813013850'} placeholder="5493812345678" className="w-full bg-indigo-950/20 border border-indigo-500/20 rounded-xl p-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 shadow-inner" />
+                        </div>
+                    </div>
+                    <div className="border-t border-indigo-500/10 my-4" />
                     <div>
                         <label className="block text-sm font-semibold text-indigo-200 mb-1.5 uppercase tracking-wide">Intervalo de Turnos (minutos)</label>
                         <input type="number" name="intervalo_minutos" defaultValue={config?.intervalo_minutos || 90} className="w-full bg-indigo-950/20 border border-indigo-500/20 rounded-xl p-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 shadow-inner" />
@@ -127,8 +142,8 @@ export default function AjustesClient({ config, servicios }: { config: Config, s
                             </tr>
                         </thead>
                         <tbody className="text-sm">
-                            {servicios.map((s, idx) => (
-                                <tr key={idx} className="border-b border-indigo-500/10 last:border-0 hover:bg-indigo-900/20 transition">
+                            {servicios.map((s) => (
+                                <tr key={s.id} className="border-b border-indigo-500/10 last:border-0 hover:bg-indigo-900/20 transition">
                                     <td className="p-3 font-semibold text-slate-100">
                                         {s.icono && <span className="mr-2 opacity-80">{s.icono}</span>}
                                         {s.nombre}

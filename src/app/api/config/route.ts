@@ -16,13 +16,16 @@ export async function GET() {
             .limit(1)
             .single()
 
+        // C-02: En caso de error, retornar config por defecto de forma silenciosa.
+        // NO filtrar detalles internos de la BD al cliente anónimo.
         if (error) {
-            return NextResponse.json({ ...DEFAULT_CONFIG, _debugError: error })
+            return NextResponse.json(DEFAULT_CONFIG)
         }
 
         return NextResponse.json(data ?? DEFAULT_CONFIG)
-    } catch (e: any) {
-        return NextResponse.json({ ...DEFAULT_CONFIG, _catchError: e.message })
+    } catch {
+        // Silencioso en producción — el cliente recibe defaults seguros
+        return NextResponse.json(DEFAULT_CONFIG)
     }
 }
 

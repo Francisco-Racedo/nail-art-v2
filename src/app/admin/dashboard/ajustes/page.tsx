@@ -1,5 +1,4 @@
 import { createClient as createServerClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
 import AjustesClient from '@/components/AjustesClient'
 
 export const dynamic = 'force-dynamic'
@@ -7,12 +6,7 @@ export const dynamic = 'force-dynamic'
 export default async function AdminAjustesPage() {
     const supabase = await createServerClient()
 
-    // Auth Validation (Security Layer)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-        redirect('/admin/login')
-    }
-
+    // C-03: Auth gestionada por el middleware — el cliente ya está validado aquí.
     // Petición paralela para máxima velocidad (Promise.all)
     const [configRes, serviciosRes] = await Promise.all([
         supabase.from('config').select('*').single(),

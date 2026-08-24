@@ -41,7 +41,11 @@ export async function updateConfig(formData: FormData) {
     })
     if (!parsed.success) throw new Error(parsed.error.issues[0].message)
 
-    const { error } = await supabase.from('config').update(parsed.data).eq('id', 1)
+    // Obtener dinámicamente el ID para evitar fallos si el ID en la BD no es 1
+    const { data: configRows } = await supabase.from('config').select('id').limit(1).single()
+    const configId = configRows?.id || 1
+
+    const { error } = await supabase.from('config').update(parsed.data).eq('id', configId)
     if (error) {
         console.error('Supabase Error Update Config:', error)
         throw new Error('Error guardando configuración')

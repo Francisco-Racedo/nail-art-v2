@@ -23,12 +23,13 @@ export async function GET() {
             .limit(1)
             .single()
 
-        // C-02: En caso de error, retornar config por defecto de forma silenciosa.
-        if (error) {
-            return NextResponse.json(DEFAULT_CONFIG)
-        }
-
-        return NextResponse.json(data ?? DEFAULT_CONFIG)
+        return NextResponse.json(data ?? DEFAULT_CONFIG, {
+            headers: {
+                'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0',
+            }
+        })
     } catch {
         return NextResponse.json(DEFAULT_CONFIG)
     }

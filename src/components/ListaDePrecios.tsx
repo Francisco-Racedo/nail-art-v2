@@ -14,7 +14,7 @@ interface Servicio {
 }
 
 async function fetchServicios(): Promise<Servicio[]> {
-    const res = await fetch('/api/servicios')
+    const res = await fetch('/api/servicios', { cache: 'no-store' })
     if (!res.ok) throw new Error('No se pudieron cargar los servicios')
     return res.json()
 }
@@ -46,7 +46,8 @@ export default function ListaDePrecios() {
     const { data: servicios = [], isLoading, error } = useQuery({
         queryKey: ['servicios'],
         queryFn: fetchServicios,
-        staleTime: 5 * 60 * 1000,
+        refetchInterval: 5000,
+        staleTime: 5000,
     })
 
     const manos = servicios.filter(s => s.categoria === 'Manos')

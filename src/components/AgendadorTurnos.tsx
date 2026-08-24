@@ -20,12 +20,12 @@ interface Servicio {
 }
 
 async function fetchConfig(): Promise<Config> {
-    const res = await fetch('/api/config')
+    const res = await fetch('/api/config', { cache: 'no-store' })
     return res.json()
 }
 
 async function fetchServicios(): Promise<Servicio[]> {
-    const res = await fetch('/api/servicios')
+    const res = await fetch('/api/servicios', { cache: 'no-store' })
     if (!res.ok) throw new Error('Error')
     return res.json()
 }
@@ -53,10 +53,18 @@ function buildHorarios(cfg: Config): string[] {
 }
 
 export default function AgendadorTurnos() {
-    // O-01: Sin refetchInterval — config y servicios son datos casi estáticos.
-    // El staleTime de 5 min del QueryClient ya gestiona el caché correctamente.
-    const { data: config = DEFAULT_CONFIG } = useQuery({ queryKey: ['config'], queryFn: fetchConfig })
-    const { data: servicios = [] } = useQuery({ queryKey: ['servicios'], queryFn: fetchServicios })
+    // O-01 revertido parcialmente: se restaura el polling cada 5 segundos según
+    // lo solicitado por el cliente para mantener la agenda sincronizada en vivo.
+    const { data: config = DEFAULT_CONFIG } = useQuery({
+        queryKey: ['config'],
+        queryFn: fetchConfig,
+        refetchInterval: 5000
+    })
+    const { data: servicios = [] } = useQuery({
+        queryKey: ['servicios'],
+        queryFn: fetchServicios,
+        refetchInterval: 5000
+    })
 
     const [horariosBase, setHorariosBase] = useState<string[]>([])
     const [ocupados, setOcupados] = useState<string[]>([])

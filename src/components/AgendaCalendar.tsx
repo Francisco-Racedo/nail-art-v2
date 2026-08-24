@@ -23,8 +23,8 @@ type EstadoReserva = 'pendiente' | 'confirmado' | 'completado'
 
 const ESTADO_CONFIG: Record<EstadoReserva, { label: string; color: string; bg: string; border: string }> = {
     pendiente: { label: 'Pendiente', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/30' },
-    confirmado: { label: 'Confirmado', color: 'text-cyan-400', bg: 'bg-cyan-500/10', border: 'border-cyan-500/30' },
-    completado: { label: 'Completado', color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/30' },
+    confirmado: { label: 'Confirmado', color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/30' },
+    completado: { label: 'Completado', color: 'text-pink-400', bg: 'bg-pink-500/10', border: 'border-pink-500/30' },
 }
 
 // C-04: Recibe intervaloMinutos para calcular con precisión el fin del bloque en el calendario
@@ -55,9 +55,9 @@ export default function AgendaCalendar({ initialReservas, intervaloMinutos = 90 
 
     // M-01: Color del evento en el calendario según el estado
     const getEventColor = (estado: EstadoReserva) => {
-        if (estado === 'confirmado') return '#0e7490'   // cyan-700
-        if (estado === 'completado') return '#15803d'   // green-700
-        return '#0284c7'                                 // sky-600 (pendiente — default)
+        if (estado === 'confirmado') return '#059669'   // emerald-600
+        if (estado === 'completado') return '#db2777'   // pink-600
+        return '#d97706'                                // amber-600 (pendiente — default)
     }
 
     const eventos = initialReservas.map(r => ({

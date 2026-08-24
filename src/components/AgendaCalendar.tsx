@@ -193,7 +193,7 @@ export default function AgendaCalendar({ initialReservas, intervaloMinutos = 90 
             {modalData && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-end md:items-center justify-center animate-in fade-in duration-200">
                     <div className="absolute inset-0" onClick={() => { setModalData(null); setConfirmDelete(false) }} />
-                    <div className="bg-zinc-900 border border-zinc-800 rounded-t-3xl md:rounded-3xl w-full max-w-md shadow-2xl p-6 pb-32 md:p-6 md:pb-6 relative animate-in slide-in-from-bottom-10 md:slide-in-from-bottom-0 md:zoom-in-95 duration-300 max-h-[85dvh] md:max-h-[90vh] overflow-y-auto overscroll-contain">
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-t-3xl md:rounded-3xl w-full max-w-md shadow-2xl p-6 pb-32 md:p-6 md:pb-6 relative animate-in fade-in zoom-in-[0.98] slide-in-from-bottom-[100%] md:slide-in-from-bottom-0 md:zoom-in-95 duration-400 ease-out max-h-[85dvh] md:max-h-[90vh] overflow-y-auto overscroll-contain">
                         <div className="w-12 h-1.5 bg-zinc-700 rounded-full mx-auto mb-6 md:hidden" />
 
                         <div className="flex justify-between items-start mb-4">

@@ -1,16 +1,19 @@
 import { createClient as createServerClient } from '@/lib/supabase/server'
+import { createClient as createAnonClient } from '@/lib/supabase/client'
 import AjustesClient from '@/components/AjustesClient'
 
 export const dynamic = 'force-dynamic'
 
 export default async function AdminAjustesPage() {
-    const supabase = await createServerClient()
+    const supabaseSession = await createServerClient()
+    const supabaseAnon = createAnonClient()
 
     // C-03: Auth gestionada por el middleware — el cliente ya está validado aquí.
-    // Petición paralela para máxima velocidad (Promise.all)
+    // Usamos el cliente anónimo para SELECT porque las RLS policies pueden
+    // estar restringiendo SELECT al rol anon exclusivamente.
     const [configRes, serviciosRes] = await Promise.all([
-        supabase.from('config').select('*').single(),
-        supabase.from('servicios').select('*').order('id', { ascending: true })
+        supabaseAnon.from('config').select('*').single(),
+        supabaseAnon.from('servicios').select('*').order('id', { ascending: true })
     ])
 
     if (configRes.error) console.error('Error config:', configRes.error)

@@ -159,5 +159,5 @@ html {
 }
 
 .animate-bottom-sheet {
-  animation: slideUpNative 3s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+  animation: slideUpNative 2.5s cubic-bezier(0.32, 0.72, 0, 1) forwards;
 }

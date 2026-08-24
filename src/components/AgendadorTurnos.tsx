@@ -67,7 +67,7 @@ export default function AgendadorTurnos() {
     })
 
     const [horariosBase, setHorariosBase] = useState<string[]>([])
-    const [ocupados, setOcupados] = useState<string[]>([])
+    const [ocupados, setOcupados] = useState<{ horario: string; estado: string }[]>([])
     const [fecha, setFecha] = useState('')
     const [horario, setHorario] = useState<string | null>(null)
     const [nombre, setNombre] = useState('')
@@ -180,22 +180,42 @@ export default function AgendadorTurnos() {
                         <label className="block text-zinc-600 text-sm mb-2 font-medium mt-4">Horarios Disponibles</label>
                         {fecha && !domingoError ? (
                             <div className="grid grid-cols-3 gap-2">
-                                {horariosBase.map(h => (
-                                    <button
-                                        key={h}
-                                        type="button"
-                                        disabled={ocupados.includes(h)}
-                                        onClick={() => setHorario(h)}
-                                        className={`py-2 text-sm font-medium rounded-lg border transition duration-200 ${ocupados.includes(h)
-                                            ? 'bg-gray-100 text-gray-400 line-through border-gray-200 cursor-not-allowed'
-                                            : horario === h
-                                                ? 'bg-gradient-to-r from-amber-500 to-amber-400 text-white border-transparent shadow'
-                                                : 'bg-zinc-50 text-zinc-700 border-zinc-200 hover:border-amber-400'
-                                            }`}
-                                    >
-                                        {ocupados.includes(h) ? `${h} ❌` : h}
-                                    </button>
-                                ))}
+                                {horariosBase.map(h => {
+                                    const ocupado = ocupados.find(o => o.horario === h)
+                                    const isOcupado = !!ocupado
+                                    let btnClasses = ''
+                                    let content: React.ReactNode = <span>{h}</span>
+
+                                    if (isOcupado) {
+                                        const estado = ocupado.estado
+                                        if (estado === 'confirmado') {
+                                            btnClasses = 'bg-emerald-50 text-emerald-600/70 line-through border-emerald-200 cursor-not-allowed'
+                                            content = <span>{h} 🔒</span>
+                                        } else if (estado === 'completado') {
+                                            btnClasses = 'bg-pink-50 text-pink-600/70 line-through border-pink-200 cursor-not-allowed'
+                                            content = <span>{h} 💅</span>
+                                        } else {
+                                            btnClasses = 'bg-amber-50 text-amber-600/70 line-through border-amber-200 cursor-not-allowed'
+                                            content = <span>{h} ⏳</span>
+                                        }
+                                    } else if (horario === h) {
+                                        btnClasses = 'bg-gradient-to-r from-amber-500 to-amber-400 text-white border-transparent shadow'
+                                    } else {
+                                        btnClasses = 'bg-zinc-50 text-zinc-700 border-zinc-200 hover:border-amber-400'
+                                    }
+
+                                    return (
+                                        <button
+                                            key={h}
+                                            type="button"
+                                            disabled={isOcupado}
+                                            onClick={() => setHorario(h)}
+                                            className={`py-2 text-sm font-medium rounded-lg border transition duration-200 ${btnClasses}`}
+                                        >
+                                            {content}
+                                        </button>
+                                    )
+                                })}
                             </div>
                         ) : (
                             <div className="bg-zinc-100/80 border border-zinc-200 text-zinc-500 text-sm p-4 rounded-xl text-center italic">

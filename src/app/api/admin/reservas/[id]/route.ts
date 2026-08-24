@@ -4,7 +4,7 @@ import { z } from 'zod'
 
 const EstadoSchema = z.object({
     estado: z.enum(['pendiente', 'confirmado', 'completado'], {
-        errorMap: () => ({ message: 'Estado inválido' })
+        message: 'Estado inválido'
     })
 })
 

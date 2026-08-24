@@ -170,7 +170,7 @@ export default function AjustesClient({ config, servicios }: { config: Config, s
             {isModalOpen && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[100] flex items-end md:items-center justify-center animate-in fade-in duration-200">
                     <div className="absolute inset-0 bg-indigo-950/20" onClick={closeAndResetModal} />
-                    <div className="bg-[#050b14] border border-indigo-500/30 rounded-t-3xl md:rounded-[2rem] w-full max-w-lg shadow-[0_0_50px_rgba(0,0,0,0.8)] p-6 pb-12 md:p-8 relative animate-in slide-in-from-bottom-10 md:slide-in-from-bottom-0 md:zoom-in-95 duration-300 max-h-[85dvh] md:max-h-[90vh] overflow-y-auto">
+                    <div className="bg-[#050b14] border border-indigo-500/30 rounded-t-3xl md:rounded-[2rem] w-full max-w-lg shadow-[0_0_50px_rgba(0,0,0,0.8)] p-6 pb-32 md:p-8 md:pb-8 relative animate-in slide-in-from-bottom-10 md:slide-in-from-bottom-0 md:zoom-in-95 duration-300 max-h-[85dvh] md:max-h-[90vh] overflow-y-auto overscroll-contain">
                         <h3 className="text-2xl font-bold mb-6 text-white tracking-tight flex items-center gap-3">
                             {editingService ? <Edit2 className="text-cyan-400" /> : <Plus className="text-cyan-400" />}
                             {editingService ? "Editar Servicio" : "Nuevo Servicio"}

@@ -6,23 +6,31 @@ import { z } from 'zod'
 
 // O-06: Esquemas Zod para validación server-side de cada Server Action
 const ConfigSchema = z.object({
-    intervalo_minutos: z.coerce.number().int().min(15, 'Mínimo 15 minutos').max(240, 'Máximo 240 minutos'),
+    intervalo_minutos: z.coerce.number().int().min(1, 'El intervalo debe ser mayor a 0').max(240, 'Máximo 240 minutos'),
     hora_inicio: z.string().regex(/^\d{2}:\d{2}$/, 'Formato de hora inválido'),
     hora_fin: z.string().regex(/^\d{2}:\d{2}$/, 'Formato de hora inválido'),
-    // M-05: Campos de negocio ahora viven en config
     nombre_negocio: z.string().min(2, 'El nombre del negocio es requerido').max(80),
-    whatsapp_numero: z.string().regex(/^\d{10,15}$/, 'El número debe tener entre 10 y 15 dígitos sin espacios ni símbolos'),
-}).refine((d) => d.hora_inicio < d.hora_fin, {
-    message: 'La hora de inicio debe ser anterior a la hora de fin',
+    whatsapp_numero: z.string().regex(/^\d{10,15}$/, 'El número debe tener entre 10 y 15 dígitos sin símbolos especiales (sin +) ni espacios'),
+}).refine((d) => {
+    const [hInicio, mInicio] = d.hora_inicio.split(':').map(Number);
+    const [hFin, mFin] = d.hora_fin.split(':').map(Number);
+    const minStart = (hInicio * 60) + mInicio;
+    const minEnd = (hFin * 60) + mFin;
+    return minStart < minEnd;
+}, {
+    message: 'La hora de fin debe ser posterior a la de inicio',
     path: ['hora_fin'],
 })
 
 const ServicioSchema = z.object({
     categoria: z.enum(['Manos', 'Pies & Extras', 'Promos']),
-    nombre: z.string().min(2, 'El nombre es requerido').max(100),
+    nombre: z.string()
+        .min(3, 'El nombre debe tener al menos 3 caracteres')
+        .max(100)
+        .regex(/^[a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s\-\.]+$/, "El nombre contiene caracteres inválidos"),
     subtitulo: z.string().max(150).optional(),
     descripcion: z.string().max(500).optional(),
-    precio: z.coerce.number().min(0, 'El precio no puede ser negativo').max(1_000_000),
+    precio: z.coerce.number().positive('El precio debe ser un valor entero mayor a cero').max(1_000_000),
     icono: z.string().max(10).optional(),
     destacado: z.number().int().min(0).max(1),
 })

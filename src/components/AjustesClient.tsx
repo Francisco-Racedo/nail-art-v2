@@ -31,16 +31,56 @@ export default function AjustesClient({ config, servicios }: { config: Config, s
     const formRef = useRef<HTMLFormElement>(null)
 
     const handleSaveConfig = async (formData: FormData) => {
+        const wp = formData.get('whatsapp_numero') as string
+        if (wp && !/^\d{10,15}$/.test(wp)) {
+            toast.error('WhatsApp inválido. Solo 10-15 dígitos.')
+            return
+        }
+
+        const hInicio = formData.get('hora_inicio') as string
+        const hFin = formData.get('hora_fin') as string
+        if (hInicio && hFin && hInicio >= hFin) {
+            toast.error('Hora de Fin debe ser posterior a Inicio')
+            return
+        }
+
+        const inter = Number(formData.get('intervalo_minutos'))
+        if (isNaN(inter) || inter <= 0) {
+            toast.error('Intervalo debe ser mayor a 0')
+            return
+        }
+
         const toastId = toast.loading('Guardando ajustes...')
         try {
             await updateConfig(formData)
             toast.success('Ajustes guardados correctamente', { id: toastId })
         } catch (e: any) {
-            toast.error('Error al guardar', { id: toastId })
+            toast.error(e.message || 'Error al guardar', { id: toastId })
         }
     }
 
     const handleSaveService = async (formData: FormData) => {
+        const nServicio = formData.get('nombre') as string
+        const precioServicio = Number(formData.get('precio'))
+        const categoria = formData.get('categoria') as string
+
+        if (!nServicio || nServicio.trim().length < 3) {
+            toast.error('Nombre inválido (Min: 3 caracteres)')
+            return
+        }
+        if (!categoria) {
+            toast.error('Categoría requerida')
+            return
+        }
+        if (isNaN(precioServicio) || precioServicio <= 0) {
+            toast.error('El precio debe ser mayor a $0')
+            return
+        }
+        if (!/^[a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s\-\.]+$/.test(nServicio)) {
+            toast.error('Nombre contiene símbolos inválidos')
+            return
+        }
+
         const toastId = toast.loading(editingService ? 'Guardando edición...' : 'Añadiendo servicio...')
         try {
             if (!formData.get('nombre') || !formData.get('precio')) throw new Error('Faltan campos')

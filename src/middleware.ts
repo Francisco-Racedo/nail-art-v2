@@ -8,8 +8,9 @@ export async function middleware(request: NextRequest) {
 export const config = {
     matcher: [
         /*
-         * Aplicar middleware a todas las rutas excepto archivos estáticos y APIs de Next.js
+         * Aplicar middleware EXCLUSIVAMENTE a las rutas de administrador.
+         * Evita bloqueos (Timeout 504) en endpoints públicos y webhooks de Mercado Pago.
          */
-        '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+        '/admin/:path*',
     ],
 }

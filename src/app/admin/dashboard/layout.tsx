@@ -7,17 +7,17 @@ export default function AdminDashboardLayout({
     children: React.ReactNode
 }) {
     return (
-        <div className="min-h-screen bg-[#030614] text-slate-100 flex flex-col font-sans selection:bg-cyan-500/30 overflow-x-hidden relative">
-            <Toaster theme="dark" position="top-center" richColors />
+        <div className="h-screen w-full bg-gradient-to-br from-pink-100 via-orange-50 to-orange-100 text-stone-800 flex font-sans overflow-hidden">
+            <Toaster theme="light" position="top-center" richColors />
 
-            {/* Background Effects */}
-            <div className="fixed top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-blue-600/10 blur-[120px] pointer-events-none" />
-            <div className="fixed bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-600/10 blur-[150px] pointer-events-none" />
-            <div className="fixed top-[40%] right-[10%] w-[30%] h-[30%] rounded-full bg-cyan-500/5 blur-[100px] pointer-events-none" />
-
+            {/* Sidebar Desktop Component */}
             <AdminNav />
-            <main className="flex-1 w-full max-w-5xl mx-auto p-4 md:p-6 pb-28 md:pb-28 relative z-10">
-                {children}
+
+            {/* Main Content Area */}
+            <main className="flex-1 w-full h-full overflow-y-auto px-5 md:px-10 pt-8 pb-28 md:pb-8 relative z-10">
+                <div className="max-w-6xl mx-auto w-full">
+                    {children}
+                </div>
             </main>
         </div>
     )

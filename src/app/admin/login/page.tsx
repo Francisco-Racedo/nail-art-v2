@@ -1,11 +1,15 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { Eye, EyeOff } from 'lucide-react'
 import { login } from '../actions'
 
 export default function LoginPage() {
+    const router = useRouter()
     const [error, setError] = useState<string | null>(null)
     const [loading, setLoading] = useState(false)
+    const [showPassword, setShowPassword] = useState(false)
 
     async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
         e.preventDefault()
@@ -16,6 +20,9 @@ export default function LoginPage() {
         if (result?.error) {
             setError(result.error)
             setLoading(false)
+        } else if (result?.success) {
+            // Redirección controlada en el cliente para garantizar la navegación
+            router.push('/admin/dashboard')
         }
     }
 
@@ -49,6 +56,7 @@ export default function LoginPage() {
                             name="email"
                             type="email"
                             required
+                            autoComplete="email"
                             placeholder="admin@franyromy.com"
                             className="w-full px-4 py-3 rounded-xl border border-zinc-200 bg-zinc-50 text-zinc-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition"
                         />
@@ -58,13 +66,27 @@ export default function LoginPage() {
                         <label className="block text-sm font-medium text-zinc-700 mb-2">
                             Contraseña
                         </label>
-                        <input
-                            name="password"
-                            type="password"
-                            required
-                            placeholder="••••••••"
-                            className="w-full px-4 py-3 rounded-xl border border-zinc-200 bg-zinc-50 text-zinc-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition"
-                        />
+                        <div className="relative">
+                            <input
+                                name="password"
+                                type={showPassword ? 'text' : 'password'}
+                                required
+                                autoComplete="current-password"
+                                placeholder="••••••••"
+                                className="w-full px-4 py-3 pr-12 rounded-xl border border-zinc-200 bg-zinc-50 text-zinc-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(v => !v)}
+                                className="absolute inset-y-0 right-0 flex items-center px-3 text-zinc-400 hover:text-zinc-600 transition"
+                                aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                            >
+                                {showPassword
+                                    ? <EyeOff className="w-5 h-5" />
+                                    : <Eye className="w-5 h-5" />
+                                }
+                            </button>
+                        </div>
                     </div>
 
                     <button

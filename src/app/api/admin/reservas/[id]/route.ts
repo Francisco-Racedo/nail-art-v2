@@ -3,9 +3,11 @@ import { createClient as createServerClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 
 const EstadoSchema = z.object({
-    estado: z.enum(['pendiente', 'confirmado', 'completado'], {
-        message: 'Estado inválido'
-    })
+    estado: z.enum(['pendiente', 'confirmado', 'completado']).optional(),
+    notificacion_enviada: z.boolean().optional(),
+    descuento_aplicado: z.number().min(0).max(100).optional()
+}).refine(data => data.estado !== undefined || data.notificacion_enviada !== undefined || data.descuento_aplicado !== undefined, {
+    message: 'Debe proveer datos a actualizar'
 })
 
 export async function DELETE(
@@ -66,9 +68,20 @@ export async function PATCH(
             return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 })
         }
 
+        const updatePayload: Record<string, unknown> = {}
+        if (parsed.data.estado !== undefined) {
+            updatePayload.estado = parsed.data.estado
+            // Al completar un turno, el pago se registra como total en local
+            if (parsed.data.estado === 'completado') {
+                updatePayload.estado_pago = 'pagado_total'
+            }
+        }
+        if (parsed.data.notificacion_enviada !== undefined) updatePayload.notificacion_enviada = parsed.data.notificacion_enviada
+        if (parsed.data.descuento_aplicado !== undefined) updatePayload.descuento_aplicado = parsed.data.descuento_aplicado
+
         const { error } = await supabase
             .from('reservas')
-            .update({ estado: parsed.data.estado })
+            .update(updatePayload)
             .eq('id', id)
 
         if (error) throw error

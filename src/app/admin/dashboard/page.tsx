@@ -1,5 +1,6 @@
 import { createClient as createServerClient } from '@/lib/supabase/server'
 import AgendaCalendar from '@/components/AgendaCalendar'
+import DashboardAnalytics from '@/components/DashboardAnalytics'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,7 +19,7 @@ export default async function AdminAgendaPage() {
             .order('horario', { ascending: true }),
         supabase
             .from('config')
-            .select('intervalo_minutos')
+            .select('*')
             .limit(1)
             .single()
     ])
@@ -27,15 +28,29 @@ export default async function AdminAgendaPage() {
         console.error('Error fetching reservas:', reservasRes.error)
     }
 
-    const intervaloMinutos = Number(configRes.data?.intervalo_minutos) || 90
+    // Provide safe defaults so it doesn't crash if config is empty
+    const configData = configRes.data || {
+        intervalo_minutos: 90,
+        hora_inicio: '09:00',
+        hora_fin: '20:00'
+    }
 
     return (
-        <div className="w-full animate-in fade-in duration-500">
-            <div className="mb-6">
-                <h2 className="text-2xl font-bold text-white mb-1">Tu Agenda</h2>
-                <p className="text-zinc-400 text-sm">Gestioná todos los turnos confirmados por tus clientes.</p>
+        <div className="w-full lg:max-w-[70%] animate-in fade-in duration-500">
+            <div className="mb-6 pt-2 pb-6 border-b border-stone-200">
+                <p className="text-rose-500 font-bold text-xs uppercase tracking-widest mb-2">Gestión Operativa</p>
+                <h2 className="text-3xl font-black text-stone-900 mb-2">Agenda y Turnos</h2>
+                <p className="text-stone-500 text-sm">Disponibilidad, reservas, reprogramaciones y bloqueos profesionales.</p>
             </div>
-            <AgendaCalendar initialReservas={reservasRes.data || []} intervaloMinutos={intervaloMinutos} />
+
+            <DashboardAnalytics reservas={reservasRes.data || []} />
+
+            <div className="mt-8">
+                <AgendaCalendar
+                    initialReservas={reservasRes.data || []}
+                    config={configData}
+                />
+            </div>
         </div>
     )
 }

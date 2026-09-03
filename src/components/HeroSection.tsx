@@ -1,95 +1,112 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { motion } from 'framer-motion'
+import { useEffect, useState } from 'react'
 
 export default function HeroSection() {
-    const [isVisible, setIsVisible] = useState(true)
-    const headerRef = useRef<HTMLElement>(null)
+    const [mounted, setMounted] = useState(false)
+    useEffect(() => setMounted(true), [])
 
-    useEffect(() => {
-        const observer = new IntersectionObserver(
-            ([entry]) => {
-                // Remove the animation classes entirely and re-add them when visible
-                setIsVisible(entry.isIntersecting)
-            },
-            { threshold: 0.1 }
-        )
-
-        if (headerRef.current) {
-            observer.observe(headerRef.current)
-        }
-
-        return () => observer.disconnect()
-    }, [])
+    const titleWords = ["Revelando", "el", "Arte", "en", "tus", "Manos"]
 
     return (
-        <header
-            ref={headerRef}
-            className="relative min-h-[100vh] flex flex-col items-center justify-center pt-28 pb-32 overflow-hidden"
-            style={{
-                backgroundColor: '#FDF8F5',
-                backgroundImage: 'radial-gradient(#d4af37 0.5px, transparent 0.5px), radial-gradient(#d4af37 0.5px, #FDF8F5 0.5px)',
-                backgroundSize: '20px 20px',
-                backgroundPosition: '0 0, 10px 10px',
-            }}>
+        <header className="relative w-full max-w-[1400px] mx-auto pt-12 md:pt-20 px-6 md:px-12 mb-20 font-sans bg-gradient-to-br from-[#FDF8F5] via-[#FDF8F5] md:via-[#E8B4B8]/40 to-[#D4A373]/30 rounded-[3rem] shadow-xl overflow-hidden border border-[#D4A373]/20">
 
-            {/* Imagen + Título superpuesto */}
-            <div className="relative w-full max-w-lg mb-8 flex justify-center items-center mt-6 px-4" style={{ height: 350 }}>
-                <div
-                    className="absolute w-64 h-64 md:w-80 md:h-80 rounded-[2.5rem] shadow-2xl border-4 border-white left-2 md:left-8 flex items-center justify-center overflow-hidden"
-                    style={{ animation: isVisible ? 'slideInLeft 4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards' : 'none', opacity: 0 }}
-                >
-                    <img src="/img/hero.png" alt="Manos y uñas perfectas" className="w-full h-full object-cover" />
+            {/* Contenedor Estructural Principal */}
+            <div className="flex flex-col lg:grid lg:grid-cols-2 lg:gap-12 items-center">
+
+                {/* 2. Bloque de Texto (Izquierda/Arriba) */}
+                <div className="relative z-10 w-full pb-8 lg:pb-0">
+                    {mounted ? (
+                        <motion.div
+                            initial="hidden"
+                            animate="visible"
+                            variants={{
+                                hidden: {},
+                                visible: { transition: { staggerChildren: 0.15 } }
+                            }}
+                            className="flex flex-col items-center text-center lg:items-start lg:text-left"
+                        >
+                            <motion.span
+                                variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}
+                                className="text-[#D4A373] uppercase tracking-[0.3em] font-semibold text-[10px] md:text-sm mb-4 block"
+                            >
+                                Luxury Manicure Studio
+                            </motion.span>
+
+                            {/* Título Teatral animado por palabra */}
+                            <h1 className="text-5xl lg:text-6xl xl:text-7xl font-bold leading-[1.05] tracking-tight mb-6 text-[#2C2421]" style={{ fontFamily: 'serif' }}>
+                                {titleWords.map((word, i) => (
+                                    <motion.span
+                                        key={i}
+                                        className="inline-block mr-3 lg:mr-4"
+                                        variants={{
+                                            hidden: { opacity: 0, y: 40, filter: "blur(10px)" },
+                                            visible: { opacity: 1, y: 0, filter: "blur(0px)", transition: { type: "spring", damping: 12, stiffness: 100 } }
+                                        }}
+                                    >
+                                        {word}
+                                    </motion.span>
+                                ))}
+                            </h1>
+
+                            <motion.p
+                                variants={{ hidden: { opacity: 0, scale: 0.95 }, visible: { opacity: 1, scale: 1, transition: { duration: 0.8 } } }}
+                                className="text-[#2C2421]/80 text-sm sm:text-base font-medium leading-[1.8] mb-8 max-w-[90%] md:max-w-md"
+                            >
+                                "Quieres mirarte las manos por la mañana y pensar que tu estilo de vida es increíble; de eso se trata vivir una experiencia beauty. <strong className="font-extrabold text-[#2C2421]">Se trata de creer en vos misma</strong> y de saber que mereces destacar. No se me ocurre nada más emocionante que embellecer tu día a día."
+                                <span className="font-light italic block mt-2 text-[#2C2421]/60">- Fran & Romy</span>
+                            </motion.p>
+
+                            {/* CTAs ocultos por solicitud */}
+                        </motion.div>
+                    ) : (
+                        <div className="opacity-0 h-[400px]"></div>
+                    )}
                 </div>
-                <h1
-                    className="absolute z-10 text-[3.2rem] md:text-7xl text-white text-right font-bold leading-[0.9] drop-shadow-2xl right-4 md:right-8"
-                    style={{
-                        fontFamily: 'serif',
-                        animation: isVisible ? 'slideInRight 4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards' : 'none',
-                        textShadow: '0px 4px 20px rgba(0,0,0,0.8), 0 2px 5px rgba(0,0,0,0.5)',
-                        opacity: 0
-                    }}
-                >
-                    FRAN<br /><span className="text-amber-300">&amp;</span> ROMY<br />NAILS
-                </h1>
-            </div>
 
-            {/* Subtítulo */}
-            <div className="flex flex-col items-center text-center px-6 mt-4 z-10"
-                style={{ animation: isVisible ? 'fadeUp 1.2s ease forwards' : 'none', animationDelay: isVisible ? '0.4s' : '0s', opacity: 0 }}>
-                <span className="inline-block px-4 py-1 mb-4 text-xs font-semibold tracking-wider uppercase bg-rose-100 text-rose-800 rounded-full border border-rose-200 shadow-sm">
-                    ✨ Zona Lules
-                </span>
-                <h2 className="text-2xl md:text-3xl font-bold text-zinc-900 mb-4" style={{ fontFamily: 'serif' }}>
-                    Manicuría Profesional de{' '}
-                    <br />
-                    <span className="text-[2.5rem] md:text-5xl mt-2 inline-block font-bold"
-                        style={{ background: 'linear-gradient(to right, #C59B27, #E5C158, #C59B27)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
-                        Alta Gama
-                    </span>
-                </h2>
-                <p className="text-zinc-600 max-w-md mx-auto mb-8">
-                    Especialistas en Kapping, Esculpidas y Semipermanente. Relájate mientras cuidamos de tus manos y pies.
-                </p>
-                <a href="#servicios" className="text-rose-600 font-bold border-b-2 border-rose-300 pb-1 hover:text-rose-800 transition">
-                    Ver Catálogo de Servicios ↓
-                </a>
-            </div>
+                {/* 3. Bloque de Imágenes (Derecha/Abajo) */}
+                {mounted && (
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: 0.4, duration: 1, ease: "easeOut" }}
+                        className="relative w-full h-[450px] lg:h-[650px] mt-8 lg:mt-0 max-w-sm sm:max-w-md lg:max-w-none mx-auto"
+                    >
+                        {/* Imagen Principal Animada */}
+                        <motion.div
+                            initial={{ y: 0 }}
+                            animate={{ y: [0, -10, 0] }}
+                            whileHover={{ y: -20, transition: { duration: 0.4 } }}
+                            transition={{ repeat: Infinity, duration: 8, ease: "easeInOut" }}
+                            className="absolute inset-0 w-full h-full rounded-t-full rounded-bl-[4rem] rounded-br-2xl lg:rounded-bl-[6rem] lg:rounded-br-[4rem] border-8 border-white overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.15)] bg-stone-100 cursor-pointer hover:shadow-2xl hover:shadow-rose-900/30 transition-shadow"
+                        >
+                            <img
+                                src="/img/nail-1.png"
+                                alt="Fondo Trabajos Premium"
+                                className="w-full h-full object-cover"
+                                onError={(e) => { e.currentTarget.src = "https://images.unsplash.com/photo-1519014816548-bf5fe059c98b?auto=format&fit=crop&w=600&q=80" }}
+                            />
+                        </motion.div>
 
-            <style>{`
-        @keyframes slideInLeft {
-          0% { transform: translateX(-40px); opacity: 0; }
-          100% { transform: translateX(0); opacity: 1; }
-        }
-        @keyframes slideInRight {
-          0% { transform: translateX(40px); opacity: 0; }
-          100% { transform: translateX(0); opacity: 1; }
-        }
-        @keyframes fadeUp {
-          0% { transform: translateY(20px); opacity: 0; }
-          100% { transform: translateY(0); opacity: 1; }
-        }
-      `}</style>
+                        {/* Imagen Superpuesta: Flotación Inversa */}
+                        <motion.div
+                            initial={{ y: 0 }}
+                            animate={{ y: [0, 15, 0] }}
+                            whileHover={{ y: -10, scale: 1.05, transition: { duration: 0.3 } }}
+                            transition={{ repeat: Infinity, duration: 6, ease: "easeInOut" }}
+                            className="absolute -bottom-8 -right-4 lg:-left-12 lg:bottom-10 w-[55%] aspect-[3/4] rounded-[2rem] border-[6px] lg:border-8 border-white overflow-hidden shadow-2xl z-20 bg-stone-100 cursor-pointer hover:shadow-3xl hover:shadow-rose-900/40"
+                        >
+                            <img
+                                src="/img/hero-secondary.png"
+                                alt="Detalle de trabajo"
+                                className="w-full h-full object-cover"
+                                onError={(e) => { e.currentTarget.src = "https://images.unsplash.com/photo-1604654894610-df63bc536371?auto=format&fit=crop&w=600&q=80" }}
+                            />
+                        </motion.div>
+                    </motion.div>
+                )}
+            </div>
         </header>
     )
 }

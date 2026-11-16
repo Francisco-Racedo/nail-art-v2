@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
+import { notificarCambioEnTiempoReal } from '@/app/providers'
 import {
     ModalData,
     EstadoReserva,
@@ -361,6 +362,7 @@ export default function TurnoModal({
             ...(data.mp_preference_id ? { mp_preference_id: data.mp_preference_id } : {})
         })
         router.refresh()
+        notificarCambioEnTiempoReal('reservas')
         return data
     }
 
@@ -569,6 +571,7 @@ export default function TurnoModal({
             toast.success('Turno eliminado y horario liberado', { id: toastId })
             setModalData(null)
             router.refresh()
+            notificarCambioEnTiempoReal('reservas')
             onUpdated?.()
         } catch {
             toast.error('Error al liberar turno', { id: toastId })

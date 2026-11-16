@@ -1,6 +1,7 @@
 import { Toaster } from 'sonner'
 import { redirect } from 'next/navigation'
 import AdminNav from '@/components/AdminNav'
+import RealtimeAdminListener from '@/components/admin/RealtimeAdminListener'
 import { createClient as createServerClient } from '@/lib/supabase/server'
 
 export default async function AdminDashboardLayout({
@@ -21,6 +22,7 @@ export default async function AdminDashboardLayout({
     return (
         <div className="h-[100dvh] w-full bg-gradient-to-br from-pink-100 via-orange-50 to-orange-100 text-stone-800 flex font-sans overflow-hidden">
             <Toaster theme="light" position="top-center" richColors />
+            <RealtimeAdminListener />
 
             {/* Sidebar Desktop Component */}
             <AdminNav />

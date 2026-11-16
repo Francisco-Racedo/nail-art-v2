@@ -31,6 +31,7 @@ import {
     getAhoraArgentina
 } from '@/lib/utils'
 import type { AvisoReprogramacionCliente } from '@/app/admin/actions'
+import { notificarCambioEnTiempoReal } from '@/app/providers'
 
 const monthNames = [
     'Enero',
@@ -80,6 +81,33 @@ export default function AgendaCalendar({
     useEffect(() => {
         setReservasList(initialReservas)
     }, [initialReservas])
+
+    // Sincronización instantánea en tiempo real ante cualquier cambio (reservas creadas/modificadas/eliminadas)
+    useEffect(() => {
+        let isMounted = true
+
+        const refrescarTurnos = async () => {
+            try {
+                const res = await fetch('/api/reservas', { cache: 'no-store' })
+                if (res.ok && isMounted) {
+                    const data = await res.json()
+                    if (Array.isArray(data.reservas)) {
+                        setReservasList(data.reservas)
+                    }
+                }
+            } catch {}
+        }
+
+        const handleSyncEvent = () => {
+            refrescarTurnos()
+        }
+
+        window.addEventListener('nail_art_sync_event', handleSyncEvent)
+        return () => {
+            isMounted = false
+            window.removeEventListener('nail_art_sync_event', handleSyncEvent)
+        }
+    }, [])
 
     // Asignación manual de turno desde un bloque libre de la grilla
     const [slotLibreElegido, setSlotLibreElegido] = useState<string | null>(null)
@@ -237,6 +265,7 @@ export default function AgendaCalendar({
             if (!res.ok) throw new Error()
             toast.success(`Turno de ${r.nombre} confirmado`, { id: toastId })
             router.refresh()
+            notificarCambioEnTiempoReal('reservas')
         } catch {
             toast.error('No se pudo confirmar el turno', { id: toastId })
         }
@@ -282,6 +311,7 @@ export default function AgendaCalendar({
                 setNuevoCelular('')
                 setNuevoServicio('')
                 router.refresh()
+                notificarCambioEnTiempoReal('reservas')
             }
         } catch {
             toast.error('Error al asignar el turno', { id: toastId })
@@ -311,6 +341,7 @@ export default function AgendaCalendar({
                     toast.success('Jornada especial guardada para este día', { id: toastId })
                     setShowImprevisto(false)
                     router.refresh()
+                    notificarCambioEnTiempoReal('config')
                 }
                 setProcesandoMasivo(false)
                 return
@@ -336,6 +367,7 @@ export default function AgendaCalendar({
                 )
                 setAvisosCola(res.avisos || [])
                 router.refresh()
+                notificarCambioEnTiempoReal('reservas')
             }
         } catch {
             toast.error('Error al procesar la acción', { id: toastId })
@@ -350,6 +382,7 @@ export default function AgendaCalendar({
             await eliminarJornadaEspecialAction(selectedDayStr)
             toast.success('Día restaurado a su horario habitual', { id: toastId })
             router.refresh()
+            notificarCambioEnTiempoReal('config')
         } catch {
             toast.error('Error al restaurar el día', { id: toastId })
         }

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { notificarCambioServidor } from '@/lib/realtime-server'
 import { z } from 'zod'
 import {
     getHoyArgentina,
@@ -158,31 +159,26 @@ export async function POST(request: Request) {
             )
         }
 
-        // 4. Medida anti-ausencias: máximo 1 turno futuro activo por número de celular
+        // 4. Control de reservas por clienta:
+        // Permite agendar libremente en diferentes fechas.
+        // En una misma fecha se permite un máximo de 2 turnos activos por clienta (ej: manos + pies o bloques continuos).
         const celNorm = normalizarCelular(celular)
         if (celNorm.length >= 8) {
-            const { data: futuras } = await supabaseAdmin
+            const { data: reservasMismoDia } = await supabaseAdmin
                 .from('reservas')
                 .select('id, fecha, horario, celular, estado, mp_preference_id')
-                .gte('fecha', hoyArg)
+                .eq('fecha', fecha)
 
-            const turnoActivoMismoCel = (futuras || []).find(r => {
+            const turnosActivosMismoDia = (reservasMismoDia || []).filter(r => {
                 if (!esTurnoActivoEnGrilla(r)) return false
-                if (normalizarCelular(r.celular) !== celNorm) return false
-                // Si es hoy pero el horario ya pasó, no cuenta como futuro activo
-                return true
+                return normalizarCelular(r.celular) === celNorm
             })
 
-            if (turnoActivoMismoCel) {
-                const metaExistente = parseReservaMeta(
-                    turnoActivoMismoCel.mp_preference_id,
-                    turnoActivoMismoCel.id
-                )
-                const fechaLatam = turnoActivoMismoCel.fecha.split('-').reverse().join('/')
+            if (turnosActivosMismoDia.length >= 2) {
+                const fechaLatam = fecha.split('-').reverse().join('/')
                 return NextResponse.json(
                     {
-                        error: `Ya tenés un turno activo agendado para el ${fechaLatam} a las ${turnoActivoMismoCel.horario.substring(0, 5)} hs. Si necesitás cambiarlo, podés reprogramarlo desde tu enlace de turno.`,
-                        codigoExistente: metaExistente.codigo
+                        error: `Ya tenés ${turnosActivosMismoDia.length} turnos agendados para el ${fechaLatam}. Si necesitás coordinar turnos adicionales o un servicio especial en este mismo día, por favor comunicate por WhatsApp.`
                     },
                     { status: 409 }
                 )
@@ -276,6 +272,14 @@ export async function POST(request: Request) {
                 { status: 500 }
             )
         }
+
+        // Notificar en tiempo real a todos los dispositivos (admin y clientes)
+        notificarCambioServidor('reserva_nueva', {
+            id: inserted.id,
+            cliente: nombre,
+            fecha,
+            horario
+        }).catch(() => {})
 
         return NextResponse.json({
             success: true,

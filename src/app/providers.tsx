@@ -2,14 +2,10 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState, useEffect } from 'react'
+import { emitirCambioRealtime, suscribirCambiosRealtime } from '@/lib/realtime'
 
-export function notificarCambioEnTiempoReal(tipo = 'all') {
-    if (typeof window === 'undefined') return
-    try {
-        const bc = new BroadcastChannel('nail_art_sync')
-        bc.postMessage({ tipo, ts: Date.now() })
-        bc.close()
-    } catch {}
+export function notificarCambioEnTiempoReal(tipo = 'all', detalle?: any) {
+    emitirCambioRealtime(tipo, detalle).catch(() => {})
 }
 
 export default function Providers({ children }: { children: React.ReactNode }) {
@@ -18,7 +14,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
             new QueryClient({
                 defaultOptions: {
                     queries: {
-                        staleTime: 15_000,
+                        staleTime: 10_000,
                         refetchOnWindowFocus: true,
                         retry: 1
                     }
@@ -27,12 +23,14 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     )
 
     useEffect(() => {
-        if (typeof window === 'undefined' || !('BroadcastChannel' in window)) return
-        const bc = new BroadcastChannel('nail_art_sync')
-        bc.onmessage = () => {
+        // Suscripción universal en tiempo real: Postgres + Broadcast + Local BroadcastChannel
+        const desuscribir = suscribirCambiosRealtime((evento) => {
             queryClient.invalidateQueries()
+        })
+
+        return () => {
+            desuscribir()
         }
-        return () => bc.close()
     }, [queryClient])
 
     return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>

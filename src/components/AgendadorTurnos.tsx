@@ -21,6 +21,7 @@ import {
 } from '../lib/utils'
 import { DEFAULT_CMS_CONTENIDO, mergeCMSContenido } from '../lib/cms-types'
 import type { DisponibilidadDia } from '../lib/reservas-server'
+import { emitirCambioRealtime } from '@/lib/realtime'
 
 const FormVisitanteSchema = z.object({
     nombre: z
@@ -280,6 +281,7 @@ export default function AgendadorTurnos() {
                 if (result.montoSena) setMontoAbonar(result.montoSena)
                 queryClient.invalidateQueries({ queryKey: ['disponibilidad-rango'] })
                 queryClient.invalidateQueries({ queryKey: ['ocupados', fecha] })
+                emitirCambioRealtime('reserva_nueva', { id: result.id, fecha, horario })
                 toast.success('¡Solicitud de turno registrada!')
             } else {
                 if (result.codigoExistente) {

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { createClient as createServerClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { notificarCambioServidor } from '@/lib/realtime-server'
 import { z } from 'zod'
 import {
     parseReservaMeta,
@@ -67,6 +68,8 @@ export async function DELETE(
         const { error } = await supabaseAdmin.from('reservas').delete().eq('id', id)
 
         if (error) throw error
+
+        notificarCambioServidor('reserva_eliminada', { id }).catch(() => {})
 
         revalidatePath('/', 'layout')
         return NextResponse.json({ success: true, message: 'Turno liberado.' })
@@ -264,6 +267,8 @@ export async function PATCH(
             .eq('id', id)
 
         if (error) throw error
+
+        notificarCambioServidor('reserva_actualizada', { id, estado: d.estado }).catch(() => {})
 
         // Sincronizar también con la ficha CRM del cliente si se actualizó recordatorio, notas o datos de contacto
         if (

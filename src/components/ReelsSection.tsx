@@ -59,7 +59,6 @@ export default function ReelsSection() {
     const [activeIndex, setActiveIndex] = useState(0)
     const [isMuted, setIsMuted] = useState(true)
     const [playingState, setPlayingState] = useState<Record<number, boolean>>({})
-    const [sectionVisible, setSectionVisible] = useState(false)
 
     const swiperRef = useRef<SwiperType | null>(null)
     const videoRefs = useRef<(HTMLVideoElement | null)[]>([])
@@ -67,23 +66,30 @@ export default function ReelsSection() {
     const isMutedRef = useRef(true)
     isMutedRef.current = isMuted
 
-    // Reproducir un reel específico y pausar todos los demás
+    const isVisibleRef = useRef(false)
+
+    // Reproducción optimizada y segura: sin abortos, sin recargas de buffer en móviles
     const playVideoIndex = useCallback(
         (targetIdx: number) => {
             setActiveIndex(targetIdx)
 
-            // Intentar deslizar el carrusel hacia ese slide si no está centrado
             if (swiperRef.current) {
                 swiperRef.current.slideTo(targetIdx)
             }
 
             videoRefs.current.forEach((vid, i) => {
                 if (!vid) return
+
                 if (i === targetIdx) {
                     vid.muted = isMutedRef.current
                     vid.defaultMuted = isMutedRef.current
-                    vid.currentTime = 0
 
+                    // Si ya finalizó, reiniciar suavemente
+                    if (vid.ended) {
+                        vid.currentTime = 0
+                    }
+
+                    // Iniciar reproducción
                     const playPromise = vid.play()
                     if (playPromise !== undefined) {
                         playPromise
@@ -91,7 +97,10 @@ export default function ReelsSection() {
                                 setPlayingState({ [i]: true })
                             })
                             .catch(err => {
-                                console.warn('Autoplay bloqueado con audio, forzando mute:', err)
+                                // Ignorar AbortError normal que ocurre al cambiar rápidamente de video
+                                if (err.name === 'AbortError') return
+
+                                // Si fue rechazado por directiva de audio, forzar mute y reproducir
                                 vid.muted = true
                                 vid.defaultMuted = true
                                 vid.play()
@@ -104,70 +113,52 @@ export default function ReelsSection() {
                             })
                     }
                 } else {
-                    vid.pause()
-                    vid.currentTime = 0
+                    // Pausar sin resetear currentTime para no tirar el buffer en celulares
+                    if (!vid.paused) {
+                        vid.pause()
+                    }
                 }
             })
         },
         []
     )
 
-    // Detectar si la sección está visible en pantalla (PC y celular)
+    // Observador de visibilidad optimizado (sensor suave en scroll)
     useEffect(() => {
         const el = sectionRef.current
         if (!el) return
 
-        const checkInView = () => {
-            const rect = el.getBoundingClientRect()
-            const inView = rect.top < window.innerHeight && rect.bottom > 0
-            if (inView && !sectionVisible) {
-                setSectionVisible(true)
-            } else if (!inView && sectionVisible) {
-                setSectionVisible(false)
-            }
-        }
-
         const observer = new IntersectionObserver(
             ([entry]) => {
-                setSectionVisible(entry.isIntersecting)
+                const nowVisible = entry.isIntersecting
+                if (nowVisible !== isVisibleRef.current) {
+                    isVisibleRef.current = nowVisible
+
+                    if (nowVisible) {
+                        playVideoIndex(activeIndex)
+                    } else {
+                        // Pausar todos al salir de pantalla
+                        videoRefs.current.forEach(v => {
+                            if (v && !v.paused) v.pause()
+                        })
+                        setPlayingState({})
+                    }
+                }
             },
             {
-                threshold: [0, 0.05, 0.1, 0.25],
-                rootMargin: '100px 0px 100px 0px'
+                threshold: 0.15,
+                rootMargin: '80px 0px 80px 0px'
             }
         )
 
         observer.observe(el)
-        window.addEventListener('scroll', checkInView, { passive: true })
-        window.addEventListener('resize', checkInView, { passive: true })
-
-        checkInView()
-
-        return () => {
-            observer.disconnect()
-            window.removeEventListener('scroll', checkInView)
-            window.removeEventListener('resize', checkInView)
-        }
-    }, [sectionVisible])
-
-    // Reaccionar a cambios de visibilidad de la sección
-    useEffect(() => {
-        if (!sectionVisible) {
-            // Pausar todos los videos si la sección salió de la pantalla
-            videoRefs.current.forEach(vid => {
-                if (vid && !vid.paused) vid.pause()
-            })
-            setPlayingState({})
-        } else {
-            // Reproducir el video activo en cuanto la sección entra en pantalla
-            playVideoIndex(activeIndex)
-        }
-    }, [sectionVisible, activeIndex, playVideoIndex])
+        return () => observer.disconnect()
+    }, [activeIndex, playVideoIndex])
 
     // Al deslizar en celular o avanzar con flechas
     const handleSlideChange = (swiper: SwiperType) => {
         const newIdx = swiper.realIndex ?? swiper.activeIndex
-        if (newIdx !== activeIndex) {
+        if (newIdx !== activeIndex && isVisibleRef.current) {
             playVideoIndex(newIdx)
         }
     }
@@ -175,7 +166,6 @@ export default function ReelsSection() {
     // Al finalizar un video: avanzar automáticamente al siguiente reel en bucle continuo
     const handleVideoEnded = (idx: number) => {
         if (reels.length <= 1) {
-            // Si hay un solo video, reiniciarlo en bucle
             const singleVid = videoRefs.current[0]
             if (singleVid) {
                 singleVid.currentTime = 0
@@ -184,7 +174,7 @@ export default function ReelsSection() {
             return
         }
 
-        // Pasar siempre al siguiente video de forma consecutiva (0 -> 1 -> 2 -> 3 -> 4 -> 0...)
+        // Bucle continuo consecutivo (0 -> 1 -> 2 -> 3 -> 4 -> 0...)
         const nextIndex = (idx + 1) % reels.length
         playVideoIndex(nextIndex)
     }
@@ -203,22 +193,19 @@ export default function ReelsSection() {
         }
     }
 
-    // Tocar o hacer clic en cualquier reel (sea el activo o cualquier otro)
+    // Tocar o hacer clic en cualquier reel
     const togglePlayPause = (idx: number) => {
         const vid = videoRefs.current[idx]
         if (!vid) return
 
-        // Si es el reel que ya está reproduciéndose, pausarlo
         if (idx === activeIndex && playingState[idx]) {
             vid.pause()
             setPlayingState({ [idx]: false })
         } else {
-            // Si estaba pausado o es otro reel, reproducirlo directamente
             playVideoIndex(idx)
         }
     }
 
-    // Si no hay reels aún o está cargando y no hay datos, no mostrar nada
     if (isLoading && reels.length === 0) return null
     if (reels.length === 0) return null
 
@@ -324,6 +311,10 @@ export default function ReelsSection() {
                         const isActive = idx === activeIndex
                         const isPlaying = playingState[idx] ?? false
 
+                        // Optimización crítica para celulares: solo precargar video activo y su vecino inmediato
+                        const isAdjacent = Math.abs(idx - activeIndex) <= 1
+                        const preloadMode = isActive ? 'auto' : (isAdjacent ? 'metadata' : 'none')
+
                         return (
                             <SwiperSlide key={reel.name || idx}>
                                 <div
@@ -335,21 +326,27 @@ export default function ReelsSection() {
                                     }`}
                                     style={{ aspectRatio: '9/16' }}
                                 >
-                                    {/* Video Player */}
+                                    {/* Video Player Ultra Optimizado */}
                                     <video
                                         ref={el => {
                                             videoRefs.current[idx] = el
                                             if (el) {
-                                                el.muted = isMuted
-                                                el.defaultMuted = isMuted
+                                                el.muted = isMutedRef.current
+                                                el.defaultMuted = isMutedRef.current
                                             }
                                         }}
                                         src={reel.url}
                                         className="w-full h-full object-cover"
                                         playsInline
+                                        // @ts-ignore
+                                        webkit-playsinline="true"
                                         autoPlay={idx === 0}
                                         muted={isMuted}
-                                        preload="auto"
+                                        preload={preloadMode}
+                                        // @ts-ignore
+                                        disablePictureInPicture={true}
+                                        // @ts-ignore
+                                        disableRemotePlayback={true}
                                         onEnded={() => handleVideoEnded(idx)}
                                         onPlay={() =>
                                             setPlayingState({ [idx]: true })

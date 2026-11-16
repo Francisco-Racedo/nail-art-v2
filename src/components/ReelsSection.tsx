@@ -65,22 +65,6 @@ export default function ReelsSection() {
     const videoRefs = useRef<(HTMLVideoElement | null)[]>([])
     const sectionRef = useRef<HTMLElement | null>(null)
 
-    // Detectar si la sección está a la vista del usuario
-    useEffect(() => {
-        const el = sectionRef.current
-        if (!el) return
-
-        const observer = new IntersectionObserver(
-            ([entry]) => {
-                setSectionVisible(entry.isIntersecting)
-            },
-            { threshold: 0.25 }
-        )
-
-        observer.observe(el)
-        return () => observer.disconnect()
-    }, [])
-
     // Sincronizar reproducción del video activo
     const syncPlayback = useCallback(
         (targetIdx: number) => {
@@ -88,13 +72,25 @@ export default function ReelsSection() {
                 if (!vid) return
                 if (i === targetIdx) {
                     vid.muted = isMuted
-                    if (sectionVisible) {
-                        vid.play()
+                    vid.defaultMuted = isMuted
+
+                    const playPromise = vid.play()
+                    if (playPromise !== undefined) {
+                        playPromise
                             .then(() => {
                                 setPlayingState(prev => ({ ...prev, [i]: true }))
                             })
-                            .catch(() => {
-                                setPlayingState(prev => ({ ...prev, [i]: false }))
+                            .catch(err => {
+                                console.warn('Autoplay bloqueado con audio, forzando mute:', err)
+                                vid.muted = true
+                                vid.defaultMuted = true
+                                vid.play()
+                                    .then(() => {
+                                        setPlayingState(prev => ({ ...prev, [i]: true }))
+                                    })
+                                    .catch(() => {
+                                        setPlayingState(prev => ({ ...prev, [i]: false }))
+                                    })
                             })
                     }
                 } else {
@@ -104,18 +100,58 @@ export default function ReelsSection() {
                 }
             })
         },
-        [isMuted, sectionVisible]
+        [isMuted]
     )
+
+    // Detectar si la sección está a la vista del usuario en PC y celular
+    useEffect(() => {
+        const el = sectionRef.current
+        if (!el) return
+
+        const checkInView = () => {
+            const rect = el.getBoundingClientRect()
+            const inView = rect.top < window.innerHeight && rect.bottom > 0
+            if (inView && !sectionVisible) {
+                setSectionVisible(true)
+            } else if (!inView && sectionVisible) {
+                setSectionVisible(false)
+            }
+        }
+
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                setSectionVisible(entry.isIntersecting)
+            },
+            {
+                threshold: [0, 0.05, 0.1, 0.25],
+                rootMargin: '100px 0px 100px 0px'
+            }
+        )
+
+        observer.observe(el)
+        window.addEventListener('scroll', checkInView, { passive: true })
+        window.addEventListener('resize', checkInView, { passive: true })
+
+        // Check inicial
+        checkInView()
+
+        return () => {
+            observer.disconnect()
+            window.removeEventListener('scroll', checkInView)
+            window.removeEventListener('resize', checkInView)
+        }
+    }, [sectionVisible])
 
     // Si la visibilidad de la sección cambia o cambia el slide activo
     useEffect(() => {
         if (!sectionVisible) {
-            // Pausar todos si el usuario scrolleó fuera de la sección
+            // Pausar todos los videos si el usuario scrolleó fuera de la sección
             videoRefs.current.forEach(vid => {
                 if (vid && !vid.paused) vid.pause()
             })
             setPlayingState({})
         } else {
+            // Reproducir el video activo en cuanto la sección entra en pantalla
             syncPlayback(activeIndex)
         }
     }, [sectionVisible, activeIndex, syncPlayback])
@@ -124,20 +160,17 @@ export default function ReelsSection() {
     const handleSlideChange = (swiper: SwiperType) => {
         const newIdx = swiper.realIndex ?? swiper.activeIndex
         setActiveIndex(newIdx)
-        syncPlayback(newIdx)
+        if (sectionVisible) {
+            syncPlayback(newIdx)
+        }
     }
 
-    // Al finalizar un video en PC/laptop: avanzar automáticamente al siguiente
+    // Al finalizar un video: avanzar automáticamente al siguiente reel en bucle continuo
     const handleVideoEnded = (idx: number) => {
         if (!swiperRef.current || reels.length <= 1) return
 
-        if (swiperRef.current.isEnd) {
-            // Volver al primer reel si terminó la lista
-            swiperRef.current.slideTo(0)
-        } else {
-            // Pasar al siguiente
-            swiperRef.current.slideNext()
-        }
+        const nextIndex = (idx + 1) % reels.length
+        swiperRef.current.slideTo(nextIndex)
     }
 
     // Alternar sonido global para los reels
@@ -149,13 +182,14 @@ export default function ReelsSection() {
         const activeVid = videoRefs.current[activeIndex]
         if (activeVid) {
             activeVid.muted = newMuted
+            activeVid.defaultMuted = newMuted
         }
     }
 
     // Alternar reproducir/pausar en el slide activo
     const togglePlayPause = (idx: number) => {
         if (idx !== activeIndex) {
-            // Si hace clic en un reel no activo, deslizar hacia él
+            // Si hace clic en un reel que no es el del centro, deslizar hacia él
             swiperRef.current?.slideTo(idx)
             return
         }
@@ -230,10 +264,9 @@ export default function ReelsSection() {
                     }}
                     onSlideChange={handleSlideChange}
                     grabCursor={true}
-                    centeredSlides={false}
                     pagination={{ clickable: true, dynamicBullets: true }}
                     breakpoints={{
-                        // Celular: centrado, 1.25 slides para no cortar y deslizar suave
+                        // Celular: centrado, 1.22 slides para encuadre simétrico sin cortes
                         320: {
                             slidesPerView: 1.22,
                             centeredSlides: true,
@@ -288,12 +321,17 @@ export default function ReelsSection() {
                                     <video
                                         ref={el => {
                                             videoRefs.current[idx] = el
+                                            if (el) {
+                                                el.muted = isMuted
+                                                el.defaultMuted = isMuted
+                                            }
                                         }}
                                         src={reel.url}
                                         className="w-full h-full object-cover"
                                         playsInline
+                                        autoPlay={idx === 0}
                                         muted={isMuted}
-                                        preload="metadata"
+                                        preload="auto"
                                         onEnded={() => handleVideoEnded(idx)}
                                         onPlay={() =>
                                             setPlayingState(prev => ({ ...prev, [idx]: true }))

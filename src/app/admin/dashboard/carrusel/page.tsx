@@ -30,6 +30,17 @@ export default async function CMSCarouselPage() {
 
     const validItems = (data || [])
         .filter(f => f.name !== '.emptyFolderPlaceholder')
+        .sort((a, b) => {
+            const isVideoA = /\.(mp4|webm|mov|m4v|ogg)$/i.test(a.name)
+            const isVideoB = /\.(mp4|webm|mov|m4v|ogg)$/i.test(b.name)
+            // Si ambos son videos, ordenar cronológicamente (más viejo primero, nuevos al final)
+            if (isVideoA && isVideoB) {
+                const tsA = parseInt(a.name.split('_')[0], 10) || (a.created_at ? new Date(a.created_at).getTime() : 0)
+                const tsB = parseInt(b.name.split('_')[0], 10) || (b.created_at ? new Date(b.created_at).getTime() : 0)
+                return tsA - tsB
+            }
+            return 0
+        })
         .map(f => {
             const isVideo = /\.(mp4|webm|mov|m4v|ogg)$/i.test(f.name)
             return {

@@ -6,7 +6,9 @@ import {
     getEstadoEfectivo,
     getHoyArgentina,
     getFinMesesSiguientesArgentina,
-    esTurnoActivoEnGrilla
+    esTurnoActivoEnGrilla,
+    calcularDesgloseReserva,
+    obtenerLabelsAdicionales
 } from '@/lib/utils'
 import {
     getConfigCompleta,
@@ -53,6 +55,8 @@ export async function GET(
 
         const { reserva, meta } = found
         const estadoEfectivo = getEstadoEfectivo(reserva)
+        const desglose = calcularDesgloseReserva(reserva)
+        const labelsAdicionales = obtenerLabelsAdicionales(desglose.adicionalesIds)
 
         // Generar hasta 3 sugerencias inteligentes de horario libre cercanas a la fecha del turno
         const hoyArg = getHoyArgentina()
@@ -94,6 +98,10 @@ export async function GET(
                 codigo: meta.codigo,
                 nombre: reserva.nombre,
                 servicio: reserva.servicio,
+                adicionales: labelsAdicionales,
+                montoAdicionales: desglose.montoAdicionales,
+                totalFinal: desglose.totalFinal,
+                descuentoPct: desglose.descuentoPct,
                 fecha: reserva.fecha,
                 horario: (reserva.horario || '').substring(0, 5),
                 estado: estadoEfectivo,

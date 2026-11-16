@@ -7,7 +7,8 @@ import {
     esTurnoActivoEnGrilla,
     parseReservaMeta,
     serializeReservaMeta,
-    normalizarCelular
+    normalizarCelular,
+    calcularDesgloseReserva
 } from '@/lib/utils'
 import { isPagosHabilitadosEnv } from '@/lib/payments/mercadopago'
 import { CMSContenido, DEFAULT_CMS_CONTENIDO, mergeCMSContenido } from '@/lib/cms-types'
@@ -486,12 +487,10 @@ export function construirFichasClientes(
         const efectivo = getEstadoEfectivo(r)
         const meta = parseReservaMeta(r.mp_preference_id, r.id)
         const hClean = (r.horario || '').replace(/^~/, '').split('#')[0].substring(0, 5)
-        const precioBase =
-            meta.precioPersonalizado !== undefined && meta.precioPersonalizado >= 0
-                ? meta.precioPersonalizado
-                : parsePrecioServicio(r.servicio)
-        const desc = Number(r.descuento_aplicado) || 0
-        const precioFinal = Math.max(0, Math.round(precioBase * (1 - desc / 100)))
+        const desglose = calcularDesgloseReserva(r)
+        const precioBase = desglose.subtotalBruto
+        const desc = desglose.descuentoPct
+        const precioFinal = desglose.totalFinal
 
         const prev: ResumenCliente = map.get(key) || {
             key,

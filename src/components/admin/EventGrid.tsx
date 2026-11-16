@@ -9,7 +9,12 @@ import {
     Clock
 } from 'lucide-react'
 import { Reserva, ESTADO_CONFIG, checkCumple, getEstadoEfectivo } from './agendaTypes'
-import { generarHorariosDisponibles, parseReservaMeta } from '@/lib/utils'
+import {
+    generarHorariosDisponibles,
+    parseReservaMeta,
+    calcularDesgloseReserva,
+    obtenerLabelsAdicionales
+} from '@/lib/utils'
 
 interface EventGridProps {
     dayReservas: Reserva[]
@@ -173,15 +178,10 @@ export default function EventGrid({
                                     hSlot,
                                     !!meta.ocupaBloqueSiguiente
                                 )
-                                const precioBase =
-                                    meta.precioPersonalizado !== undefined &&
-                                    meta.precioPersonalizado >= 0
-                                        ? meta.precioPersonalizado
-                                        : parsePrecioGrilla(reserva.servicio)
-                                const desc = Number(reserva.descuento_aplicado) || 0
-                                const precioFinal = Math.max(
-                                    0,
-                                    Math.round(precioBase * (1 - desc / 100))
+                                const desglose = calcularDesgloseReserva(reserva)
+                                const precioFinal = desglose.totalFinal
+                                const labelsAdic = obtenerLabelsAdicionales(
+                                    desglose.adicionalesIds
                                 )
                                 const diasService = meta.diasRecordatorioService || 18
 
@@ -240,18 +240,15 @@ export default function EventGrid({
                                                             {reserva.servicio.split('(')[0].trim()}
                                                         </span>
                                                     </span>
-                                                    {meta.adicionalesSeleccionados &&
-                                                        meta.adicionalesSeleccionados.length >
-                                                            0 && (
-                                                            <span className="bg-pink-50 text-pink-700 border border-pink-200 text-[10px] px-2 py-0.5 rounded-full font-bold">
-                                                                +{meta.adicionalesSeleccionados.length}{' '}
-                                                                adicional
-                                                                {meta.adicionalesSeleccionados
-                                                                    .length > 1
-                                                                    ? 'es'
-                                                                    : ''}
-                                                            </span>
-                                                        )}
+                                                    {labelsAdic.length > 0 && (
+                                                        <span className="bg-pink-50 text-pink-700 border border-pink-200 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                                                            + {labelsAdic.join(', ')} (+$
+                                                            {desglose.montoAdicionales.toLocaleString(
+                                                                'es-AR'
+                                                            )}
+                                                            )
+                                                        </span>
+                                                    )}
                                                     {(reserva.descuento_aplicado || 0) > 0 && (
                                                         <span className="bg-rose-50 text-rose-600 border border-rose-200 text-[10px] px-2 py-0.5 rounded font-bold">
                                                             🎁 -{reserva.descuento_aplicado}%

@@ -13,7 +13,11 @@ import CalendarioReserva from './CalendarioReserva'
 import {
     generarHorariosDisponibles,
     getHoyArgentina,
-    getFinMesesSiguientesArgentina
+    getFinMesesSiguientesArgentina,
+    ADICIONALES_CATALOGO,
+    parsePrecioServicioBase,
+    calcularTotalAdicionales,
+    obtenerLabelsAdicionales
 } from '../lib/utils'
 import { DEFAULT_CMS_CONTENIDO, mergeCMSContenido } from '../lib/cms-types'
 import type { DisponibilidadDia } from '../lib/reservas-server'
@@ -110,6 +114,7 @@ export default function AgendadorTurnos() {
     const maxFecha = getFinMesesSiguientesArgentina(mesesVisibles)
     const [fecha, setFecha] = useState('')
     const [horario, setHorario] = useState<string | null>(null)
+    const [adicionalesCliente, setAdicionalesCliente] = useState<string[]>([])
     const [loading, setLoading] = useState(false)
     const [submitted, setSubmitted] = useState(false)
     const [wppEnviado, setWppEnviado] = useState(false)
@@ -220,11 +225,17 @@ export default function AgendadorTurnos() {
     const handleLimpiarFormulario = () => {
         setFecha('')
         setHorario(null)
+        setAdicionalesCliente([])
         setNacDia('')
         setNacMes('')
         setNacAnio('')
         reset()
     }
+
+    const precioBaseElegido = parsePrecioServicioBase(watchServicio)
+    const montoAdicionalesElegidos = calcularTotalAdicionales(adicionalesCliente)
+    const totalEstimadoCliente = precioBaseElegido + montoAdicionalesElegidos
+    const labelsAdicionalesElegidos = obtenerLabelsAdicionales(adicionalesCliente)
 
     async function onSubmit(data: FormData) {
         if (!fecha || !horario) {
@@ -240,6 +251,7 @@ export default function AgendadorTurnos() {
                 body: JSON.stringify({
                     nombre: data.nombre,
                     servicio: data.servicio,
+                    adicionales: adicionalesCliente,
                     fecha,
                     horario,
                     celular: data.celular,
@@ -287,11 +299,19 @@ export default function AgendadorTurnos() {
         const fechaLatam = fecha.split('-').reverse().join('/')
         const origin = typeof window !== 'undefined' ? window.location.origin : ''
         const linkSeguimiento = codigoTurno ? `\n*Ver o reprogramar mi turno:* ${origin}/mi-turno/${codigoTurno}` : ''
+        const lineaAdicionales =
+            labelsAdicionalesElegidos.length > 0
+                ? `\n*Adicionales:* ${labelsAdicionalesElegidos.join(', ')} (+$${montoAdicionalesElegidos.toLocaleString('es-AR')})`
+                : ''
+        const lineaTotal =
+            totalEstimadoCliente > 0
+                ? `\n*Total estimado:* $${totalEstimadoCliente.toLocaleString('es-AR')}`
+                : ''
 
         const msg =
             config.pagos_habilitados && watchMetodoPago === 'transferencia'
-                ? `*NUEVO TURNO - COMPROBANTE*\n\nHola! Hice una reserva para ${watchServicio} a nombre de ${watchNombre}.\nAdjunto comprobante por $${montoAbonar.toLocaleString('es-AR')}.\n\nDía: ${fechaLatam} a las ${horario} hs.${linkSeguimiento}\n¿Me envían confirmación? 💅`
-                : `*SOLICITUD DE TURNO - ${negocio!.toUpperCase()}*\n\nHola! Solicité un turno desde la web.\n*Cliente:* ${watchNombre}\n*Servicio:* ${watchServicio}\n*Día:* ${fechaLatam} a las ${horario} hs.${linkSeguimiento}\n\n¡Muchas gracias! 💅✨`
+                ? `*NUEVO TURNO - COMPROBANTE*\n\nHola! Hice una reserva para ${watchServicio} a nombre de ${watchNombre}.${lineaAdicionales}${lineaTotal}\nAdjunto comprobante por $${montoAbonar.toLocaleString('es-AR')}.\n\nDía: ${fechaLatam} a las ${horario} hs.${linkSeguimiento}\n¿Me envían confirmación? 💅`
+                : `*SOLICITUD DE TURNO - ${negocio!.toUpperCase()}*\n\nHola! Solicité un turno desde la web.\n*Cliente:* ${watchNombre}\n*Servicio:* ${watchServicio}${lineaAdicionales}${lineaTotal}\n*Día:* ${fechaLatam} a las ${horario} hs.${linkSeguimiento}\n\n¡Muchas gracias! 💅✨`
         return `https://wa.me/${numero}?text=${encodeURIComponent(msg)}`
     }
 
@@ -509,13 +529,33 @@ export default function AgendadorTurnos() {
                                     ¡Solicitud de Turno Registrada!
                                 </div>
 
-                                <p className="text-sm text-stone-600 max-w-md mx-auto mb-5 leading-relaxed">
+                                <p className="text-sm text-stone-600 max-w-md mx-auto mb-4 leading-relaxed">
                                     Tu horario del{' '}
                                     <strong>{fecha.split('-').reverse().join('/')}</strong> a las{' '}
                                     <strong>{horario} hs</strong> ya quedó reservado para vos. Recibirás
                                     la confirmación en un máximo de{' '}
                                     <strong>{config.minutos_autoconfirmacion || 10} minutos</strong>.
                                 </p>
+
+                                {totalEstimadoCliente > 0 && (
+                                    <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4 mb-5 max-w-md mx-auto text-left">
+                                        <p className="text-xs font-bold text-stone-800">
+                                            💅 {watchServicio}
+                                        </p>
+                                        {labelsAdicionalesElegidos.length > 0 && (
+                                            <p className="text-xs text-rose-700 font-semibold mt-1">
+                                                ✨ Adicionales: {labelsAdicionalesElegidos.join(', ')} (+$
+                                                {montoAdicionalesElegidos.toLocaleString('es-AR')})
+                                            </p>
+                                        )}
+                                        <p className="text-sm font-black text-stone-900 mt-2 pt-2 border-t border-stone-200 flex items-center justify-between">
+                                            <span>Total estimado del turno:</span>
+                                            <span className="text-rose-600 text-base">
+                                                ${totalEstimadoCliente.toLocaleString('es-AR')}
+                                            </span>
+                                        </p>
+                                    </div>
+                                )}
 
                                 {codigoTurno && (
                                     <div className="bg-rose-50/80 border border-pink-200 rounded-2xl p-4 mb-6 text-left max-w-md mx-auto">
@@ -717,36 +757,135 @@ export default function AgendadorTurnos() {
 
                                 <div>
                                     <label className="flex items-center gap-1.5 text-[#231C19] text-xs uppercase tracking-wider mb-1.5 font-bold">
-                                        <Sparkles className="w-3.5 h-3.5 text-rose-500" /> Servicio a realizar
+                                        <Sparkles className="w-3.5 h-3.5 text-rose-500" /> Servicio Principal a realizar
                                     </label>
                                     <select
                                         {...register('servicio')}
                                         className="w-full p-3.5 text-base bg-white/95 text-stone-800 border border-pink-200 rounded-xl focus:bg-white focus:outline-none focus:border-pink-500 focus:ring-4 focus:ring-pink-200/50 transition-all shadow-sm min-h-[48px]"
                                     >
                                         <option value="">Elegí un servicio...</option>
-                                        {Object.keys(grupos).map(cat => (
-                                            <optgroup
-                                                key={cat}
-                                                label={cat.toUpperCase()}
-                                                className="bg-white text-pink-500 font-bold"
-                                            >
-                                                {grupos[cat].map(s => (
-                                                    <option
-                                                        key={s.id}
-                                                        value={`${s.nombre} ($${s.precio.toLocaleString('es-AR')})`}
-                                                        className="text-stone-800 font-medium bg-white"
-                                                    >
-                                                        {s.nombre} ($
-                                                        {s.precio.toLocaleString('es-AR')})
-                                                    </option>
-                                                ))}
-                                            </optgroup>
-                                        ))}
+                                        {Object.keys(grupos)
+                                            .filter(
+                                                cat =>
+                                                    !cat
+                                                        .toLowerCase()
+                                                        .includes('adicional')
+                                            )
+                                            .concat(
+                                                Object.keys(grupos).filter(cat =>
+                                                    cat
+                                                        .toLowerCase()
+                                                        .includes('adicional')
+                                                )
+                                            )
+                                            .map(cat => (
+                                                <optgroup
+                                                    key={cat}
+                                                    label={cat.toUpperCase()}
+                                                    className="bg-white text-pink-500 font-bold"
+                                                >
+                                                    {grupos[cat].map(s => (
+                                                        <option
+                                                            key={s.id}
+                                                            value={`${s.nombre} ($${s.precio.toLocaleString('es-AR')})`}
+                                                            className="text-stone-800 font-medium bg-white"
+                                                        >
+                                                            {s.nombre} ($
+                                                            {s.precio.toLocaleString('es-AR')})
+                                                        </option>
+                                                    ))}
+                                                </optgroup>
+                                            ))}
                                     </select>
                                     {errors.servicio && (
                                         <p className="text-red-600 font-bold text-xs mt-1">
                                             {errors.servicio.message}
                                         </p>
+                                    )}
+                                </div>
+
+                                {/* Selector opcional de Adicionales / Nail Art / Retirado para la clienta */}
+                                <div className="bg-white/80 border border-rose-200/70 rounded-2xl p-4 shadow-sm">
+                                    <div className="flex items-center justify-between gap-2 mb-2">
+                                        <label className="text-[#231C19] text-xs uppercase tracking-wider font-bold flex items-center gap-1.5">
+                                            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                                            ¿Deseás agregar algún Adicional o Retirado?
+                                        </label>
+                                        <span className="text-[11px] font-semibold text-stone-400">
+                                            Opcional
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-stone-500 mb-3">
+                                        Podés sumar efectos, decoración extra o retirado de otro salón a tu servicio principal:
+                                    </p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {ADICIONALES_CATALOGO.map(ad => {
+                                            const activo = adicionalesCliente.includes(ad.id)
+                                            return (
+                                                <button
+                                                    key={ad.id}
+                                                    type="button"
+                                                    onClick={() =>
+                                                        setAdicionalesCliente(prev =>
+                                                            prev.includes(ad.id)
+                                                                ? prev.filter(x => x !== ad.id)
+                                                                : [...prev, ad.id]
+                                                        )
+                                                    }
+                                                    className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                                                        activo
+                                                            ? 'bg-gradient-to-r from-rose-500 to-orange-500 text-white border-transparent shadow-sm scale-[1.02]'
+                                                            : 'bg-white text-stone-700 border-rose-200/80 hover:bg-rose-50'
+                                                    }`}
+                                                >
+                                                    {activo ? '✓ ' : '+ '}
+                                                    {ad.label} (+$
+                                                    {ad.precio.toLocaleString('es-AR')})
+                                                </button>
+                                            )
+                                        })}
+                                    </div>
+
+                                    {/* Resumen en vivo del importe total estimado */}
+                                    {(precioBaseElegido > 0 ||
+                                        montoAdicionalesElegidos > 0) && (
+                                        <div className="mt-3.5 pt-3 border-t border-rose-100 flex flex-col gap-1">
+                                            <div className="flex items-center justify-between text-xs text-stone-600">
+                                                <span>Servicio principal:</span>
+                                                <span className="font-bold text-stone-800">
+                                                    $
+                                                    {precioBaseElegido.toLocaleString(
+                                                        'es-AR'
+                                                    )}
+                                                </span>
+                                            </div>
+                                            {montoAdicionalesElegidos > 0 && (
+                                                <div className="flex items-center justify-between text-xs text-rose-700">
+                                                    <span>
+                                                        Adicionales (
+                                                        {labelsAdicionalesElegidos.join(
+                                                            ', '
+                                                        )}
+                                                        ):
+                                                    </span>
+                                                    <span className="font-bold">
+                                                        +$
+                                                        {montoAdicionalesElegidos.toLocaleString(
+                                                            'es-AR'
+                                                        )}
+                                                    </span>
+                                                </div>
+                                            )}
+                                            <div className="flex items-center justify-between text-sm font-black text-[#231C19] pt-1.5 mt-0.5 border-t border-rose-200/60">
+                                                <span>Total estimado del turno:</span>
+                                                <span className="text-lg text-rose-600">
+                                                    $
+                                                    {totalEstimadoCliente.toLocaleString(
+                                                        'es-AR'
+                                                    )}
+                                                </span>
+                                            </div>
+                                        </div>
                                     )}
                                 </div>
 

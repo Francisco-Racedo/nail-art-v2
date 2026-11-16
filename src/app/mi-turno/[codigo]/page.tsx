@@ -13,6 +13,10 @@ interface TurnoPublico {
     codigo: string
     nombre: string
     servicio: string
+    adicionales?: string[]
+    montoAdicionales?: number
+    totalFinal?: number
+    descuentoPct?: number
     fecha: string
     horario: string
     estado: string
@@ -304,7 +308,19 @@ export default function MiTurnoPage() {
 
                     {/* Datos del turno */}
                     <h1 className="text-2xl font-bold text-stone-900 mb-1">{turno.nombre}</h1>
-                    <p className="text-sm font-medium text-pink-600 mb-5">{turno.servicio}</p>
+                    <p className="text-sm font-medium text-pink-600 mb-2">{turno.servicio}</p>
+                    {turno.adicionales && turno.adicionales.length > 0 && (
+                        <p className="text-xs font-semibold text-rose-700 mb-2">
+                            ✨ Adicionales: {turno.adicionales.join(', ')} (+$
+                            {(turno.montoAdicionales || 0).toLocaleString('es-AR')})
+                        </p>
+                    )}
+                    {(turno.totalFinal || 0) > 0 && (
+                        <p className="text-sm font-black text-stone-800 mb-5">
+                            Total estimado: ${(turno.totalFinal || 0).toLocaleString('es-AR')}
+                            {(turno.descuentoPct || 0) > 0 && ` (-${turno.descuentoPct}% aplicado)`}
+                        </p>
+                    )}
 
                     <div className="grid grid-cols-2 gap-3 mb-6">
                         <div className="bg-stone-50 border border-stone-200/80 rounded-2xl p-4">

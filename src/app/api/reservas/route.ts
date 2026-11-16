@@ -10,7 +10,10 @@ import {
     serializeReservaMeta,
     parseReservaMeta,
     esTurnoActivoEnGrilla,
-    getEstadoEfectivo
+    getEstadoEfectivo,
+    ADICIONALES_CATALOGO,
+    calcularTotalAdicionales,
+    obtenerLabelsAdicionales
 } from '@/lib/utils'
 import {
     getConfigCompleta,
@@ -45,6 +48,7 @@ const ReservaSchema = z.object({
         .optional()
         .or(z.literal('')),
     servicio: z.string().min(1, 'El servicio es requerido'),
+    adicionales: z.array(z.string()).optional(),
     fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha inválida (YYYY-MM-DD)'),
     horario: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Horario inválido'),
     metodo_pago: z.enum(['mp', 'transferencia', 'local']).optional().default('local')
@@ -73,6 +77,7 @@ export async function POST(request: Request) {
         const {
             nombre,
             servicio,
+            adicionales,
             fecha,
             horario,
             celular,
@@ -80,6 +85,10 @@ export async function POST(request: Request) {
             fecha_nacimiento,
             metodo_pago
         } = parsed.data
+
+        const adicionalesValidos = Array.isArray(adicionales)
+            ? adicionales.filter(id => ADICIONALES_CATALOGO.some(a => a.id === id))
+            : []
 
         const cfg = await getConfigCompleta()
         await autoConfirmarPendientesVencidos(cfg.minutos_autoconfirmacion)
@@ -183,7 +192,9 @@ export async function POST(request: Request) {
         // 5. Preparar metadata con código único de seguimiento y auditoría
         const nowIso = new Date().toISOString()
         const codigoPublico = generarCodigoPublico()
-        const montoSena = Math.round(Number(dbServicio.precio) * 0.5)
+        const extraAdic = calcularTotalAdicionales(adicionalesValidos)
+        const totalBruto = Number(dbServicio.precio) + extraAdic
+        const montoSena = Math.round(totalBruto * 0.5)
 
         let initPoint: string | null = null
         let mpPreferenceId: string | undefined = undefined
@@ -201,17 +212,24 @@ export async function POST(request: Request) {
             initPoint = mp.initPoint
         }
 
+        const labelsAdic = obtenerLabelsAdicionales(adicionalesValidos)
         const metaPayload = serializeReservaMeta({
             v: 1,
             codigo: codigoPublico,
             createdAt: nowIso,
+            ...(adicionalesValidos.length > 0
+                ? { adicionalesSeleccionados: adicionalesValidos }
+                : {}),
             ...(mpPreferenceId ? { mpPreferenceId } : {}),
             historial: [
                 {
                     fecha: nowIso,
                     accion: 'creado',
                     actor: 'cliente',
-                    detalle: 'Reserva creada desde la web en estado PENDIENTE'
+                    detalle:
+                        labelsAdic.length > 0
+                            ? `Reserva creada desde la web con adicionales: ${labelsAdic.join(', ')}`
+                            : 'Reserva creada desde la web en estado PENDIENTE'
                 }
             ]
         })

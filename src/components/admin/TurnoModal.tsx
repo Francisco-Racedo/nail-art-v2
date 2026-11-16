@@ -30,7 +30,11 @@ import {
     getHoyUTC3,
     checkCumple
 } from './agendaTypes'
-import { generarHorariosDisponibles, celularParaWhatsapp } from '@/lib/utils'
+import {
+    generarHorariosDisponibles,
+    celularParaWhatsapp,
+    ADICIONALES_CATALOGO
+} from '@/lib/utils'
 
 interface ServicioCatalogo {
     id: number
@@ -49,18 +53,10 @@ interface TurnoModalProps {
         completados: number
         ausencias: number
     }
-    onUpdated?: () => void
+    onUpdated?: (updatedReservaPartial?: Record<string, any>) => void
 }
 
-const ADICIONALES_RAPIDOS = [
-    { id: 'strass', label: 'Strass / Piedrería', precio: 1500 },
-    { id: 'una_quebrada', label: 'Arreglo uña quebrada', precio: 1500 },
-    { id: 'pigmentos', label: 'Pigmentos / Aurora', precio: 2000 },
-    { id: 'cat_eye', label: 'Efecto Cat Eye', precio: 2000 },
-    { id: 'francesas', label: 'Francesas (10 uñas)', precio: 2000 },
-    { id: 'dibujos', label: 'Dibujos / Nail Art', precio: 2500 },
-    { id: 'retirado_otro', label: 'Retirado de otro salón', precio: 3000 }
-]
+const ADICIONALES_RAPIDOS = ADICIONALES_CATALOGO
 
 const LAPSOS_SERVICE = [
     { dias: 10, label: '10 días' },
@@ -359,8 +355,12 @@ export default function TurnoModal({
             throw new Error(data.error || 'No se pudo actualizar el turno')
         }
         toast.success(successMessage)
+        onUpdated?.({
+            id: modalData.id,
+            ...payload,
+            ...(data.mp_preference_id ? { mp_preference_id: data.mp_preference_id } : {})
+        })
         router.refresh()
-        onUpdated?.()
         return data
     }
 
@@ -373,15 +373,12 @@ export default function TurnoModal({
                     ? parseInt(precioPersonalizado.replace(/\D/g, ''), 10)
                     : null
 
-            // Si tiene adicionales o precio manual, reflejar el precio base actualizado o mantener el string
+            // Solo guardamos precio_personalizado cuando la administradora ingresó explícitamente un valor manual;
+            // de lo contrario enviamos null para que siempre se calcule de forma dinámica (Servicio Base + Adicionales).
             const precioParaGuardar =
-                manualNum !== null && !isNaN(manualNum)
-                    ? manualNum
-                    : calculoPrecio.extraAdicionales > 0
-                      ? calculoPrecio.subtotalAutomatico
-                      : null
+                manualNum !== null && !isNaN(manualNum) ? manualNum : null
 
-            await patchTurno(
+            const data = await patchTurno(
                 {
                     servicio: servicioElegido,
                     adicionales: adicionalesSel,
@@ -407,7 +404,8 @@ export default function TurnoModal({
                           descuento_motivo: motivoDescuento,
                           metodo_pago: metodoPago,
                           estado_pago: estadoPago,
-                          ocupa_bloque_siguiente: ocupaSiguiente
+                          ocupa_bloque_siguiente: ocupaSiguiente,
+                          mp_preference_id: data.mp_preference_id || prev.mp_preference_id
                       }
                     : null
             )
@@ -787,7 +785,10 @@ export default function TurnoModal({
                             </label>
                             <select
                                 value={servicioElegido}
-                                onChange={e => setServicioElegido(e.target.value)}
+                                onChange={e => {
+                                    setServicioElegido(e.target.value)
+                                    setPrecioPersonalizado('')
+                                }}
                                 className="w-full bg-stone-50 border border-stone-200 focus:bg-white focus:border-rose-400 rounded-xl px-3.5 py-3 text-sm font-bold text-stone-900 transition"
                             >
                                 {/* Mantener opción actual si es histórica y no coincide con el catálogo nuevo */}
@@ -829,13 +830,14 @@ export default function TurnoModal({
                                         <button
                                             key={ad.id}
                                             type="button"
-                                            onClick={() =>
+                                            onClick={() => {
                                                 setAdicionalesSel(prev =>
                                                     prev.includes(ad.id)
                                                         ? prev.filter(x => x !== ad.id)
                                                         : [...prev, ad.id]
                                                 )
-                                            }
+                                                setPrecioPersonalizado('')
+                                            }}
                                             className={`px-3 py-2 rounded-xl text-xs font-bold border transition cursor-pointer ${
                                                 activo
                                                     ? 'bg-rose-500 text-white border-rose-600 shadow-sm'
@@ -888,9 +890,24 @@ export default function TurnoModal({
                             </div>
 
                             <div className="bg-stone-50 border border-stone-200/80 rounded-2xl p-3.5">
-                                <label className="block text-[11px] font-bold uppercase tracking-wider text-stone-600 mb-1.5">
-                                    Precio Base Manual (Opcional)
-                                </label>
+                                <div className="flex items-center justify-between mb-1.5">
+                                    <label className="block text-[11px] font-bold uppercase tracking-wider text-stone-600">
+                                        Precio Base Manual (Opcional)
+                                    </label>
+                                    {precioPersonalizado.trim() !== '' && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setPrecioPersonalizado('')}
+                                            className="text-[10px] font-bold text-rose-600 hover:underline cursor-pointer"
+                                        >
+                                            Usar automático ($
+                                            {calculoPrecio.subtotalAutomatico.toLocaleString(
+                                                'es-AR'
+                                            )}
+                                            )
+                                        </button>
+                                    )}
+                                </div>
                                 <div className="relative">
                                     <DollarSign className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
                                     <input

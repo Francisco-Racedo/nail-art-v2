@@ -220,3 +220,83 @@ export function esTurnoActivoEnGrilla(reserva: {
     const efectivo = getEstadoEfectivo(reserva)
     return efectivo === 'pendiente' || efectivo === 'confirmado' || efectivo === 'completado'
 }
+
+export interface AdicionalCatalogo {
+    id: string
+    label: string
+    precio: number
+}
+
+export const ADICIONALES_CATALOGO: AdicionalCatalogo[] = [
+    { id: 'strass', label: 'Strass / Piedrería', precio: 1500 },
+    { id: 'una_quebrada', label: 'Arreglo de uña quebrada', precio: 1500 },
+    { id: 'pigmentos', label: 'Pigmentos / Efecto Aurora', precio: 2000 },
+    { id: 'cat_eye', label: 'Efecto Cat Eye', precio: 2000 },
+    { id: 'francesas', label: 'Francesas (10 uñas)', precio: 2000 },
+    { id: 'dibujos', label: 'Dibujos / Nail Art', precio: 2500 },
+    { id: 'retirado_otro', label: 'Retirado de otro salón', precio: 3000 }
+]
+
+export function parsePrecioServicioBase(servicioStr?: string | null): number {
+    if (!servicioStr) return 0
+    const m = servicioStr.match(/\$([\d.,]+)/)
+    return m ? parseInt(m[1].replace(/[.,]/g, ''), 10) || 0 : 0
+}
+
+export function calcularTotalAdicionales(ids?: string[] | null): number {
+    if (!Array.isArray(ids) || ids.length === 0) return 0
+    return ids.reduce((acc, id) => {
+        const found = ADICIONALES_CATALOGO.find(a => a.id === id)
+        return acc + (found ? found.precio : 0)
+    }, 0)
+}
+
+export function obtenerLabelsAdicionales(ids?: string[] | null): string[] {
+    if (!Array.isArray(ids) || ids.length === 0) return []
+    return ids
+        .map(id => ADICIONALES_CATALOGO.find(a => a.id === id)?.label)
+        .filter((x): x is string => !!x)
+}
+
+export function calcularDesgloseReserva(reserva: {
+    servicio?: string | null
+    descuento_aplicado?: number | null
+    mp_preference_id?: string | null
+    id?: number
+    adicionalesOverride?: string[]
+    precioManualOverride?: number | null
+}) {
+    const meta = parseReservaMeta(reserva.mp_preference_id, reserva.id)
+    const precioBaseServicio = parsePrecioServicioBase(reserva.servicio)
+    const adicionalesIds =
+        reserva.adicionalesOverride !== undefined
+            ? reserva.adicionalesOverride
+            : meta.adicionalesSeleccionados || []
+    const montoAdicionales = calcularTotalAdicionales(adicionalesIds)
+    const subtotalAutomatico = precioBaseServicio + montoAdicionales
+
+    const rawManual =
+        reserva.precioManualOverride !== undefined
+            ? reserva.precioManualOverride
+            : meta.precioPersonalizado
+
+    const usaPrecioManual =
+        typeof rawManual === 'number' && !isNaN(rawManual) && rawManual >= 0
+
+    const subtotalBruto = usaPrecioManual ? rawManual! : subtotalAutomatico
+    const descuentoPct = Number(reserva.descuento_aplicado) || 0
+    const montoDescuento = Math.round(subtotalBruto * (descuentoPct / 100))
+    const totalFinal = Math.max(0, subtotalBruto - montoDescuento)
+
+    return {
+        precioBaseServicio,
+        adicionalesIds,
+        montoAdicionales,
+        subtotalAutomatico,
+        usaPrecioManual,
+        subtotalBruto,
+        descuentoPct,
+        montoDescuento,
+        totalFinal
+    }
+}

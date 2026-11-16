@@ -35,9 +35,7 @@ export default async function AdminAgendaPage() {
                 </p>
             </div>
 
-            <DashboardAnalytics reservas={reservasRes.data || []} />
-
-            <div className="mt-8">
+            <div className="mt-2">
                 <AgendaCalendar
                     initialReservas={reservasRes.data || []}
                     config={configData}

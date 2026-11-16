@@ -58,7 +58,7 @@ const DEFAULT_CONFIG: Config = {
     hora_inicio: '10:00',
     hora_fin: '22:00',
     intervalo_minutos: 120,
-    nombre_negocio: 'Pintitas Nails',
+    nombre_negocio: 'Pintaditas Nails',
     whatsapp_numero: '5493813013850',
     pagos_habilitados: false,
     minutos_autoconfirmacion: 10,

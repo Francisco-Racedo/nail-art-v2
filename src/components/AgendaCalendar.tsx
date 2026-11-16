@@ -394,7 +394,7 @@ export default function AgendaCalendar({
                                 typeof window !== 'undefined' ? window.location.origin : ''
                             const wpp = p.celular
                                 ? `https://wa.me/${celularParaWhatsapp(p.celular)}?text=${encodeURIComponent(
-                                      `Hola *${p.nombre}*! Confirmamos tu turno del *${p.fecha.split('-').reverse().join('/')}* a las *${p.horario.substring(0, 5)} hs* en ${config?.nombre_negocio || 'Pintitas Nails'}.\nEnlace de tu turno: ${origin}/mi-turno/${meta.codigo} 💅`
+                                      `Hola *${p.nombre}*! Confirmamos tu turno del *${p.fecha.split('-').reverse().join('/')}* a las *${p.horario.substring(0, 5)} hs* en ${config?.nombre_negocio || 'Pintaditas Nails'}.\nEnlace de tu turno: ${origin}/mi-turno/${meta.codigo} 💅`
                                   )}`
                                 : '#'
                             return (

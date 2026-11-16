@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic'
 
 export default async function HomePage() {
     const cfg = await getConfigCompleta()
-    const nombreNegocio = cfg.nombre_negocio || 'Pintitas Nails'
+    const nombreNegocio = cfg.nombre_negocio || 'Pintaditas Nails'
     const cms = cfg.cms
 
     return (

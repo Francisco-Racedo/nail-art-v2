@@ -21,7 +21,7 @@ export default function NavBar({ initialNombre }: { initialNombre?: string }) {
     const nombreNegocio = (
         config?.nombre_negocio ||
         initialNombre ||
-        'PINTITAS NAILS'
+        'PINTADITAS NAILS'
     ).toUpperCase()
 
     useEffect(() => {

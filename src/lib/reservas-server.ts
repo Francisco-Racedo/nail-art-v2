@@ -364,18 +364,65 @@ export async function obtenerDisponibilidadRango(
     return { config: cfg, dias }
 }
 
+export type EtiquetaCliente = 'vip' | 'frecuente' | 'nueva' | 'atencion'
+
+export interface FichaCRMManual {
+    key: string
+    nombre: string
+    celular: string
+    email?: string
+    fecha_nacimiento?: string
+    notas_tecnicas?: string
+    etiqueta?: EtiquetaCliente
+    oculto?: boolean
+}
+
+export interface TurnoHistorialCliente {
+    id: number
+    fecha: string
+    horario: string
+    servicio: string
+    estado: string
+    descuento_aplicado: number
+    precioBase: number
+    precioFinal: number
+}
+
 export interface ResumenCliente {
+    key: string
     celularNorm: string
     celularDisplay: string
     nombre: string
     email?: string
     fecha_nacimiento?: string
+    notas_tecnicas?: string
+    etiqueta?: EtiquetaCliente
     totalTurnos: number
     completados: number
     ausencias: number
     cancelados: number
+    totalInvertido: number
     ultimoTurno?: string
+    diasDesdeUltimoTurno: number | null
+    proximoTurno?: {
+        id: number
+        fecha: string
+        horario: string
+        servicio: string
+        estado: string
+    }
+    esCumpleHoy: boolean
     esCumpleSemana: boolean
+    esCumpleMes: boolean
+    necesitaService: boolean
+    reservaIds: number[]
+    turnos: TurnoHistorialCliente[]
+}
+
+const parsePrecioServicio = (servicioStr?: string | null): number => {
+    if (!servicioStr) return 0
+    const m = servicioStr.match(/\$([\d.,]+)/)
+    return m ? parseInt(m[1].replace(/[.,]/g, ''), 10) || 0 : 0
 }
 
 export function checkCumpleEnSemana(fn?: string | null): boolean {
@@ -386,48 +433,227 @@ export function checkCumpleEnSemana(fn?: string | null): boolean {
     if (!m || !d) return false
 
     const ahora = getAhoraArgentina()
+    ahora.setHours(0, 0, 0, 0)
     const cumpleEsteAnio = new Date(ahora.getFullYear(), m - 1, d)
     const diffDays = Math.abs((cumpleEsteAnio.getTime() - ahora.getTime()) / (1000 * 60 * 60 * 24))
     return diffDays <= 7
 }
 
-export function construirFichasClientes(reservas: any[]): Map<string, ResumenCliente> {
+export function checkCumpleEnMes(fn?: string | null): boolean {
+    if (!fn || fn.length < 10) return false
+    const [, mStr] = fn.substring(0, 10).split('-')
+    const m = parseInt(mStr, 10)
+    if (!m) return false
+    const ahora = getAhoraArgentina()
+    return ahora.getMonth() + 1 === m
+}
+
+export function checkCumpleHoy(fn?: string | null): boolean {
+    if (!fn || fn.length < 10) return false
+    const [, mStr, dStr] = fn.substring(0, 10).split('-')
+    const m = parseInt(mStr, 10)
+    const d = parseInt(dStr, 10)
+    const ahora = getAhoraArgentina()
+    return ahora.getMonth() + 1 === m && ahora.getDate() === d
+}
+
+export async function obtenerFichasCRM(): Promise<Record<string, FichaCRMManual>> {
+    try {
+        const supabase = createServiceClient()
+        const { data } = await supabase
+            .from('configuracion')
+            .select('valor')
+            .eq('clave', 'clientes_crm')
+            .single()
+        if (data?.valor) {
+            const parsed = JSON.parse(data.valor)
+            if (parsed && typeof parsed === 'object') return parsed
+        }
+    } catch {}
+    return {}
+}
+
+export function construirFichasClientes(
+    reservas: any[],
+    fichasCRM: Record<string, FichaCRMManual> = {}
+): Map<string, ResumenCliente> {
     const map = new Map<string, ResumenCliente>()
+    const hoyArg = getHoyArgentina()
+    const ahoraArg = getAhoraArgentina()
+    ahoraArg.setHours(0, 0, 0, 0)
+
     for (const r of reservas || []) {
         const norm = normalizarCelular(r.celular)
-        const key = norm || `nombre:${(r.nombre || '').toLowerCase().trim()}`
-        const efectivo = getEstadoEfectivo(r)
+        const nombreLimpio = (r.nombre || 'Cliente').trim()
+        const nombreKey = `nombre:${nombreLimpio.toLowerCase()}`
+        // Si es el teléfono de prueba del salón (3813013850) y hay distintos nombres, agrupamos por nombre para no mezclar clientas distintas
+        const key =
+            norm && norm !== '3813013850'
+                ? norm
+                : norm === '3813013850'
+                  ? `${norm}_${nombreLimpio.toLowerCase()}`
+                  : nombreKey
 
-        const prev = map.get(key) || {
+        const efectivo = getEstadoEfectivo(r)
+        const hClean = (r.horario || '').replace(/^~/, '').split('#')[0].substring(0, 5)
+        const precioBase = parsePrecioServicio(r.servicio)
+        const desc = Number(r.descuento_aplicado) || 0
+        const precioFinal = Math.max(0, Math.round(precioBase * (1 - desc / 100)))
+
+        const prev: ResumenCliente = map.get(key) || {
+            key,
             celularNorm: norm,
             celularDisplay: r.celular || '',
-            nombre: r.nombre || 'Cliente',
+            nombre: nombreLimpio,
             email: r.email || undefined,
             fecha_nacimiento: r.fecha_nacimiento || undefined,
+            notas_tecnicas: undefined,
+            etiqueta: undefined,
             totalTurnos: 0,
             completados: 0,
             ausencias: 0,
             cancelados: 0,
+            totalInvertido: 0,
             ultimoTurno: undefined,
-            esCumpleSemana: false
+            diasDesdeUltimoTurno: null,
+            proximoTurno: undefined,
+            esCumpleHoy: false,
+            esCumpleSemana: false,
+            esCumpleMes: false,
+            necesitaService: false,
+            reservaIds: [],
+            turnos: []
         }
 
         prev.totalTurnos += 1
-        if (efectivo === 'completado' || efectivo === 'confirmado') prev.completados += 1
+        prev.reservaIds.push(r.id)
+        prev.turnos.push({
+            id: r.id,
+            fecha: r.fecha,
+            horario: hClean,
+            servicio: r.servicio,
+            estado: efectivo,
+            descuento_aplicado: desc,
+            precioBase,
+            precioFinal
+        })
+
+        if (efectivo === 'completado' || efectivo === 'confirmado') {
+            prev.completados += 1
+            prev.totalInvertido += precioFinal
+        }
         if (efectivo === 'ausente') prev.ausencias += 1
         if (efectivo === 'cancelado') prev.cancelados += 1
-        if (r.nombre) prev.nombre = r.nombre
-        if (r.celular) prev.celularDisplay = r.celular
-        if (r.email) prev.email = r.email
-        if (r.fecha_nacimiento) {
+
+        if (r.nombre) prev.nombre = r.nombre.trim()
+        if (r.celular && !prev.celularDisplay) prev.celularDisplay = r.celular
+        if (r.email && !prev.email) prev.email = r.email
+        if (r.fecha_nacimiento && !prev.fecha_nacimiento) {
             prev.fecha_nacimiento = r.fecha_nacimiento
-            prev.esCumpleSemana = checkCumpleEnSemana(r.fecha_nacimiento)
         }
-        if (!prev.ultimoTurno || r.fecha > prev.ultimoTurno) {
-            prev.ultimoTurno = r.fecha
+
+        // Última visita pasada o de hoy vs próximo turno futuro
+        if (r.fecha <= hoyArg && (efectivo === 'confirmado' || efectivo === 'completado')) {
+            if (!prev.ultimoTurno || r.fecha > prev.ultimoTurno) {
+                prev.ultimoTurno = r.fecha
+            }
+        }
+        if (r.fecha >= hoyArg && (efectivo === 'pendiente' || efectivo === 'confirmado')) {
+            if (!prev.proximoTurno || r.fecha < prev.proximoTurno.fecha) {
+                prev.proximoTurno = {
+                    id: r.id,
+                    fecha: r.fecha,
+                    horario: hClean,
+                    servicio: r.servicio,
+                    estado: efectivo
+                }
+            }
         }
 
         map.set(key, prev)
     }
+
+    // Incorporar o fusionar las fichas editadas/creadas manualmente desde el CRM
+    for (const [crmKey, crm] of Object.entries(fichasCRM)) {
+        if (crm.oculto) {
+            map.delete(crmKey)
+            continue
+        }
+        const existente = map.get(crmKey)
+        if (existente) {
+            if (crm.nombre) existente.nombre = crm.nombre
+            if (crm.celular !== undefined) {
+                existente.celularDisplay = crm.celular
+                existente.celularNorm = normalizarCelular(crm.celular)
+            }
+            if (crm.email !== undefined) existente.email = crm.email || undefined
+            if (crm.fecha_nacimiento !== undefined) {
+                existente.fecha_nacimiento = crm.fecha_nacimiento || undefined
+            }
+            if (crm.notas_tecnicas !== undefined) {
+                existente.notas_tecnicas = crm.notas_tecnicas || undefined
+            }
+            if (crm.etiqueta !== undefined) {
+                existente.etiqueta = crm.etiqueta
+            }
+        } else {
+            map.set(crmKey, {
+                key: crmKey,
+                celularNorm: normalizarCelular(crm.celular),
+                celularDisplay: crm.celular || '',
+                nombre: crm.nombre || 'Clienta',
+                email: crm.email || undefined,
+                fecha_nacimiento: crm.fecha_nacimiento || undefined,
+                notas_tecnicas: crm.notas_tecnicas || undefined,
+                etiqueta: crm.etiqueta || 'nueva',
+                totalTurnos: 0,
+                completados: 0,
+                ausencias: 0,
+                cancelados: 0,
+                totalInvertido: 0,
+                ultimoTurno: undefined,
+                diasDesdeUltimoTurno: null,
+                proximoTurno: undefined,
+                esCumpleHoy: false,
+                esCumpleSemana: false,
+                esCumpleMes: false,
+                necesitaService: false,
+                reservaIds: [],
+                turnos: []
+            })
+        }
+    }
+
+    // Calcular métricas derivadas (cumpleaños, días desde último turno, alerta de service, etiqueta automática)
+    for (const item of map.values()) {
+        item.turnos.sort((a, b) =>
+            `${b.fecha}_${b.horario}`.localeCompare(`${a.fecha}_${a.horario}`)
+        )
+        item.esCumpleHoy = checkCumpleHoy(item.fecha_nacimiento)
+        item.esCumpleSemana = checkCumpleEnSemana(item.fecha_nacimiento)
+        item.esCumpleMes = checkCumpleEnMes(item.fecha_nacimiento)
+
+        if (item.ultimoTurno) {
+            const [y, m, d] = item.ultimoTurno.split('-').map(Number)
+            const fechaUlt = new Date(y, m - 1, d)
+            const diff = Math.floor(
+                (ahoraArg.getTime() - fechaUlt.getTime()) / (1000 * 60 * 60 * 24)
+            )
+            item.diasDesdeUltimoTurno = Math.max(0, diff)
+        }
+
+        item.necesitaService =
+            item.diasDesdeUltimoTurno !== null &&
+            item.diasDesdeUltimoTurno >= 18 &&
+            !item.proximoTurno
+
+        if (!item.etiqueta) {
+            if (item.ausencias >= 2) item.etiqueta = 'atencion'
+            else if (item.completados >= 5) item.etiqueta = 'vip'
+            else if (item.completados >= 2) item.etiqueta = 'frecuente'
+            else item.etiqueta = 'nueva'
+        }
+    }
+
     return map
 }

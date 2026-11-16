@@ -20,10 +20,10 @@ export default function AdminNav() {
             <aside className="hidden md:flex w-56 lg:w-60 bg-stone-900 border-r border-stone-800 h-full flex-col shrink-0 shadow-2xl relative z-20">
                 <div className="p-8 pb-6 text-center flex flex-col items-center">
                     <div className="w-14 h-14 bg-gradient-to-tr from-rose-400 to-orange-400 rounded-[1.25rem] mb-4 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-rose-500/20">
-                        FR
+                        PN
                     </div>
-                    <h1 className="text-xl font-black tracking-tight text-white mb-0 uppercase leading-none font-sans drop-shadow-sm">Panel <span className="text-rose-400">Pro</span></h1>
-                    <p className="text-[10px] text-stone-500 font-bold mt-1.5 tracking-widest uppercase">Gestión Operativa</p>
+                    <h1 className="text-xl font-black tracking-tight text-white mb-0 uppercase leading-none font-sans drop-shadow-sm">Pintaditas <span className="text-rose-400">Nails</span></h1>
+                    <p className="text-[10px] text-stone-500 font-bold mt-1.5 tracking-widest uppercase">Panel Administrador</p>
                 </div>
 
                 <nav className="flex-1 overflow-y-auto px-4 py-2 flex flex-col gap-2">

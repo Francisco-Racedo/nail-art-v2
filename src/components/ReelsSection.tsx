@@ -64,21 +64,31 @@ export default function ReelsSection() {
     const swiperRef = useRef<SwiperType | null>(null)
     const videoRefs = useRef<(HTMLVideoElement | null)[]>([])
     const sectionRef = useRef<HTMLElement | null>(null)
+    const isMutedRef = useRef(true)
+    isMutedRef.current = isMuted
 
-    // Sincronizar reproducción del video activo
-    const syncPlayback = useCallback(
+    // Reproducir un reel específico y pausar todos los demás
+    const playVideoIndex = useCallback(
         (targetIdx: number) => {
+            setActiveIndex(targetIdx)
+
+            // Intentar deslizar el carrusel hacia ese slide si no está centrado
+            if (swiperRef.current) {
+                swiperRef.current.slideTo(targetIdx)
+            }
+
             videoRefs.current.forEach((vid, i) => {
                 if (!vid) return
                 if (i === targetIdx) {
-                    vid.muted = isMuted
-                    vid.defaultMuted = isMuted
+                    vid.muted = isMutedRef.current
+                    vid.defaultMuted = isMutedRef.current
+                    vid.currentTime = 0
 
                     const playPromise = vid.play()
                     if (playPromise !== undefined) {
                         playPromise
                             .then(() => {
-                                setPlayingState(prev => ({ ...prev, [i]: true }))
+                                setPlayingState({ [i]: true })
                             })
                             .catch(err => {
                                 console.warn('Autoplay bloqueado con audio, forzando mute:', err)
@@ -86,24 +96,23 @@ export default function ReelsSection() {
                                 vid.defaultMuted = true
                                 vid.play()
                                     .then(() => {
-                                        setPlayingState(prev => ({ ...prev, [i]: true }))
+                                        setPlayingState({ [i]: true })
                                     })
                                     .catch(() => {
-                                        setPlayingState(prev => ({ ...prev, [i]: false }))
+                                        setPlayingState({ [i]: false })
                                     })
                             })
                     }
                 } else {
                     vid.pause()
                     vid.currentTime = 0
-                    setPlayingState(prev => ({ ...prev, [i]: false }))
                 }
             })
         },
-        [isMuted]
+        []
     )
 
-    // Detectar si la sección está a la vista del usuario en PC y celular
+    // Detectar si la sección está visible en pantalla (PC y celular)
     useEffect(() => {
         const el = sectionRef.current
         if (!el) return
@@ -132,7 +141,6 @@ export default function ReelsSection() {
         window.addEventListener('scroll', checkInView, { passive: true })
         window.addEventListener('resize', checkInView, { passive: true })
 
-        // Check inicial
         checkInView()
 
         return () => {
@@ -142,35 +150,43 @@ export default function ReelsSection() {
         }
     }, [sectionVisible])
 
-    // Si la visibilidad de la sección cambia o cambia el slide activo
+    // Reaccionar a cambios de visibilidad de la sección
     useEffect(() => {
         if (!sectionVisible) {
-            // Pausar todos los videos si el usuario scrolleó fuera de la sección
+            // Pausar todos los videos si la sección salió de la pantalla
             videoRefs.current.forEach(vid => {
                 if (vid && !vid.paused) vid.pause()
             })
             setPlayingState({})
         } else {
             // Reproducir el video activo en cuanto la sección entra en pantalla
-            syncPlayback(activeIndex)
+            playVideoIndex(activeIndex)
         }
-    }, [sectionVisible, activeIndex, syncPlayback])
+    }, [sectionVisible, activeIndex, playVideoIndex])
 
-    // Al cambiar de slide (en celular por swipe o en PC por clic/flecha/avance automático)
+    // Al deslizar en celular o avanzar con flechas
     const handleSlideChange = (swiper: SwiperType) => {
         const newIdx = swiper.realIndex ?? swiper.activeIndex
-        setActiveIndex(newIdx)
-        if (sectionVisible) {
-            syncPlayback(newIdx)
+        if (newIdx !== activeIndex) {
+            playVideoIndex(newIdx)
         }
     }
 
     // Al finalizar un video: avanzar automáticamente al siguiente reel en bucle continuo
     const handleVideoEnded = (idx: number) => {
-        if (!swiperRef.current || reels.length <= 1) return
+        if (reels.length <= 1) {
+            // Si hay un solo video, reiniciarlo en bucle
+            const singleVid = videoRefs.current[0]
+            if (singleVid) {
+                singleVid.currentTime = 0
+                singleVid.play().catch(() => {})
+            }
+            return
+        }
 
+        // Pasar siempre al siguiente video de forma consecutiva (0 -> 1 -> 2 -> 3 -> 4 -> 0...)
         const nextIndex = (idx + 1) % reels.length
-        swiperRef.current.slideTo(nextIndex)
+        playVideoIndex(nextIndex)
     }
 
     // Alternar sonido global para los reels
@@ -178,6 +194,7 @@ export default function ReelsSection() {
         e.stopPropagation()
         const newMuted = !isMuted
         setIsMuted(newMuted)
+        isMutedRef.current = newMuted
 
         const activeVid = videoRefs.current[activeIndex]
         if (activeVid) {
@@ -186,23 +203,18 @@ export default function ReelsSection() {
         }
     }
 
-    // Alternar reproducir/pausar en el slide activo
+    // Tocar o hacer clic en cualquier reel (sea el activo o cualquier otro)
     const togglePlayPause = (idx: number) => {
-        if (idx !== activeIndex) {
-            // Si hace clic en un reel que no es el del centro, deslizar hacia él
-            swiperRef.current?.slideTo(idx)
-            return
-        }
-
         const vid = videoRefs.current[idx]
         if (!vid) return
 
-        if (vid.paused) {
-            vid.play().catch(() => {})
-            setPlayingState(prev => ({ ...prev, [idx]: true }))
-        } else {
+        // Si es el reel que ya está reproduciéndose, pausarlo
+        if (idx === activeIndex && playingState[idx]) {
             vid.pause()
-            setPlayingState(prev => ({ ...prev, [idx]: false }))
+            setPlayingState({ [idx]: false })
+        } else {
+            // Si estaba pausado o es otro reel, reproducirlo directamente
+            playVideoIndex(idx)
         }
     }
 
@@ -240,7 +252,10 @@ export default function ReelsSection() {
                 {/* Botón Navegación Izquierda (Desktop/Tablet) */}
                 <button
                     type="button"
-                    onClick={() => swiperRef.current?.slidePrev()}
+                    onClick={() => {
+                        const prevIdx = activeIndex === 0 ? reels.length - 1 : activeIndex - 1
+                        playVideoIndex(prevIdx)
+                    }}
                     className="hidden md:flex absolute -left-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-white/95 hover:bg-white text-stone-800 shadow-xl border border-rose-200 items-center justify-center transition-transform hover:scale-110 active:scale-95"
                     title="Anterior reel"
                 >
@@ -250,7 +265,10 @@ export default function ReelsSection() {
                 {/* Botón Navegación Derecha (Desktop/Tablet) */}
                 <button
                     type="button"
-                    onClick={() => swiperRef.current?.slideNext()}
+                    onClick={() => {
+                        const nextIdx = (activeIndex + 1) % reels.length
+                        playVideoIndex(nextIdx)
+                    }}
                     className="hidden md:flex absolute -right-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-white/95 hover:bg-white text-stone-800 shadow-xl border border-rose-200 items-center justify-center transition-transform hover:scale-110 active:scale-95"
                     title="Siguiente reel"
                 >
@@ -334,10 +352,10 @@ export default function ReelsSection() {
                                         preload="auto"
                                         onEnded={() => handleVideoEnded(idx)}
                                         onPlay={() =>
-                                            setPlayingState(prev => ({ ...prev, [idx]: true }))
+                                            setPlayingState({ [idx]: true })
                                         }
                                         onPause={() =>
-                                            setPlayingState(prev => ({ ...prev, [idx]: false }))
+                                            setPlayingState(prev => (prev[idx] ? { [idx]: false } : prev))
                                         }
                                     />
 
@@ -347,7 +365,7 @@ export default function ReelsSection() {
                                     {/* Header de la tarjeta */}
                                     <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-10 pointer-events-none">
                                         <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/50 backdrop-blur-md border border-white/20 text-white text-[10px] font-bold">
-                                            <Film className="w-3 h-3 text-rose-300" /> REEL
+                                            <Film className="w-3 h-3 text-rose-300" /> REEL #{idx + 1}
                                         </div>
 
                                         {/* Botón de Sonido interactivo */}

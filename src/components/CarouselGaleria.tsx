@@ -1,10 +1,12 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
+import React, { useEffect } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Swiper, SwiperSlide } from 'swiper/react'
 import { EffectCoverflow, Autoplay, Pagination } from 'swiper/modules'
 import { Sparkles } from 'lucide-react'
 import { DEFAULT_CMS_CONTENIDO, mergeCMSContenido } from '@/lib/cms-types'
+import { suscribirCambiosRealtime } from '@/lib/realtime'
 import 'swiper/css'
 import 'swiper/css/effect-coverflow'
 import 'swiper/css/pagination'
@@ -16,11 +18,25 @@ async function fetchCarousel(): Promise<string[]> {
 }
 
 export default function CarouselGaleria() {
+    const queryClient = useQueryClient()
+
     const { data: fotos = [], isLoading } = useQuery({
         queryKey: ['carousel'],
         queryFn: fetchCarousel,
-        staleTime: 10 * 60 * 1000
+        staleTime: 60 * 1000,
+        refetchInterval: 15_000,
+        refetchOnWindowFocus: true
     })
+
+    // Sincronización en tiempo real al subir/borrar fotos
+    useEffect(() => {
+        const unsub = suscribirCambiosRealtime((evento) => {
+            if (evento.tipo === 'media_actualizado' || evento.tipo === 'all') {
+                queryClient.invalidateQueries({ queryKey: ['carousel'] })
+            }
+        })
+        return () => unsub()
+    }, [queryClient])
 
     const { data: config } = useQuery({
         queryKey: ['config'],

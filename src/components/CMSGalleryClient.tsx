@@ -20,6 +20,7 @@ import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { createClient as createBrowserClient } from '@/lib/supabase/client'
 import { processVideoForUpload } from '@/lib/video-processor'
+import { emitirCambioRealtime } from '@/lib/realtime'
 
 export interface MediaItem {
     name: string
@@ -132,6 +133,8 @@ export default function CMSGalleryClient({
                 toast.success(`¡${successCount} archivo(s) publicado(s) con éxito!`, {
                     id: toastId
                 })
+                // Notificar en tiempo real a clientes y web pública
+                await emitirCambioRealtime('media_actualizado', { count: successCount })
                 router.refresh()
             } else {
                 toast.dismiss(toastId)
@@ -158,6 +161,7 @@ export default function CMSGalleryClient({
             if (error) throw error
 
             toast.success('Eliminado correctamente', { id: toastId })
+            await emitirCambioRealtime('media_actualizado', { deleted: fileName })
             if (previewMedia?.name === fileName) {
                 setPreviewMedia(null)
             }

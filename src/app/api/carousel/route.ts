@@ -5,15 +5,17 @@ export async function GET() {
     try {
         const supabase = await createClient()
         const { data, error } = await supabase.storage.from('carousel').list('', {
-            limit: 50,
+            limit: 100,
             sortBy: { column: 'created_at', order: 'desc' }
         })
 
         if (error) throw error
 
         const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+        // Filter out placeholder and video files so only images go to the photo carousel
         const urls = (data ?? [])
             .filter(f => f.name !== '.emptyFolderPlaceholder')
+            .filter(f => !/\.(mp4|webm|mov|m4v|ogg)$/i.test(f.name))
             .map(f => `${supabaseUrl}/storage/v1/object/public/carousel/${f.name}`)
 
         return NextResponse.json(urls)

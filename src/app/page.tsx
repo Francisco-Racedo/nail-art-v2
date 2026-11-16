@@ -1,6 +1,7 @@
 import NavBar from '@/components/NavBar'
 import HeroSection from '@/components/HeroSection'
 import CarouselGaleria from '@/components/CarouselGaleria'
+import ReelsSection from '@/components/ReelsSection'
 import ListaDePrecios from '@/components/ListaDePrecios'
 import AgendadorTurnos from '@/components/AgendadorTurnos'
 import FloatingCTA from '@/components/FloatingCTA'
@@ -21,6 +22,7 @@ export default async function HomePage() {
                 <NavBar initialNombre={nombreNegocio} />
                 <HeroSection initialNombre={nombreNegocio} />
                 <CarouselGaleria />
+                <ReelsSection />
 
                 {/* Secciones personalizadas creadas por el dueño antes de Servicios */}
                 <SeccionesPersonalizadas

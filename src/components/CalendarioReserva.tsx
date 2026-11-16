@@ -114,6 +114,8 @@ export default function CalendarioReserva({
                     <div className="flex flex-col items-center">
                         {meses.length > 1 ? (
                             <select
+                                id="selector_mes_calendario"
+                                name="selector_mes_calendario"
                                 aria-label="Seleccionar mes"
                                 value={mesIdx}
                                 onChange={e => setMesIdx(Number(e.target.value))}

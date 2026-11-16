@@ -424,9 +424,9 @@ export default function AgendadorTurnos() {
                                 loading={loadingCalendario}
                             />
 
-                            <label className="block text-[#2C2421]/85 text-sm mb-2.5 font-semibold mt-5">
+                            <h3 className="block text-[#2C2421]/85 text-sm mb-2.5 font-semibold mt-5">
                                 Horarios Disponibles (turnos de 2 hs)
-                            </label>
+                            </h3>
 
                             {fecha ? (
                                 <>
@@ -830,10 +830,10 @@ export default function AgendadorTurnos() {
                                 {/* Selector opcional de Adicionales / Nail Art / Retirado para la clienta */}
                                 <div className="bg-white/80 border border-rose-200/70 rounded-2xl p-4 shadow-sm">
                                     <div className="flex items-center justify-between gap-2 mb-2">
-                                        <label className="text-[#231C19] text-xs uppercase tracking-wider font-bold flex items-center gap-1.5">
+                                        <h4 className="text-[#231C19] text-xs uppercase tracking-wider font-bold flex items-center gap-1.5">
                                             <Sparkles className="w-3.5 h-3.5 text-amber-500" />
                                             ¿Deseás agregar algún Adicional o Retirado?
-                                        </label>
+                                        </h4>
                                         <span className="text-[11px] font-semibold text-stone-400">
                                             Opcional
                                         </span>
@@ -963,12 +963,12 @@ export default function AgendadorTurnos() {
                                 {/* Bloque de seña 50% oculto mientras pagos_habilitados === false */}
                                 {config.pagos_habilitados && (
                                     <div className="mt-1">
-                                        <label className="block text-[#2C2421]/80 text-sm mb-2 font-medium">
+                                        <p className="block text-[#2C2421]/80 text-sm mb-2 font-medium">
                                             Método de Pago{' '}
                                             <span className="text-pink-500 font-bold">
                                                 — Seña 50%
                                             </span>
-                                        </label>
+                                        </p>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                             <button
                                                 type="button"

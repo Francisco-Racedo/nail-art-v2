@@ -39,12 +39,22 @@ const ConfigSchema = z
     )
 
 const ServicioSchema = z.object({
-    categoria: z.enum(['Manos', 'Pies & Extras', 'Promos']),
+    categoria: z.enum([
+        'Servicios Base (Lisas)',
+        'Con 2 Decos Simples',
+        'Adicionales & Nail Art',
+        'Manos',
+        'Pies & Extras',
+        'Promos'
+    ]),
     nombre: z
         .string()
         .min(3, 'El nombre debe tener al menos 3 caracteres')
         .max(100)
-        .regex(/^[a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s\-\.\/\+]+$/, 'El nombre contiene caracteres inválidos'),
+        .regex(
+            /^[a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s\-\.\/\+(),$]+$/,
+            'El nombre contiene caracteres inválidos'
+        ),
     subtitulo: z.string().max(150).optional(),
     descripcion: z.string().max(500).optional(),
     precio: z.coerce

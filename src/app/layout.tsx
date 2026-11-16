@@ -27,7 +27,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const nombre = (cfg.nombre_negocio || "Pintaditas Nails").toUpperCase()
   const tituloCompleto = `${nombre} | MANICURA PROFESIONAL EN LULES, TUCUMÁN`
   const descripcion =
-    "Especialistas en Kapping, Uñas Esculpidas, Semipermanente y Pedi Spa en Lules. Reservá tu turno online."
+    "Especialistas en Esmaltado Semipermanente, Capping Gel, Polygel, Soft Gel y Nail Art en Lules. Reservá tu turno online."
 
   return {
     title: tituloCompleto,

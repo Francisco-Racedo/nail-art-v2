@@ -5,7 +5,6 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Sparkles, ChevronDown, Gift, Crown, Gem } from 'lucide-react'
 import { DEFAULT_CMS_CONTENIDO, mergeCMSContenido } from '@/lib/cms-types'
-import SeccionesPersonalizadas from './SeccionesPersonalizadas'
 
 interface Servicio {
     id: number
@@ -116,9 +115,13 @@ export default function ListaDePrecios() {
     const cms = config?.cms ? mergeCMSContenido(config.cms) : DEFAULT_CMS_CONTENIDO
     const sv = cms.servicios
 
-    const manos = servicios.filter(s => s.categoria === 'Manos')
-    const pies = servicios.filter(s => s.categoria === 'Pies & Extras')
-    const promos = servicios.filter(s => s.categoria === 'Promos')
+    const serviciosLisas = servicios.filter(
+        s => s.categoria === 'Servicios Base (Lisas)' || s.categoria === 'Manos'
+    )
+    const serviciosConDeco = servicios.filter(s => s.categoria === 'Con 2 Decos Simples')
+    const adicionales = servicios.filter(
+        s => s.categoria === 'Adicionales & Nail Art' || s.categoria === 'Promos'
+    )
 
     return (
         <>
@@ -166,44 +169,45 @@ export default function ListaDePrecios() {
 
                         {!isLoading && !error && (
                             <>
-                                {/* Grilla de Manos y Pies */}
+                                {/* Grilla de Servicios Base (Lisas) y Servicios con 2 Decos Simples */}
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-12 max-w-5xl mx-auto mb-16">
-                                    {manos.length > 0 && (
+                                    {serviciosLisas.length > 0 && (
                                         <div>
                                             <div className="flex items-center justify-between mb-6 pb-3 border-b border-rose-200/70">
                                                 <h3 className="font-editorial text-2xl sm:text-3xl font-bold text-[#231C19] flex items-center gap-2.5">
                                                     <span className="w-8 h-8 rounded-full bg-rose-100 border border-rose-200 flex items-center justify-center text-base">
                                                         {sv.icono_manos || '💅'}
                                                     </span>
-                                                    {sv.titulo_manos || 'Manos & Estructura'}
+                                                    {sv.titulo_manos || 'Servicios Base (Lisas)'}
                                                 </h3>
                                                 <span className="text-[11px] uppercase tracking-widest font-bold text-rose-600">
-                                                    {manos.length} opciones
+                                                    {serviciosLisas.length} opciones
                                                 </span>
                                             </div>
                                             <div className="space-y-3.5">
-                                                {manos.map((s, i) => (
+                                                {serviciosLisas.map((s, i) => (
                                                     <ServiceCard key={s.id} s={s} index={i} />
                                                 ))}
                                             </div>
                                         </div>
                                     )}
 
-                                    {pies.length > 0 && (
+                                    {serviciosConDeco.length > 0 && (
                                         <div>
                                             <div className="flex items-center justify-between mb-6 pb-3 border-b border-rose-200/70">
                                                 <h3 className="font-editorial text-2xl sm:text-3xl font-bold text-[#231C19] flex items-center gap-2.5">
                                                     <span className="w-8 h-8 rounded-full bg-amber-100 border border-amber-200 flex items-center justify-center text-base">
-                                                        {sv.icono_pies || '🦶'}
+                                                        {sv.icono_pies || '✨'}
                                                     </span>
-                                                    {sv.titulo_pies || 'Pies & Spa Botánico'}
+                                                    {sv.titulo_pies ||
+                                                        'Servicios con 2 Decos Simples'}
                                                 </h3>
                                                 <span className="text-[11px] uppercase tracking-widest font-bold text-amber-700">
-                                                    {pies.length} opciones
+                                                    {serviciosConDeco.length} opciones
                                                 </span>
                                             </div>
                                             <div className="space-y-3.5">
-                                                {pies.map((s, i) => (
+                                                {serviciosConDeco.map((s, i) => (
                                                     <ServiceCard key={s.id} s={s} index={i} />
                                                 ))}
                                             </div>
@@ -211,13 +215,13 @@ export default function ListaDePrecios() {
                                     )}
                                 </div>
 
-                                {/* Sección Inferior: Promos Exclusivas & Beneficio de Cumpleaños */}
+                                {/* Sección Inferior: Adicionales, Nail Art & Arreglos + Tarjeta Día Especial */}
                                 {(sv.mostrar_promos || sv.mostrar_cumple) && (
                                     <div
                                         id="promos"
                                         className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto mt-16"
                                     >
-                                        {sv.mostrar_promos && promos.length > 0 && (
+                                        {sv.mostrar_promos && adicionales.length > 0 && (
                                             <motion.div
                                                 initial={{ opacity: 0, y: 20 }}
                                                 whileInView={{ opacity: 1, y: 0 }}
@@ -229,53 +233,79 @@ export default function ListaDePrecios() {
 
                                                 <div className="relative z-10">
                                                     {sv.badge_promos && (
-                                                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/15 text-rose-200 text-[10px] font-bold uppercase tracking-[0.2em] mb-4">
+                                                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/15 text-rose-200 text-[10px] font-bold uppercase tracking-[0.2em] mb-3">
                                                             <Crown className="w-3 h-3 text-amber-300" />{' '}
                                                             {sv.badge_promos}
                                                         </div>
                                                     )}
-                                                    <h3 className="font-editorial text-3xl sm:text-4xl font-semibold tracking-wide mb-6 text-white">
+                                                    <h3 className="font-editorial text-3xl sm:text-4xl font-semibold tracking-wide mb-2 text-white">
                                                         {sv.titulo_promos}{' '}
                                                         <span className="italic text-rose-300">
                                                             {sv.titulo_promos_resaltado}
                                                         </span>
                                                     </h3>
+                                                    <p className="text-xs text-stone-300/90 mb-5 leading-relaxed">
+                                                        Opciones de deco en 10 dedos, pigmentos, cat
+                                                        eye, francesas, diseños complejos y piedrería:
+                                                    </p>
 
                                                     <div className="space-y-2">
-                                                        {promos.map(s => (
-                                                            <div
-                                                                key={s.id}
-                                                                className="flex justify-between items-center py-3.5 px-3.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition-colors"
-                                                            >
-                                                                <div className="flex items-center gap-3">
-                                                                    <span className="text-lg bg-white/10 rounded-full w-9 h-9 flex items-center justify-center">
-                                                                        {s.icono || '✨'}
-                                                                    </span>
-                                                                    <div>
-                                                                        <span className="font-semibold text-white text-sm sm:text-base block">
-                                                                            {s.nombre}
+                                                        {adicionales.map(s => {
+                                                            const esRangoDibujo =
+                                                                s.nombre
+                                                                    .toLowerCase()
+                                                                    .includes('dibujo') ||
+                                                                (s.subtitulo || '').includes('3.000')
+                                                            return (
+                                                                <div
+                                                                    key={s.id}
+                                                                    className="flex justify-between items-center py-3 px-3.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition-colors"
+                                                                >
+                                                                    <div className="flex items-center gap-3 min-w-0 pr-2">
+                                                                        <span className="text-lg bg-white/10 rounded-full w-9 h-9 flex items-center justify-center shrink-0">
+                                                                            {s.icono || '✨'}
                                                                         </span>
-                                                                        {s.descripcion && (
-                                                                            <span className="text-[11px] text-stone-300 line-clamp-1">
-                                                                                {s.descripcion}
+                                                                        <div className="min-w-0">
+                                                                            <span className="font-semibold text-white text-sm sm:text-base block truncate">
+                                                                                {s.nombre}
                                                                             </span>
-                                                                        )}
+                                                                            {(s.subtitulo ||
+                                                                                s.descripcion) && (
+                                                                                <span className="text-[11px] text-stone-300 line-clamp-1">
+                                                                                    {s.subtitulo ||
+                                                                                        s.descripcion}
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
                                                                     </div>
+                                                                    <span className="font-editorial font-bold text-amber-300 text-xl sm:text-2xl shrink-0 ml-2">
+                                                                        {esRangoDibujo
+                                                                            ? '$2.000 - $3.000'
+                                                                            : `$${Number(
+                                                                                  s.precio
+                                                                              ).toLocaleString(
+                                                                                  'es-AR'
+                                                                              )}`}
+                                                                    </span>
                                                                 </div>
-                                                                <span className="font-editorial font-bold text-amber-300 text-2xl shrink-0 ml-2">
-                                                                    $
-                                                                    {Number(
-                                                                        s.precio
-                                                                    ).toLocaleString('es-AR')}
-                                                                </span>
-                                                            </div>
-                                                        ))}
+                                                            )
+                                                        })}
+                                                    </div>
+
+                                                    <div className="mt-5 p-3.5 rounded-2xl bg-amber-500/10 border border-amber-400/25 text-xs text-amber-100 leading-relaxed">
+                                                        ⚠️ <strong>Importante:</strong> Si asistís al
+                                                        turno con un trabajo realizado por otra
+                                                        profesional y debemos retirarlo,{' '}
+                                                        <strong className="text-amber-300 underline">
+                                                            el retiro se cobra aparte
+                                                        </strong>
+                                                        .
                                                     </div>
                                                 </div>
                                             </motion.div>
                                         )}
 
-                                        {/* Tarjeta Beneficio de Cumpleaños */}
+                                        {/* Tarjeta Beneficio Día Especial */}
                                         {sv.mostrar_cumple && (
                                             <motion.div
                                                 initial={{ opacity: 0, y: 20 }}

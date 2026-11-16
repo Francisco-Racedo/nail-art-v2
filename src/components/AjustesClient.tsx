@@ -1761,12 +1761,20 @@ export default function AjustesClient({
                                 <label className={labelCls}>Categoría</label>
                                 <select
                                     name="categoria"
-                                    defaultValue={editingService?.categoria || 'Manos'}
+                                    defaultValue={
+                                        editingService?.categoria || 'Servicios Base (Lisas)'
+                                    }
                                     className={inputCls}
                                 >
-                                    <option value="Manos">Manos</option>
-                                    <option value="Pies & Extras">Pies & Extras</option>
-                                    <option value="Promos">Promos</option>
+                                    <option value="Servicios Base (Lisas)">
+                                        Servicios Base (Lisas)
+                                    </option>
+                                    <option value="Con 2 Decos Simples">
+                                        Con 2 Decos Simples
+                                    </option>
+                                    <option value="Adicionales & Nail Art">
+                                        Adicionales &amp; Nail Art
+                                    </option>
                                 </select>
                             </div>
                             <div>

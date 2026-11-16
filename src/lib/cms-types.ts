@@ -186,20 +186,20 @@ export const DEFAULT_CMS_CONTENIDO: CMSContenido = {
         titulo_resaltado: 'Tarifas & Cuidado',
         subtitulo:
             'Tocá cualquier servicio para conocer el detalle del protocolo. Precios actualizados en tiempo real.',
-        titulo_manos: 'Manos & Estructura',
+        titulo_manos: 'Servicios Base (Lisas)',
         icono_manos: '💅',
-        titulo_pies: 'Pies & Spa Botánico',
-        icono_pies: '🦶',
+        titulo_pies: 'Servicios con 2 Decos Simples',
+        icono_pies: '✨',
         mostrar_promos: true,
-        badge_promos: 'Combinados Exclusivos',
-        titulo_promos: 'Promos del',
-        titulo_promos_resaltado: 'Mes',
+        badge_promos: 'Personalizá tu Diseño',
+        titulo_promos: 'Adicionales,',
+        titulo_promos_resaltado: 'Nail Art & Arreglos',
         mostrar_cumple: true,
         badge_cumple: 'Atención Especial a Clientas',
         titulo_cumple: '¡Celebramos tu',
-        titulo_cumple_resaltado: 'Semana Especial!',
+        titulo_cumple_resaltado: 'Día Especial!',
         texto_cumple:
-            'Al registrar tu fecha de nacimiento cuando agendás tu turno, nuestro sistema nos avisa en tu semana de cumpleaños para mimarte en el salón. 🥂✨',
+            'Al registrar tu fecha de nacimiento cuando agendás tu turno, nuestro sistema nos avisa en tu día especial para mimarte en el salón. 🥂✨',
         boton_cumple: 'Reservar mi cita'
     },
     reserva: {
@@ -209,7 +209,7 @@ export const DEFAULT_CMS_CONTENIDO: CMSContenido = {
         subtitulo:
             'Seleccioná el día en el calendario y tu bloque de 2 horas disponible (Lunes a Sábado de 10:00 a 20:00 hs).',
         texto_compromiso:
-            'Tu turno quedará en estado PENDIENTE y se confirmará en pocos minutos. Si no podés asistir, podrás reprogramarlo desde tu enlace personal.',
+            'Si asistís con un trabajo realizado por otra profesional y debemos retirarlo, el retiro se cobra aparte. Tu turno quedará en estado PENDIENTE y se confirmará en pocos minutos.',
         texto_boton_confirmar: 'Confirmar Reserva'
     },
     footer: {

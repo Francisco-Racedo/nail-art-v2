@@ -25,11 +25,21 @@ export const viewport: Viewport = {
 export async function generateMetadata(): Promise<Metadata> {
   const cfg = await getConfigCompleta()
   const nombre = (cfg.nombre_negocio || "Pintitas Nails").toUpperCase()
+  const tituloCompleto = `${nombre} | MANICURA PROFESIONAL EN LULES, TUCUMÁN`
+  const descripcion =
+    "Especialistas en Kapping, Uñas Esculpidas, Semipermanente y Pedi Spa en Lules. Reservá tu turno online."
+
   return {
-    title: `${nombre} | MANICURA PROFESIONAL EN LULES, TUCUMÁN`,
-    description:
-      "Especialistas en Kapping, Uñas Esculpidas, Semipermanente y Pedi Spa en Lules. Reservá tu turno online.",
+    title: tituloCompleto,
+    description: descripcion,
     manifest: "/manifest.json",
+    openGraph: {
+      title: tituloCompleto,
+      description: descripcion,
+      siteName: cfg.nombre_negocio || "Pintitas Nails",
+      locale: "es_AR",
+      type: "website",
+    },
     appleWebApp: {
       capable: true,
       statusBarStyle: "default",

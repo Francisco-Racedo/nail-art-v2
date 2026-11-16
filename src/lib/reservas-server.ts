@@ -265,22 +265,9 @@ export function calcularDisponibilidadParaFecha(
 
     const ocupadosMap = new Map<string, string>()
 
-    // Si es hoy en Argentina, marcar como no disponibles los horarios que ya pasaron
-    const hoyArg = getHoyArgentina()
-    if (fecha === hoyArg) {
-        const ahoraArg = getAhoraArgentina()
-        const minsAhora = ahoraArg.getHours() * 60 + ahoraArg.getMinutes()
-        for (const h of horariosDelDia) {
-            const [hh, mm] = h.split(':').map(Number)
-            if (hh * 60 + mm <= minsAhora) {
-                ocupadosMap.set(h, 'completado')
-            }
-        }
-    }
-
     for (const r of reservasDelDia) {
         if (!esTurnoActivoEnGrilla(r)) continue
-        const hNorm = (r.horario || '').substring(0, 5)
+        const hNorm = (r.horario || '').replace(/^~/, '').split('#')[0].substring(0, 5)
         const efectivo = getEstadoEfectivo(r)
         ocupadosMap.set(hNorm, efectivo)
 
@@ -374,6 +361,7 @@ export interface FichaCRMManual {
     fecha_nacimiento?: string
     notas_tecnicas?: string
     etiqueta?: EtiquetaCliente
+    dias_recordatorio_service?: number
     oculto?: boolean
 }
 
@@ -397,6 +385,7 @@ export interface ResumenCliente {
     fecha_nacimiento?: string
     notas_tecnicas?: string
     etiqueta?: EtiquetaCliente
+    dias_recordatorio_service: number
     totalTurnos: number
     completados: number
     ausencias: number
@@ -495,8 +484,12 @@ export function construirFichasClientes(
                   : nombreKey
 
         const efectivo = getEstadoEfectivo(r)
+        const meta = parseReservaMeta(r.mp_preference_id, r.id)
         const hClean = (r.horario || '').replace(/^~/, '').split('#')[0].substring(0, 5)
-        const precioBase = parsePrecioServicio(r.servicio)
+        const precioBase =
+            meta.precioPersonalizado !== undefined && meta.precioPersonalizado >= 0
+                ? meta.precioPersonalizado
+                : parsePrecioServicio(r.servicio)
         const desc = Number(r.descuento_aplicado) || 0
         const precioFinal = Math.max(0, Math.round(precioBase * (1 - desc / 100)))
 
@@ -509,6 +502,7 @@ export function construirFichasClientes(
             fecha_nacimiento: r.fecha_nacimiento || undefined,
             notas_tecnicas: undefined,
             etiqueta: undefined,
+            dias_recordatorio_service: 18,
             totalTurnos: 0,
             completados: 0,
             ausencias: 0,
@@ -523,6 +517,13 @@ export function construirFichasClientes(
             necesitaService: false,
             reservaIds: [],
             turnos: []
+        }
+
+        if (meta.diasRecordatorioService && meta.diasRecordatorioService >= 5) {
+            prev.dias_recordatorio_service = meta.diasRecordatorioService
+        }
+        if (meta.notasTurno && !prev.notas_tecnicas) {
+            prev.notas_tecnicas = meta.notasTurno
         }
 
         prev.totalTurnos += 1
@@ -596,6 +597,9 @@ export function construirFichasClientes(
             if (crm.etiqueta !== undefined) {
                 existente.etiqueta = crm.etiqueta
             }
+            if (crm.dias_recordatorio_service !== undefined && crm.dias_recordatorio_service >= 5) {
+                existente.dias_recordatorio_service = crm.dias_recordatorio_service
+            }
         } else {
             map.set(crmKey, {
                 key: crmKey,
@@ -606,6 +610,7 @@ export function construirFichasClientes(
                 fecha_nacimiento: crm.fecha_nacimiento || undefined,
                 notas_tecnicas: crm.notas_tecnicas || undefined,
                 etiqueta: crm.etiqueta || 'nueva',
+                dias_recordatorio_service: crm.dias_recordatorio_service || 18,
                 totalTurnos: 0,
                 completados: 0,
                 ausencias: 0,
@@ -642,9 +647,10 @@ export function construirFichasClientes(
             item.diasDesdeUltimoTurno = Math.max(0, diff)
         }
 
+        const umbralService = item.dias_recordatorio_service || 18
         item.necesitaService =
             item.diasDesdeUltimoTurno !== null &&
-            item.diasDesdeUltimoTurno >= 18 &&
+            item.diasDesdeUltimoTurno >= umbralService &&
             !item.proximoTurno
 
         if (!item.etiqueta) {

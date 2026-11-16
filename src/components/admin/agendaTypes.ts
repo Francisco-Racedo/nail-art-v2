@@ -1,4 +1,10 @@
-import { getEstadoEfectivo, parseReservaMeta } from '@/lib/utils'
+import {
+    getEstadoEfectivo,
+    parseReservaMeta,
+    getHoyArgentina,
+    getAhoraArgentina,
+    HistorialEvento
+} from '@/lib/utils'
 
 export type EstadoReserva =
     | 'pendiente'
@@ -109,6 +115,11 @@ export interface ModalData {
     reprogramado?: boolean
     codigo?: string
     ocupa_bloque_siguiente?: boolean
+    dias_recordatorio_service?: number
+    notas_turno?: string
+    precio_personalizado?: number
+    adicionales?: string[]
+    historial_eventos?: HistorialEvento[]
     mp_preference_id?: string
 }
 
@@ -116,13 +127,10 @@ export const formatDateStr = (date: Date) => {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
-// Detecta cumpleaños hoy o dentro de ±7 días para que el dueño pueda ofrecer promo
+// Detecta cumpleaños hoy o dentro de ±7 días en horario de Argentina
 export const checkCumple = (fn?: string) => {
     if (!fn || fn.length < 10) return false
-    const now = new Date()
-    const tzTime = new Date(
-        now.toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' })
-    )
+    const tzTime = getAhoraArgentina()
     const [, mStr, dStr] = fn.substring(0, 10).split('-')
     const m = parseInt(mStr, 10)
     const d = parseInt(dStr, 10)
@@ -135,11 +143,7 @@ export const checkCumple = (fn?: string) => {
 }
 
 export const getHoyUTC3 = () => {
-    const now = new Date()
-    const tzTime = new Date(
-        now.toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' })
-    )
-    return formatDateStr(tzTime)
+    return getHoyArgentina()
 }
 
 export { getEstadoEfectivo, parseReservaMeta }

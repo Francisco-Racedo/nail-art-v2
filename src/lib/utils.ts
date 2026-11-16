@@ -31,9 +31,43 @@ export function generarHorariosDisponibles(
 
 export const TZ_ARGENTINA = 'America/Argentina/Buenos_Aires'
 
-export function getAhoraArgentina(): Date {
+export function getPartesAhoraArgentina(): {
+    year: number
+    month: number
+    day: number
+    hour: number
+    minute: number
+    second: number
+} {
     const now = new Date()
-    return new Date(now.toLocaleString('en-US', { timeZone: TZ_ARGENTINA }))
+    const dtf = new Intl.DateTimeFormat('en-CA', {
+        timeZone: TZ_ARGENTINA,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+    })
+    const parts = dtf.formatToParts(now)
+    const map: Record<string, string> = {}
+    for (const p of parts) {
+        if (p.type !== 'literal') map[p.type] = p.value
+    }
+    const year = parseInt(map.year || '2026', 10)
+    const month = parseInt(map.month || '1', 10)
+    const day = parseInt(map.day || '1', 10)
+    const rawHour = parseInt(map.hour || '0', 10)
+    const hour = rawHour === 24 ? 0 : rawHour
+    const minute = parseInt(map.minute || '0', 10)
+    const second = parseInt(map.second || '0', 10)
+    return { year, month, day, hour, minute, second }
+}
+
+export function getAhoraArgentina(): Date {
+    const p = getPartesAhoraArgentina()
+    return new Date(p.year, p.month - 1, p.day, p.hour, p.minute, p.second)
 }
 
 export function formatDateYYYYMMDD(date: Date): string {
@@ -41,7 +75,15 @@ export function formatDateYYYYMMDD(date: Date): string {
 }
 
 export function getHoyArgentina(): string {
-    return formatDateYYYYMMDD(getAhoraArgentina())
+    const p = getPartesAhoraArgentina()
+    return `${p.year}-${String(p.month).padStart(2, '0')}-${String(p.day).padStart(2, '0')}`
+}
+
+export function parseFechaLocalYYYYMMDD(fechaStr: string): Date {
+    const clean = (fechaStr || '').substring(0, 10)
+    const [y, m, d] = clean.split('-').map(Number)
+    if (!y || !m || !d) return getAhoraArgentina()
+    return new Date(y, m - 1, d, 12, 0, 0)
 }
 
 export function getFinMesSiguienteArgentina(): string {
@@ -109,6 +151,10 @@ export interface ReservaMeta {
     horarioOriginal?: string
     ocupaBloqueSiguiente?: boolean
     descuentoMotivo?: string
+    diasRecordatorioService?: number
+    notasTurno?: string
+    precioPersonalizado?: number
+    adicionalesSeleccionados?: string[]
     mpPreferenceId?: string
     historial?: HistorialEvento[]
 }

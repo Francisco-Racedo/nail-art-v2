@@ -642,7 +642,7 @@ export default function ClientesPanel({
                                                     className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-2.5 px-3 rounded-xl flex items-center justify-center gap-1.5 shadow-sm"
                                                 >
                                                     <BellRing className="w-3.5 h-3.5" /> Recordar
-                                                    Service (+18 d)
+                                                    Service (+{c.dias_recordatorio_service || 18} d)
                                                 </a>
                                             )}
 

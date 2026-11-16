@@ -26,7 +26,8 @@ import {
 import {
     generarHorariosDisponibles,
     normalizarCelular,
-    celularParaWhatsapp
+    celularParaWhatsapp,
+    getAhoraArgentina
 } from '@/lib/utils'
 import type { AvisoReprogramacionCliente } from '@/app/admin/actions'
 
@@ -62,10 +63,14 @@ export default function AgendaCalendar({
     config: any
 }) {
     const router = useRouter()
-    const [viewDate, setViewDate] = useState(new Date())
-    const [selectedDate, setSelectedDate] = useState(new Date())
+    const [viewDate, setViewDate] = useState(() => {
+        const now = getAhoraArgentina()
+        return new Date(now.getFullYear(), now.getMonth(), 1)
+    })
+    const [selectedDate, setSelectedDate] = useState(() => getAhoraArgentina())
     const [mounted, setMounted] = useState(false)
     const [modalData, setModalData] = useState<ModalData | null>(null)
+    const [vistaActiva, setVistaActiva] = useState<'calendario' | 'detalle_turno'>('calendario')
     const [mesesCliente, setMesesCliente] = useState<number>(
         Number(config?.meses_visibles_cliente) || 3
     )
@@ -105,7 +110,7 @@ export default function AgendaCalendar({
     )
 
     useEffect(() => {
-        const localNow = new Date()
+        const localNow = getAhoraArgentina()
         setViewDate(new Date(localNow.getFullYear(), localNow.getMonth(), 1))
         setSelectedDate(localNow)
         setHorariosReducidosSel(horariosBaseConfig.slice(0, 3))
@@ -156,7 +161,7 @@ export default function AgendaCalendar({
     }
 
     const handleGoToday = () => {
-        const now = new Date()
+        const now = getAhoraArgentina()
         setViewDate(new Date(now.getFullYear(), now.getMonth(), 1))
         setSelectedDate(now)
     }
@@ -205,8 +210,14 @@ export default function AgendaCalendar({
             reprogramado: reserva.reprogramado,
             codigo: meta.codigo,
             ocupa_bloque_siguiente: meta.ocupaBloqueSiguiente,
+            dias_recordatorio_service: meta.diasRecordatorioService || 18,
+            notas_turno: meta.notasTurno || '',
+            precio_personalizado: meta.precioPersonalizado,
+            adicionales: meta.adicionalesSeleccionados || [],
+            historial_eventos: meta.historial || [],
             mp_preference_id: reserva.mp_preference_id
         })
+        setVistaActiva('detalle_turno')
     }
 
     const confirmarRapido = async (r: Reserva) => {
@@ -375,8 +386,71 @@ export default function AgendaCalendar({
 
     return (
         <div className="w-full relative bg-white/90 backdrop-blur-sm p-4 md:p-6 rounded-[1.5rem] md:rounded-[2rem] border border-orange-200/50 shadow-md overflow-hidden">
-            {/* Barra rápida de turnos PENDIENTES (Confirmación en 1 toque) */}
-            {pendientesFuturos.length > 0 && (
+            {/* Barra de Pestañas (Tabs) de la Agenda */}
+            <div className="flex flex-wrap items-center gap-2 mb-6 pb-3 border-b border-stone-200">
+                <button
+                    type="button"
+                    onClick={() => setVistaActiva('calendario')}
+                    className={`px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-black transition flex items-center gap-2 cursor-pointer ${
+                        vistaActiva === 'calendario' || !modalData
+                            ? 'bg-stone-900 text-white shadow-sm'
+                            : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                    }`}
+                >
+                    <span>📅 Calendario y Grilla del Día</span>
+                </button>
+
+                {modalData && (
+                    <div
+                        className={`inline-flex items-center rounded-2xl border transition overflow-hidden ${
+                            vistaActiva === 'detalle_turno'
+                                ? 'bg-gradient-to-r from-rose-500 to-orange-500 text-white border-transparent shadow-sm'
+                                : 'bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100'
+                        }`}
+                    >
+                        <button
+                            type="button"
+                            onClick={() => setVistaActiva('detalle_turno')}
+                            className="px-4 py-2.5 text-xs sm:text-sm font-black flex items-center gap-2 cursor-pointer"
+                        >
+                            <span>
+                                💅 Pestaña del Turno: {modalData.cliente} ({modalData.hora} hs)
+                            </span>
+                        </button>
+                        <button
+                            type="button"
+                            title="Cerrar pestaña del turno"
+                            onClick={() => {
+                                setModalData(null)
+                                setVistaActiva('calendario')
+                            }}
+                            className={`px-2.5 py-2.5 border-l transition cursor-pointer ${
+                                vistaActiva === 'detalle_turno'
+                                    ? 'border-white/25 hover:bg-black/15 text-white'
+                                    : 'border-rose-200 hover:bg-rose-200/60 text-rose-700'
+                            }`}
+                        >
+                            <X className="w-3.5 h-3.5" />
+                        </button>
+                    </div>
+                )}
+            </div>
+
+            {modalData && vistaActiva === 'detalle_turno' ? (
+                <TurnoModal
+                    modalData={modalData}
+                    setModalData={val => {
+                        setModalData(val)
+                        if (!val) setVistaActiva('calendario')
+                    }}
+                    config={config}
+                    serviciosCatalogo={serviciosLista}
+                    historialCliente={clienteHistModal}
+                />
+            ) : (
+                <>
+                    {/* Barra rápida de turnos PENDIENTES (Confirmación en 1 toque) */}
+                    {pendientesFuturos.length > 0 && (
                 <div className="mb-6 bg-amber-50/95 border border-amber-300 rounded-2xl p-4 shadow-sm">
                     <div className="flex items-center justify-between mb-2.5">
                         <span className="text-xs font-black uppercase tracking-wider text-amber-900 flex items-center gap-1.5">
@@ -796,14 +870,7 @@ export default function AgendaCalendar({
                 handleEventClick={handleEventClick}
                 onSelectFreeSlot={h => setSlotLibreElegido(h)}
             />
-
-            {modalData && (
-                <TurnoModal
-                    modalData={modalData}
-                    setModalData={setModalData}
-                    config={config}
-                    historialCliente={clienteHistModal}
-                />
+                </>
             )}
         </div>
     )

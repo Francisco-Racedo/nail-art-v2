@@ -209,13 +209,13 @@ export const DEFAULT_CMS_CONTENIDO: CMSContenido = {
         subtitulo:
             'Seleccioná el día en el calendario y tu bloque de 2 horas disponible (Lunes a Sábado de 10:00 a 20:00 hs).',
         texto_compromiso:
-            'Si asistís con un trabajo realizado por otra profesional y debemos retirarlo, el retiro se cobra aparte. Tu turno quedará en estado PENDIENTE y se confirmará en pocos minutos.',
+            'Si asistís con un trabajo realizado por otra profesional y debemos retirarlo, el retiro se cobra aparte según el material (Semi $3.000, Capping $4.000, Soft Gel $4.500). Recibimos Efectivo y Transferencia.',
         texto_boton_confirmar: 'Confirmar Reserva'
     },
     footer: {
         visible: true,
-        ubicacion: 'Lules, Tucumán, Argentina',
-        derechos: 'Todos los derechos reservados © 2026 • Estudio de Manicuría Profesional'
+        ubicacion: 'Bartolomé Mitre 155, B° 25 de Mayo • Lules, Tucumán',
+        derechos: 'Pintaditas Nails by Mili Tripolone • Estudio de Manicuría Profesional'
     },
     secciones_personalizadas: []
 }

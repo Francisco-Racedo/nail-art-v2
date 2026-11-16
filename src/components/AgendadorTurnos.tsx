@@ -123,6 +123,8 @@ export default function AgendadorTurnos() {
     const [reservaId, setReservaId] = useState<number | null>(null)
     const [codigoTurno, setCodigoTurno] = useState<string | null>(null)
     const [ultimoCodigoGuardado, setUltimoCodigoGuardado] = useState<string | null>(null)
+    const [tieneVoucher, setTieneVoucher] = useState(false)
+    const [detalleVoucher, setDetalleVoucher] = useState('')
 
     // Selectores de fecha de nacimiento compatibles 100% con iOS y Android (sin showPicker)
     const [nacDia, setNacDia] = useState('')
@@ -309,11 +311,14 @@ export default function AgendadorTurnos() {
             totalEstimadoCliente > 0
                 ? `\n*Total estimado:* $${totalEstimadoCliente.toLocaleString('es-AR')}`
                 : ''
+        const lineaVoucher = tieneVoucher
+            ? `\n*Pago:* 🎁 Presento Gift Card / Voucher de Regalo${detalleVoucher ? ` (${detalleVoucher})` : ''}`
+            : ''
 
         const msg =
             config.pagos_habilitados && watchMetodoPago === 'transferencia'
-                ? `*NUEVO TURNO - COMPROBANTE*\n\nHola! Hice una reserva para ${watchServicio} a nombre de ${watchNombre}.${lineaAdicionales}${lineaTotal}\nAdjunto comprobante por $${montoAbonar.toLocaleString('es-AR')}.\n\nDía: ${fechaLatam} a las ${horario} hs.${linkSeguimiento}\n¿Me envían confirmación? 💅`
-                : `*SOLICITUD DE TURNO - ${negocio!.toUpperCase()}*\n\nHola! Solicité un turno desde la web.\n*Cliente:* ${watchNombre}\n*Servicio:* ${watchServicio}${lineaAdicionales}${lineaTotal}\n*Día:* ${fechaLatam} a las ${horario} hs.${linkSeguimiento}\n\n¡Muchas gracias! 💅✨`
+                ? `*NUEVO TURNO - COMPROBANTE*\n\nHola! Hice una reserva para ${watchServicio} a nombre de ${watchNombre}.${lineaAdicionales}${lineaTotal}${lineaVoucher}\nAdjunto comprobante por $${montoAbonar.toLocaleString('es-AR')}.\n\nDía: ${fechaLatam} a las ${horario} hs.${linkSeguimiento}\n¿Me envían confirmación? 💅`
+                : `*SOLICITUD DE TURNO - ${negocio!.toUpperCase()}*\n\nHola! Solicité un turno desde la web.\n*Cliente:* ${watchNombre}\n*Servicio:* ${watchServicio}${lineaAdicionales}${lineaTotal}${lineaVoucher}\n*Día:* ${fechaLatam} a las ${horario} hs.${linkSeguimiento}\n\n¡Muchas gracias! 💅✨`
         return `https://wa.me/${numero}?text=${encodeURIComponent(msg)}`
     }
 
@@ -821,7 +826,9 @@ export default function AgendadorTurnos() {
                                         Podés sumar efectos, decoración extra o retirado de otro salón a tu servicio principal:
                                     </p>
                                     <div className="flex flex-wrap gap-2">
-                                        {ADICIONALES_CATALOGO.map(ad => {
+                                        {ADICIONALES_CATALOGO.filter(
+                                            ad => ad.id !== 'retirado_otro'
+                                        ).map(ad => {
                                             const activo = adicionalesCliente.includes(ad.id)
                                             return (
                                                 <button
@@ -889,6 +896,45 @@ export default function AgendadorTurnos() {
                                             </div>
                                         </div>
                                     )}
+                                </div>
+
+                                {/* Opción de Voucher / Gift Card de Regalo */}
+                                <div className="bg-gradient-to-r from-amber-50/90 via-rose-50/90 to-orange-50/90 border border-amber-200/80 rounded-2xl p-4 shadow-sm">
+                                    <label className="flex items-start gap-3 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={tieneVoucher}
+                                            onChange={e => setTieneVoucher(e.target.checked)}
+                                            className="mt-1 w-4 h-4 text-rose-500 rounded border-rose-300 focus:ring-rose-400 cursor-pointer"
+                                        />
+                                        <div className="text-xs">
+                                            <span className="font-bold text-stone-900 flex items-center gap-1.5">
+                                                🎁 Tengo una Gift Card / Voucher de Regalo
+                                            </span>
+                                            <span className="text-stone-500 block mt-0.5">
+                                                Marcá esta opción si vas a presentar una tarjeta de regalo para abonar tu turno.
+                                            </span>
+                                        </div>
+                                    </label>
+                                    {tieneVoucher && (
+                                        <div className="mt-3 pl-7">
+                                            <input
+                                                type="text"
+                                                placeholder="Nombre de quien te lo regaló o servicio del voucher..."
+                                                value={detalleVoucher}
+                                                onChange={e => setDetalleVoucher(e.target.value)}
+                                                className="w-full bg-white border border-rose-200 rounded-xl px-3 py-2 text-xs text-stone-800 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-rose-400 font-medium"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Aviso de Medios de Pago recibidos */}
+                                <div className="flex items-center gap-2.5 text-xs text-emerald-800 bg-emerald-50/90 border border-emerald-200/90 rounded-2xl px-4 py-3">
+                                    <span className="text-base">💵</span>
+                                    <span>
+                                        <strong>Medios de pago en el salón:</strong> Recibimos Efectivo y Transferencia bancaria.
+                                    </span>
                                 </div>
 
                                 {/* Bloque de seña 50% oculto mientras pagos_habilitados === false */}

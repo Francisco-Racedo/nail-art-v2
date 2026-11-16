@@ -51,18 +51,30 @@ export default async function HomePage() {
                                 <Sparkles className="w-4 h-4" />
                             </div>
                             <p className="font-editorial text-2xl sm:text-3xl font-bold tracking-wider text-[#231C19]">
-                                {nombreNegocio.toUpperCase()}
+                                PINTADITAS NAILS{' '}
+                                <span className="block sm:inline font-sans font-light italic text-base sm:text-xl text-rose-600/90 tracking-normal">
+                                    by Mili Tripolone
+                                </span>
                             </p>
-                            <div className="flex flex-wrap items-center justify-center gap-4 text-xs sm:text-sm font-medium text-stone-600">
-                                {cms.footer.ubicacion && (
-                                    <span className="inline-flex items-center gap-1.5 bg-white/80 px-3.5 py-1.5 rounded-full border border-rose-200/60">
-                                        <MapPin className="w-3.5 h-3.5 text-rose-500" />
-                                        {cms.footer.ubicacion}
+                            <div className="flex flex-wrap items-center justify-center gap-3 text-xs sm:text-sm font-medium text-stone-600">
+                                <a
+                                    href="https://maps.google.com/?q=Bartolomé+Mitre+155,+Lules,+Tucuman"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1.5 bg-white/90 hover:bg-rose-50 text-stone-700 hover:text-rose-700 px-4 py-2 rounded-full border border-rose-200/80 shadow-sm transition"
+                                >
+                                    <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                                    <span>
+                                        {cms.footer.ubicacion ||
+                                            'Bartolomé Mitre 155, B° 25 de Mayo • Lules'}
                                     </span>
-                                )}
-                                <span className="inline-flex items-center gap-1.5 bg-white/80 px-3.5 py-1.5 rounded-full border border-rose-200/60">
-                                    <Clock className="w-3.5 h-3.5 text-amber-600" />
+                                </a>
+                                <span className="inline-flex items-center gap-1.5 bg-white/90 px-4 py-2 rounded-full border border-rose-200/80 shadow-sm">
+                                    <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                                     Lunes a Sábado • {cfg.hora_inicio} a {cfg.hora_fin} hs
+                                </span>
+                                <span className="inline-flex items-center gap-1.5 bg-emerald-50/90 text-emerald-800 px-4 py-2 rounded-full border border-emerald-200/80 shadow-sm font-semibold">
+                                    💵 Efectivo y Transferencia
                                 </span>
                             </div>
                             {cms.footer.derechos && (

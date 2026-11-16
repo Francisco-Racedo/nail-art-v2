@@ -234,7 +234,10 @@ export const ADICIONALES_CATALOGO: AdicionalCatalogo[] = [
     { id: 'cat_eye', label: 'Efecto Cat Eye', precio: 2000 },
     { id: 'francesas', label: 'Francesas (10 uñas)', precio: 2000 },
     { id: 'dibujos', label: 'Dibujos / Nail Art', precio: 2500 },
-    { id: 'retirado_otro', label: 'Retirado de otro salón', precio: 3000 }
+    { id: 'retiro_semi', label: 'Retiro Semipermanente (otro salón)', precio: 3000 },
+    { id: 'retiro_capping', label: 'Retiro Capping Gel (otro salón)', precio: 4000 },
+    { id: 'retiro_softgel', label: 'Retiro Soft Gel (otro salón)', precio: 4500 },
+    { id: 'retirado_otro', label: 'Retirado de otro salón (Genérico)', precio: 3000 }
 ]
 
 export function parsePrecioServicioBase(servicioStr?: string | null): number {

@@ -3,8 +3,9 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Sparkles, ChevronDown, Gift, Crown, Gem } from 'lucide-react'
+import { Sparkles, ChevronDown, Gift, Crown, Gem, Heart, Star, Award, Send } from 'lucide-react'
 import { DEFAULT_CMS_CONTENIDO, mergeCMSContenido } from '@/lib/cms-types'
+import GiftCardModal from './GiftCardModal'
 
 interface Servicio {
     id: number
@@ -92,6 +93,7 @@ function ServiceCard({ s, index }: { s: Servicio; index: number }) {
 }
 
 export default function ListaDePrecios() {
+    const [giftCardOpen, setGiftCardOpen] = useState(false)
     const {
         data: servicios = [],
         isLoading,
@@ -292,58 +294,146 @@ export default function ListaDePrecios() {
                                                         })}
                                                     </div>
 
-                                                    <div className="mt-5 p-3.5 rounded-2xl bg-amber-500/10 border border-amber-400/25 text-xs text-amber-100 leading-relaxed">
-                                                        ⚠️ <strong>Importante:</strong> Si asistís al
-                                                        turno con un trabajo realizado por otra
-                                                        profesional y debemos retirarlo,{' '}
-                                                        <strong className="text-amber-300 underline">
-                                                            el retiro se cobra aparte
-                                                        </strong>
-                                                        .
+                                                    {/* Desglose oficial de Retirado de otro profesional */}
+                                                    <div className="mt-5 p-4 rounded-2xl bg-white/10 border border-white/15 text-xs text-stone-100">
+                                                        <div className="flex items-center gap-2 mb-2 text-amber-300 font-bold uppercase tracking-wider text-[11px]">
+                                                            <span>✨</span> Retiro de Trabajo de Otro Profesional
+                                                        </div>
+                                                        <div className="space-y-1.5 text-stone-200 text-[11px] sm:text-xs">
+                                                            <div className="flex justify-between items-center py-1 border-b border-white/10">
+                                                                <span>• Retiro Semipermanente:</span>
+                                                                <span className="font-bold text-white">
+                                                                    $4.000{' '}
+                                                                    <span className="text-stone-300 font-normal">
+                                                                        ($3.000 con nuevo esmaltado)
+                                                                    </span>
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex justify-between items-center py-1 border-b border-white/10">
+                                                                <span>• Retiro Capping Gel:</span>
+                                                                <span className="font-bold text-white">
+                                                                    $5.000{' '}
+                                                                    <span className="text-stone-300 font-normal">
+                                                                        ($4.000 con nuevo esmaltado)
+                                                                    </span>
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex justify-between items-center py-1">
+                                                                <span>• Retiro Soft Gel:</span>
+                                                                <span className="font-bold text-white">
+                                                                    $6.000{' '}
+                                                                    <span className="text-stone-300 font-normal">
+                                                                        ($4.500 con nuevo servicio)
+                                                                    </span>
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        <p className="mt-2.5 pt-2 border-t border-white/10 text-[10px] text-stone-300 font-light">
+                                                            💵 Medios de pago en el salón: Efectivo y Transferencia bancaria.
+                                                        </p>
                                                     </div>
                                                 </div>
                                             </motion.div>
                                         )}
 
-                                        {/* Tarjeta Beneficio Día Especial */}
-                                        {sv.mostrar_cumple && (
+                                        {/* Columna Derecha: Tarjeta Gift Card Oficial + Beneficios & Fidelidad */}
+                                        <div className="flex flex-col gap-6">
+                                            {/* Tarjeta 1: GIFT CARD OFICIAL */}
                                             <motion.div
                                                 initial={{ opacity: 0, y: 20 }}
                                                 whileInView={{ opacity: 1, y: 0 }}
                                                 viewport={{ once: true }}
                                                 whileHover={{ y: -4 }}
-                                                className="glass-editorial p-7 sm:p-9 rounded-[2.5rem] shadow-xl relative overflow-hidden flex flex-col justify-center text-center items-center"
+                                                className="bg-gradient-to-br from-[#FFF5F8] via-[#FFEBF1] to-[#FCE6EE] p-7 sm:p-8 rounded-[2.5rem] shadow-xl relative overflow-hidden border-2 border-rose-200/80 flex flex-col justify-between text-center"
                                             >
-                                                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-rose-400 to-amber-300 text-white flex items-center justify-center shadow-lg shadow-rose-300/40 mb-5">
-                                                    <Gift className="w-7 h-7" />
-                                                </div>
+                                                <div className="absolute -top-12 -right-12 w-40 h-40 bg-pink-300/30 rounded-full blur-2xl pointer-events-none" />
 
-                                                {sv.badge_cumple && (
-                                                    <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-rose-600 mb-2">
-                                                        {sv.badge_cumple}
-                                                    </span>
-                                                )}
+                                                <div className="relative z-10">
+                                                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-300 text-rose-700 text-[10px] font-bold uppercase tracking-[0.25em] mb-3">
+                                                        <Gift className="w-3 h-3 text-rose-600" /> Vales de Regalo
+                                                    </div>
 
-                                                <h3 className="font-editorial text-3xl sm:text-4xl font-bold tracking-tight mb-4 text-[#231C19]">
-                                                    {sv.titulo_cumple}{' '}
-                                                    <span className="italic font-normal text-rose-gold-gradient">
-                                                        {sv.titulo_cumple_resaltado}
-                                                    </span>
-                                                </h3>
-                                                <p className="text-stone-600 font-normal leading-relaxed text-sm sm:text-base max-w-sm mb-6">
-                                                    {sv.texto_cumple}
-                                                </p>
-                                                {sv.boton_cumple && (
-                                                    <a
-                                                        href="#reserva"
-                                                        className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-rose-700 hover:text-rose-800 bg-rose-100/80 hover:bg-rose-200/80 border border-rose-200 px-6 py-3 rounded-full transition"
+                                                    <h3 className="font-editorial text-3xl sm:text-4xl font-extrabold tracking-wide text-stone-900 mb-1">
+                                                        GIFT CARD
+                                                    </h3>
+                                                    <p className="font-editorial italic text-stone-700 text-sm sm:text-base font-medium mb-4">
+                                                        ¡Nada mejora tu actitud, cómo unas uñas preciosas!
+                                                    </p>
+
+                                                    <div className="bg-white/90 backdrop-blur-md rounded-2xl p-4 border border-rose-200/80 text-left text-xs space-y-2 mb-5 shadow-sm">
+                                                        <div>
+                                                            <span className="text-[10px] font-bold uppercase tracking-wider text-rose-500 block">
+                                                                Vale por:
+                                                            </span>
+                                                            <p className="font-bold text-stone-900 text-sm">
+                                                                Cualquier servicio a elección (o monto libre)
+                                                            </p>
+                                                        </div>
+                                                        <div className="pt-2 border-t border-rose-100 flex items-center justify-between text-[11px] text-stone-600">
+                                                            <span>PintaditasNails by Mili Tripolone</span>
+                                                            <span className="font-semibold text-rose-600">Cel: 3816988692</span>
+                                                        </div>
+                                                    </div>
+
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setGiftCardOpen(true)}
+                                                        className="w-full inline-flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-[0.15em] text-white bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 px-6 py-3.5 rounded-full shadow-md shadow-rose-200 transition cursor-pointer"
                                                     >
-                                                        <Sparkles className="w-3.5 h-3.5" />{' '}
-                                                        {sv.boton_cumple}
-                                                    </a>
-                                                )}
+                                                        <Sparkles className="w-4 h-4" /> Solicitar Gift Card de Regalo
+                                                    </button>
+                                                </div>
                                             </motion.div>
-                                        )}
+
+                                            {/* Tarjeta 2: Beneficios de Cumpleaños & Fidelidad (10% en servicio #12) */}
+                                            {sv.mostrar_cumple && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, y: 20 }}
+                                                    whileInView={{ opacity: 1, y: 0 }}
+                                                    viewport={{ once: true }}
+                                                    whileHover={{ y: -4 }}
+                                                    className="glass-editorial p-7 sm:p-8 rounded-[2.5rem] shadow-xl relative overflow-hidden flex flex-col justify-between"
+                                                >
+                                                    <div className="text-center">
+                                                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-300 text-amber-800 text-[10px] font-bold uppercase tracking-[0.2em] mb-3">
+                                                            <Star className="w-3 h-3 text-amber-600" /> Beneficios Exclusivos
+                                                        </div>
+
+                                                        <h3 className="font-editorial text-2xl sm:text-3xl font-bold tracking-tight mb-2 text-[#231C19]">
+                                                            {sv.titulo_cumple}{' '}
+                                                            <span className="italic font-normal text-rose-gold-gradient">
+                                                                {sv.titulo_cumple_resaltado}
+                                                            </span>
+                                                        </h3>
+                                                        <p className="text-stone-600 font-normal leading-relaxed text-xs sm:text-sm max-w-sm mx-auto mb-4">
+                                                            {sv.texto_cumple}
+                                                        </p>
+
+                                                        {/* Alerta del 10% OFF en el Servicio #12 */}
+                                                        <div className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-50 via-orange-50 to-pink-50 border border-amber-200/80 text-left mb-4 shadow-sm">
+                                                            <div className="flex items-center gap-2 mb-1">
+                                                                <span className="text-base">🏆</span>
+                                                                <p className="text-xs font-black text-amber-900 tracking-wide uppercase">
+                                                                    10% OFF en tu 12° Servicio
+                                                                </p>
+                                                            </div>
+                                                            <p className="text-[11px] text-stone-600 leading-snug">
+                                                                ¡Premiamos tu constancia! En tu servicio número 12 disfrutás de un <strong>10% de descuento de fidelidad</strong> en el salón.
+                                                            </p>
+                                                        </div>
+
+                                                        {sv.boton_cumple && (
+                                                            <a
+                                                                href="#reserva"
+                                                                className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-rose-700 hover:text-rose-800 bg-rose-100/80 hover:bg-rose-200/80 border border-rose-200 px-6 py-2.5 rounded-full transition"
+                                                            >
+                                                                <Sparkles className="w-3.5 h-3.5" /> {sv.boton_cumple}
+                                                            </a>
+                                                        )}
+                                                    </div>
+                                                </motion.div>
+                                            )}
+                                        </div>
                                     </div>
                                 )}
                             </>
@@ -351,6 +441,12 @@ export default function ListaDePrecios() {
                     </div>
                 </section>
             )}
+
+            {/* Modal interactivo de Gift Card */}
+            <GiftCardModal
+                isOpen={giftCardOpen}
+                onClose={() => setGiftCardOpen(false)}
+            />
         </>
     )
 }

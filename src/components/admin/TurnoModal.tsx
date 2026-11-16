@@ -19,11 +19,13 @@ import {
     ExternalLink,
     Save,
     RefreshCw,
-    History
+    History,
+    Gift
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { notificarCambioEnTiempoReal } from '@/app/providers'
+import GiftCardModal from '../GiftCardModal'
 import {
     ModalData,
     EstadoReserva,
@@ -122,6 +124,7 @@ export default function TurnoModal({
         !!modalData.ocupa_bloque_siguiente
     )
     const [guardandoServicio, setGuardandoServicio] = useState(false)
+    const [giftCardModalOpen, setGiftCardModalOpen] = useState(false)
 
     // 2. Estado de Fecha y Horario (Zona Horaria Argentina)
     const [nuevaFecha, setNuevaFecha] = useState(modalData.fecha)
@@ -622,6 +625,14 @@ export default function TurnoModal({
                 <div className="flex items-center gap-2">
                     <button
                         type="button"
+                        onClick={() => setGiftCardModalOpen(true)}
+                        className="inline-flex items-center gap-1.5 bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white text-xs font-bold px-3 py-2 rounded-xl transition shadow-sm cursor-pointer"
+                    >
+                        <Gift className="w-3.5 h-3.5" />
+                        Emitir Gift Card
+                    </button>
+                    <button
+                        type="button"
                         onClick={() => {
                             navigator.clipboard?.writeText(linkSeguimiento)
                             toast.success('Enlace de seguimiento copiado al portapapeles')
@@ -827,7 +838,9 @@ export default function TurnoModal({
                                 Sumar Adicionales / Nail Art / Retirado al turno
                             </label>
                             <div className="flex flex-wrap gap-2">
-                                {ADICIONALES_RAPIDOS.map(ad => {
+                                {ADICIONALES_RAPIDOS.filter(
+                                    ad => ad.id !== 'retirado_otro'
+                                ).map(ad => {
                                     const activo = adicionalesSel.includes(ad.id)
                                     return (
                                         <button
@@ -855,6 +868,36 @@ export default function TurnoModal({
                             </div>
                         </div>
 
+                        {/* Alerta inteligente: 10% OFF en 12° Servicio (Fidelidad) */}
+                        {historialCliente && historialCliente.completados >= 11 && (
+                            <div className="mb-4 p-3.5 rounded-2xl bg-gradient-to-r from-amber-50 via-orange-50 to-pink-50 border border-amber-300 flex items-center justify-between gap-3 shadow-sm">
+                                <div className="flex items-center gap-2.5">
+                                    <span className="text-2xl">🏆</span>
+                                    <div>
+                                        <p className="text-xs font-black text-amber-950 uppercase tracking-wide">
+                                            ¡12° Servicio • 10% OFF Fidelidad!
+                                        </p>
+                                        <p className="text-[11px] text-amber-900 font-medium">
+                                            {historialCliente.completados === 11
+                                                ? '¡Este turno completa su ciclo de 12 servicios! Le corresponde un 10% de regalo.'
+                                                : `Esta clienta acumula ${historialCliente.completados} servicios realizados.`}
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setDescuento(10)
+                                        setMotivoDescuento('Servicio N° 12 (10% OFF Fidelidad) 🏆')
+                                        toast.success('Descuento de 10% por 12° servicio aplicado')
+                                    }}
+                                    className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-black tracking-wide shadow-sm transition shrink-0 cursor-pointer"
+                                >
+                                    Aplicar 10% OFF
+                                </button>
+                            </div>
+                        )}
+
                         {/* Descuento (%) y Precio Personalizado */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                             <div className="bg-stone-50 border border-stone-200/80 rounded-2xl p-3.5">
@@ -862,18 +905,23 @@ export default function TurnoModal({
                                     Descuento / Promoción (%)
                                 </label>
                                 <div className="flex flex-wrap gap-1.5 mb-2">
-                                    {[0, 10, 15, 20, 25].map(pct => (
+                                    {[0, 10, 15, 20, 25, 100].map(pct => (
                                         <button
                                             key={pct}
                                             type="button"
-                                            onClick={() => setDescuento(pct)}
+                                            onClick={() => {
+                                                setDescuento(pct)
+                                                if (pct === 100) {
+                                                    setMotivoDescuento('Voucher / Gift Card de Regalo 🎁')
+                                                }
+                                            }}
                                             className={`px-2.5 py-1 rounded-lg text-xs font-bold border cursor-pointer ${
                                                 descuento === pct
                                                     ? 'bg-rose-500 text-white border-rose-600'
                                                     : 'bg-white text-stone-700 border-stone-200'
                                             }`}
                                         >
-                                            {pct === 0 ? '0%' : `-${pct}%`}
+                                            {pct === 0 ? '0%' : pct === 100 ? '100% (Voucher)' : `-${pct}%`}
                                         </button>
                                     ))}
                                 </div>
@@ -882,6 +930,12 @@ export default function TurnoModal({
                                     onChange={e => setMotivoDescuento(e.target.value)}
                                     className="w-full bg-white border border-stone-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-stone-800"
                                 >
+                                    <option value="Servicio N° 12 (10% OFF Fidelidad) 🏆">
+                                        Servicio N° 12 (10% OFF Fidelidad) 🏆
+                                    </option>
+                                    <option value="Voucher / Gift Card de Regalo 🎁">
+                                        Voucher / Gift Card de Regalo 🎁
+                                    </option>
                                     <option value="Cumpleaños 🎂">Cumpleaños 🎂</option>
                                     <option value="Clienta frecuente ⭐">
                                         Clienta frecuente ⭐
@@ -942,6 +996,7 @@ export default function TurnoModal({
                                 >
                                     <option value="local">💵 Efectivo / En el Salón</option>
                                     <option value="transferencia">🏦 Transferencia / Alias</option>
+                                    <option value="voucher">🎁 Voucher / Gift Card de Regalo</option>
                                     <option value="mp">💳 Mercado Pago</option>
                                 </select>
                             </div>
@@ -1454,6 +1509,18 @@ export default function TurnoModal({
                     </div>
                 </div>
             </div>
+
+            {/* Modal de Emisión de Gift Card digital */}
+            <GiftCardModal
+                isOpen={giftCardModalOpen}
+                onClose={() => setGiftCardModalOpen(false)}
+                isAdmin={true}
+                defaultServicio={servicioElegido.split('(')[0].trim()}
+                clienteDestino={{
+                    nombre: nombreCliente || modalData.cliente,
+                    celular: celularCliente || modalData.celular
+                }}
+            />
         </div>
     )
 }

@@ -18,8 +18,11 @@ import {
     Crown,
     Trash2,
     X,
-    FileText
+    FileText,
+    Gift,
+    Award
 } from 'lucide-react'
+import GiftCardModal from '../GiftCardModal'
 import { celularParaWhatsapp, getHoyArgentina } from '@/lib/utils'
 import type { ResumenCliente, EtiquetaCliente } from '@/lib/reservas-server'
 import {
@@ -34,6 +37,7 @@ type FiltroClientes =
     | 'cumple_mes'
     | 'service'
     | 'frecuentes'
+    | 'fidelidad_12'
     | 'sin_celular'
 
 const ETIQUETA_BADGE: Record<
@@ -98,6 +102,7 @@ export default function ClientesPanel({
     const [turnoHorario, setTurnoHorario] = useState(horariosBase[0] || '10:00')
     const [turnoServicio, setTurnoServicio] = useState('')
     const [guardandoTurno, setGuardandoTurno] = useState(false)
+    const [giftCardClient, setGiftCardClient] = useState<ResumenCliente | null>(null)
 
     // Métricas superiores de cartera
     const kpis = useMemo(() => {
@@ -109,6 +114,7 @@ export default function ClientesPanel({
             cumpleSemana: clientes.filter(c => c.esCumpleSemana).length,
             cumpleMes: clientes.filter(c => c.esCumpleMes).length,
             paraService: clientes.filter(c => c.necesitaService).length,
+            fidelidad12: clientes.filter(c => c.completados >= 11).length,
             sinCelular: clientes.filter(c => !c.celularDisplay).length
         }
     }, [clientes])
@@ -127,6 +133,7 @@ export default function ClientesPanel({
             ) {
                 return false
             }
+            if (filtro === 'fidelidad_12' && c.completados < 11) return false
             if (filtro === 'sin_celular' && !!c.celularDisplay) return false
 
             if (!q) return true
@@ -410,6 +417,10 @@ export default function ClientesPanel({
                                 label: `⭐ Frecuentes / VIP (${kpis.frecuentes})`
                             },
                             {
+                                id: 'fidelidad_12',
+                                label: `🏆 12° Servicio / 10% OFF (${kpis.fidelidad12})`
+                            },
+                            {
                                 id: 'sin_celular',
                                 label: `📱 Sin Celular (${kpis.sinCelular})`
                             }
@@ -525,6 +536,24 @@ export default function ClientesPanel({
                                                 {c.ausencias} ausencias
                                             </span>
                                         )}
+                                        {c.completados >= 11 && (
+                                            <span className="bg-gradient-to-r from-amber-400 to-orange-400 text-stone-900 border border-amber-500 px-2.5 py-1 rounded-lg font-black flex items-center gap-1 shadow-sm">
+                                                🏆 {c.completados === 11 ? '¡12° Servicio: 10% OFF!' : '10% OFF Fidelidad'}
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    {/* Contador de progreso hacia el 12° servicio */}
+                                    <div className="flex items-center justify-between text-[11px] text-amber-950 bg-amber-50/80 border border-amber-200/80 rounded-xl px-3 py-1.5 mb-2.5">
+                                        <span className="flex items-center gap-1 font-bold">
+                                            🎯 Progreso Fidelidad:
+                                        </span>
+                                        <span className="font-black text-rose-700">
+                                            {c.completados % 12}/12 servicios
+                                        </span>
+                                        <span className="text-stone-500 text-[10px]">
+                                            (10% OFF en turno #12)
+                                        </span>
                                     </div>
 
                                     {/* Estado de última visita / alerta de service / próximo turno */}
@@ -654,6 +683,15 @@ export default function ClientesPanel({
                                             >
                                                 <Send className="w-3.5 h-3.5" /> Chat WhatsApp
                                             </a>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => setGiftCardClient(c)}
+                                                className="bg-pink-50 hover:bg-pink-100 text-pink-700 border border-pink-200 text-xs font-bold py-2.5 px-3 rounded-xl flex items-center justify-center gap-1.5 transition cursor-pointer"
+                                                title="Emitir Gift Card para esta clienta"
+                                            >
+                                                <Gift className="w-3.5 h-3.5 text-pink-600" /> Gift Card
+                                            </button>
                                         </div>
                                     )}
                                 </div>
@@ -981,6 +1019,18 @@ export default function ClientesPanel({
                     </div>
                 </div>
             )}
+
+            {/* Modal de emisión de Gift Card para la clienta seleccionada */}
+            <GiftCardModal
+                isOpen={!!giftCardClient}
+                onClose={() => setGiftCardClient(null)}
+                isAdmin={true}
+                defaultServicio="Servicio de Manicuría a Elección"
+                clienteDestino={{
+                    nombre: giftCardClient?.nombre,
+                    celular: giftCardClient?.celularDisplay
+                }}
+            />
         </div>
     )
 }

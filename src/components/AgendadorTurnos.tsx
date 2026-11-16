@@ -640,11 +640,13 @@ export default function AgendadorTurnos() {
                         ) : (
                             <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 gap-4">
                                 <div>
-                                    <label className="flex items-center gap-1.5 text-[#231C19] text-xs uppercase tracking-wider mb-1.5 font-bold">
+                                    <label htmlFor="nombre" className="flex items-center gap-1.5 text-[#231C19] text-xs uppercase tracking-wider mb-1.5 font-bold">
                                         <User className="w-3.5 h-3.5 text-rose-500" /> Nombre y Apellido
                                     </label>
                                     <input
+                                        id="nombre"
                                         type="text"
+                                        autoComplete="name"
                                         {...register('nombre')}
                                         placeholder="Ej: María Gómez"
                                         className="w-full p-3.5 text-base bg-white/95 text-stone-800 border border-rose-200/80 rounded-xl placeholder-stone-400 focus:bg-white focus:outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-200/40 transition-all shadow-sm"
@@ -658,15 +660,18 @@ export default function AgendadorTurnos() {
 
                                 {/* Fecha de nacimiento compatible con Android e iPhone */}
                                 <div>
-                                    <label className="flex items-center gap-1.5 text-[#231C19] text-xs uppercase tracking-wider mb-1.5 font-bold">
+                                    <label htmlFor="nacDia" className="flex items-center gap-1.5 text-[#231C19] text-xs uppercase tracking-wider mb-1.5 font-bold">
                                         <Cake className="w-3.5 h-3.5 text-rose-500" /> Fecha de Nacimiento{' '}
                                         <span className="text-rose-600 text-[11px] font-normal normal-case">
                                             (🎂 para promos de cumpleaños)
                                         </span>
                                     </label>
-                                    <input type="hidden" {...register('fechaNacimiento')} />
+                                    <input type="hidden" id="fechaNacimiento" {...register('fechaNacimiento')} />
                                     <div className="grid grid-cols-3 gap-2">
                                         <select
+                                            id="nacDia"
+                                            name="nacDia"
+                                            autoComplete="bday-day"
                                             aria-label="Día de nacimiento"
                                             value={nacDia}
                                             onChange={e => setNacDia(e.target.value)}
@@ -683,6 +688,9 @@ export default function AgendadorTurnos() {
                                             })}
                                         </select>
                                         <select
+                                            id="nacMes"
+                                            name="nacMes"
+                                            autoComplete="bday-month"
                                             aria-label="Mes de nacimiento"
                                             value={nacMes}
                                             onChange={e => setNacMes(e.target.value)}
@@ -696,6 +704,9 @@ export default function AgendadorTurnos() {
                                             ))}
                                         </select>
                                         <select
+                                            id="nacAnio"
+                                            name="nacAnio"
+                                            autoComplete="bday-year"
                                             aria-label="Año de nacimiento"
                                             value={nacAnio}
                                             onChange={e => setNacAnio(e.target.value)}
@@ -718,11 +729,13 @@ export default function AgendadorTurnos() {
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
-                                        <label className="flex items-center gap-1.5 text-[#231C19] text-xs uppercase tracking-wider mb-1.5 font-bold">
+                                        <label htmlFor="celular" className="flex items-center gap-1.5 text-[#231C19] text-xs uppercase tracking-wider mb-1.5 font-bold">
                                             <Phone className="w-3.5 h-3.5 text-rose-500" /> WhatsApp (sin 0 ni 15)
                                         </label>
                                         <input
+                                            id="celular"
                                             type="tel"
+                                            autoComplete="tel"
                                             inputMode="numeric"
                                             {...register('celular', {
                                                 onChange: e =>
@@ -742,14 +755,16 @@ export default function AgendadorTurnos() {
                                         )}
                                     </div>
                                     <div>
-                                        <label className="flex items-center gap-1.5 text-[#231C19] text-xs uppercase tracking-wider mb-1.5 font-bold">
+                                        <label htmlFor="email" className="flex items-center gap-1.5 text-[#231C19] text-xs uppercase tracking-wider mb-1.5 font-bold">
                                             <Mail className="w-3.5 h-3.5 text-rose-500" /> Email{' '}
                                             <span className="text-stone-400 font-normal text-[11px] normal-case">
                                                 (Opcional)
                                             </span>
                                         </label>
                                         <input
+                                            id="email"
                                             type="email"
+                                            autoComplete="email"
                                             {...register('email')}
                                             placeholder="correo@ejemplo.com"
                                             className="w-full p-3.5 text-base bg-white/95 text-stone-800 border border-rose-200/80 rounded-xl placeholder-stone-400 focus:bg-white focus:outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-200/40 transition-all shadow-sm"
@@ -763,10 +778,11 @@ export default function AgendadorTurnos() {
                                 </div>
 
                                 <div>
-                                    <label className="flex items-center gap-1.5 text-[#231C19] text-xs uppercase tracking-wider mb-1.5 font-bold">
+                                    <label htmlFor="servicio" className="flex items-center gap-1.5 text-[#231C19] text-xs uppercase tracking-wider mb-1.5 font-bold">
                                         <Sparkles className="w-3.5 h-3.5 text-rose-500" /> Servicio Principal a realizar
                                     </label>
                                     <select
+                                        id="servicio"
                                         {...register('servicio')}
                                         className="w-full p-3.5 text-base bg-white/95 text-stone-800 border border-pink-200 rounded-xl focus:bg-white focus:outline-none focus:border-pink-500 focus:ring-4 focus:ring-pink-200/50 transition-all shadow-sm min-h-[48px]"
                                     >
@@ -900,8 +916,10 @@ export default function AgendadorTurnos() {
 
                                 {/* Opción de Voucher / Gift Card de Regalo */}
                                 <div className="bg-gradient-to-r from-amber-50/90 via-rose-50/90 to-orange-50/90 border border-amber-200/80 rounded-2xl p-4 shadow-sm">
-                                    <label className="flex items-start gap-3 cursor-pointer">
+                                    <label htmlFor="tieneVoucher" className="flex items-start gap-3 cursor-pointer">
                                         <input
+                                            id="tieneVoucher"
+                                            name="tieneVoucher"
                                             type="checkbox"
                                             checked={tieneVoucher}
                                             onChange={e => setTieneVoucher(e.target.checked)}
@@ -918,7 +936,12 @@ export default function AgendadorTurnos() {
                                     </label>
                                     {tieneVoucher && (
                                         <div className="mt-3 pl-7">
+                                            <label htmlFor="detalleVoucher" className="block text-[11px] font-bold text-stone-700 mb-1">
+                                                Detalle del voucher o regalo:
+                                            </label>
                                             <input
+                                                id="detalleVoucher"
+                                                name="detalleVoucher"
                                                 type="text"
                                                 placeholder="Nombre de quien te lo regaló o servicio del voucher..."
                                                 value={detalleVoucher}

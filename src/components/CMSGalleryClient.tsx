@@ -220,6 +220,8 @@ export default function CMSGalleryClient({
                     </div>
 
                     <input
+                        id="media_upload_input"
+                        name="media_upload_input"
                         type="file"
                         className="hidden"
                         accept="image/*,video/mp4,video/webm,video/quicktime"

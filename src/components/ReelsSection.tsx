@@ -45,7 +45,7 @@ export default function ReelsSection() {
         refetchOnWindowFocus: true
     })
 
-    // Sincronización en tiempo real inmediata al subir/borrar desde el panel admin
+    // Sincronización en tiempo real al subir/eliminar videos desde el panel
     useEffect(() => {
         const unsub = suscribirCambiosRealtime((evento) => {
             if (evento.tipo === 'media_actualizado' || evento.tipo === 'all') {
@@ -67,63 +67,64 @@ export default function ReelsSection() {
     isMutedRef.current = isMuted
 
     const isVisibleRef = useRef(false)
+    const isUserSwipingRef = useRef(false)
 
-    // Reproducción optimizada y segura: sin abortos, sin recargas de buffer en móviles
+    // Reproducción ultra-optimizada para móviles: un solo decodificador activo a la vez
     const playVideoIndex = useCallback(
-        (targetIdx: number) => {
+        (targetIdx: number, shouldSlideSwiper = false) => {
             setActiveIndex(targetIdx)
 
-            if (swiperRef.current) {
+            // Solo mover Swiper si fue pedido explícitamente (ej: fin de video en PC o flecha),
+            // NUNCA mientras el usuario está deslizando con el dedo en el celular
+            if (shouldSlideSwiper && swiperRef.current && !isUserSwipingRef.current) {
                 swiperRef.current.slideTo(targetIdx)
             }
 
+            // 1. Pausar inmediatamente todos los videos inactivos para liberar el chip decodificador del celular
             videoRefs.current.forEach((vid, i) => {
                 if (!vid) return
-
-                if (i === targetIdx) {
-                    vid.muted = isMutedRef.current
-                    vid.defaultMuted = isMutedRef.current
-
-                    // Si ya finalizó, reiniciar suavemente
-                    if (vid.ended) {
-                        vid.currentTime = 0
-                    }
-
-                    // Iniciar reproducción
-                    const playPromise = vid.play()
-                    if (playPromise !== undefined) {
-                        playPromise
-                            .then(() => {
-                                setPlayingState({ [i]: true })
-                            })
-                            .catch(err => {
-                                // Ignorar AbortError normal que ocurre al cambiar rápidamente de video
-                                if (err.name === 'AbortError') return
-
-                                // Si fue rechazado por directiva de audio, forzar mute y reproducir
-                                vid.muted = true
-                                vid.defaultMuted = true
-                                vid.play()
-                                    .then(() => {
-                                        setPlayingState({ [i]: true })
-                                    })
-                                    .catch(() => {
-                                        setPlayingState({ [i]: false })
-                                    })
-                            })
-                    }
-                } else {
-                    // Pausar sin resetear currentTime para no tirar el buffer en celulares
+                if (i !== targetIdx) {
                     if (!vid.paused) {
                         vid.pause()
                     }
                 }
             })
+
+            // 2. Iniciar reproducción del video objetivo
+            const targetVid = videoRefs.current[targetIdx]
+            if (targetVid) {
+                targetVid.muted = isMutedRef.current
+                targetVid.defaultMuted = isMutedRef.current
+
+                if (targetVid.ended) {
+                    targetVid.currentTime = 0
+                }
+
+                const playPromise = targetVid.play()
+                if (playPromise !== undefined) {
+                    playPromise
+                        .then(() => {
+                            setPlayingState({ [targetIdx]: true })
+                        })
+                        .catch(err => {
+                            if (err.name === 'AbortError') return
+                            targetVid.muted = true
+                            targetVid.defaultMuted = true
+                            targetVid.play()
+                                .then(() => {
+                                    setPlayingState({ [targetIdx]: true })
+                                })
+                                .catch(() => {
+                                    setPlayingState({ [targetIdx]: false })
+                                })
+                        })
+                }
+            }
         },
         []
     )
 
-    // Observador de visibilidad optimizado (sensor suave en scroll)
+    // Sensor de visibilidad de la sección
     useEffect(() => {
         const el = sectionRef.current
         if (!el) return
@@ -135,9 +136,9 @@ export default function ReelsSection() {
                     isVisibleRef.current = nowVisible
 
                     if (nowVisible) {
-                        playVideoIndex(activeIndex)
+                        playVideoIndex(activeIndex, false)
                     } else {
-                        // Pausar todos al salir de pantalla
+                        // Al salir de pantalla, pausar el reproductor
                         videoRefs.current.forEach(v => {
                             if (v && !v.paused) v.pause()
                         })
@@ -147,7 +148,7 @@ export default function ReelsSection() {
             },
             {
                 threshold: 0.15,
-                rootMargin: '80px 0px 80px 0px'
+                rootMargin: '60px 0px 60px 0px'
             }
         )
 
@@ -155,11 +156,22 @@ export default function ReelsSection() {
         return () => observer.disconnect()
     }, [activeIndex, playVideoIndex])
 
-    // Al deslizar en celular o avanzar con flechas
+    // Eventos de Swiper en celular
+    const handleTouchStart = () => {
+        isUserSwipingRef.current = true
+    }
+
+    const handleTouchEnd = () => {
+        setTimeout(() => {
+            isUserSwipingRef.current = false
+        }, 300)
+    }
+
     const handleSlideChange = (swiper: SwiperType) => {
         const newIdx = swiper.realIndex ?? swiper.activeIndex
         if (newIdx !== activeIndex && isVisibleRef.current) {
-            playVideoIndex(newIdx)
+            // Reproducir sin forzar slideTo (Swiper ya se está moviendo con el dedo)
+            playVideoIndex(newIdx, false)
         }
     }
 
@@ -174,12 +186,11 @@ export default function ReelsSection() {
             return
         }
 
-        // Bucle continuo consecutivo (0 -> 1 -> 2 -> 3 -> 4 -> 0...)
         const nextIndex = (idx + 1) % reels.length
-        playVideoIndex(nextIndex)
+        playVideoIndex(nextIndex, true)
     }
 
-    // Alternar sonido global para los reels
+    // Alternar sonido global
     const toggleSound = (e: React.MouseEvent) => {
         e.stopPropagation()
         const newMuted = !isMuted
@@ -193,7 +204,7 @@ export default function ReelsSection() {
         }
     }
 
-    // Tocar o hacer clic en cualquier reel
+    // Clic / tap directo sobre cualquier reel
     const togglePlayPause = (idx: number) => {
         const vid = videoRefs.current[idx]
         if (!vid) return
@@ -202,7 +213,7 @@ export default function ReelsSection() {
             vid.pause()
             setPlayingState({ [idx]: false })
         } else {
-            playVideoIndex(idx)
+            playVideoIndex(idx, true)
         }
     }
 
@@ -213,15 +224,12 @@ export default function ReelsSection() {
         <section
             ref={sectionRef}
             id="reels"
-            className="py-16 md:py-20 bg-gradient-to-b from-[#FAF6F2] via-[#FDF8F5] to-[#FAF3EE] border-b border-rose-200/40 relative overflow-hidden"
+            className="py-14 md:py-20 bg-gradient-to-b from-[#FAF6F2] via-[#FDF8F5] to-[#FAF3EE] border-b border-rose-200/40 relative overflow-hidden"
+            style={{ contain: 'paint' }}
         >
-            {/* Resplandores decorativos */}
-            <div className="absolute top-0 right-10 w-96 h-96 bg-rose-200/25 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute bottom-0 left-10 w-96 h-96 bg-amber-200/20 rounded-full blur-3xl pointer-events-none" />
-
-            <div className="container mx-auto px-6 mb-10 text-center relative z-10">
-                <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-rose-100/90 border border-rose-200 text-rose-700 text-[10px] sm:text-xs font-bold uppercase tracking-[0.25em] mb-3 shadow-sm">
-                    <Sparkles className="w-3.5 h-3.5" /> NAILS EN MOVIMIENTO
+            <div className="container mx-auto px-6 mb-8 text-center relative z-10">
+                <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-rose-100/90 border border-rose-200 text-rose-700 text-[10px] sm:text-xs font-bold uppercase tracking-[0.25em] mb-2.5 shadow-sm">
+                    <Sparkles className="w-3.5 h-3.5 text-rose-600" /> NAILS EN MOVIMIENTO
                 </div>
                 <h2 className="font-editorial text-3xl sm:text-4xl md:text-5xl font-semibold text-[#231C19] tracking-tight">
                     Reels &amp;{' '}
@@ -229,7 +237,7 @@ export default function ReelsSection() {
                         Trabajos Reales
                     </span>
                 </h2>
-                <p className="text-stone-500 mt-2.5 font-normal text-xs sm:text-sm md:text-base max-w-lg mx-auto">
+                <p className="text-stone-500 mt-2 font-normal text-xs sm:text-sm md:text-base max-w-lg mx-auto">
                     Apreciá el brillo, los relieves y la terminación en video. Se reproducen de forma continua uno tras otro.
                 </p>
             </div>
@@ -241,9 +249,9 @@ export default function ReelsSection() {
                     type="button"
                     onClick={() => {
                         const prevIdx = activeIndex === 0 ? reels.length - 1 : activeIndex - 1
-                        playVideoIndex(prevIdx)
+                        playVideoIndex(prevIdx, true)
                     }}
-                    className="hidden md:flex absolute -left-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-white/95 hover:bg-white text-stone-800 shadow-xl border border-rose-200 items-center justify-center transition-transform hover:scale-110 active:scale-95"
+                    className="hidden md:flex absolute -left-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-white/95 hover:bg-white text-stone-800 shadow-lg border border-rose-200 items-center justify-center transition-transform hover:scale-110 active:scale-95"
                     title="Anterior reel"
                 >
                     <ChevronLeft className="w-6 h-6 text-stone-700" />
@@ -254,9 +262,9 @@ export default function ReelsSection() {
                     type="button"
                     onClick={() => {
                         const nextIdx = (activeIndex + 1) % reels.length
-                        playVideoIndex(nextIdx)
+                        playVideoIndex(nextIdx, true)
                     }}
-                    className="hidden md:flex absolute -right-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-white/95 hover:bg-white text-stone-800 shadow-xl border border-rose-200 items-center justify-center transition-transform hover:scale-110 active:scale-95"
+                    className="hidden md:flex absolute -right-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-white/95 hover:bg-white text-stone-800 shadow-lg border border-rose-200 items-center justify-center transition-transform hover:scale-110 active:scale-95"
                     title="Siguiente reel"
                 >
                     <ChevronRight className="w-6 h-6 text-stone-700" />
@@ -267,51 +275,53 @@ export default function ReelsSection() {
                     onSwiper={swiper => {
                         swiperRef.current = swiper
                     }}
+                    onTouchStart={handleTouchStart}
+                    onTouchEnd={handleTouchEnd}
                     onSlideChange={handleSlideChange}
                     grabCursor={true}
                     pagination={{ clickable: true, dynamicBullets: true }}
                     breakpoints={{
-                        // Celular: centrado, 1.22 slides para encuadre simétrico sin cortes
+                        // Celular: 1.22 slides centrado para encuadre nítido y fluido
                         320: {
                             slidesPerView: 1.22,
                             centeredSlides: true,
-                            spaceBetween: 14
+                            spaceBetween: 12
                         },
                         480: {
                             slidesPerView: 1.45,
                             centeredSlides: true,
-                            spaceBetween: 16
+                            spaceBetween: 14
                         },
                         // Tablets
                         640: {
                             slidesPerView: 2.2,
                             centeredSlides: false,
-                            spaceBetween: 18
+                            spaceBetween: 16
                         },
                         768: {
                             slidesPerView: 3,
                             centeredSlides: false,
-                            spaceBetween: 20
+                            spaceBetween: 18
                         },
                         // PC / Laptops
                         1024: {
                             slidesPerView: 3.5,
                             centeredSlides: false,
-                            spaceBetween: 22
+                            spaceBetween: 20
                         },
                         1280: {
                             slidesPerView: 4,
                             centeredSlides: false,
-                            spaceBetween: 24
+                            spaceBetween: 22
                         }
                     }}
-                    className="w-full pb-12 pt-2 !overflow-visible"
+                    className="w-full pb-10 pt-1 !overflow-visible"
                 >
                     {reels.map((reel: ReelItem, idx: number) => {
                         const isActive = idx === activeIndex
                         const isPlaying = playingState[idx] ?? false
 
-                        // Optimización crítica para celulares: solo precargar video activo y su vecino inmediato
+                        // Aceleración de memoria: solo precargar el activo y el vecino inmediato
                         const isAdjacent = Math.abs(idx - activeIndex) <= 1
                         const preloadMode = isActive ? 'auto' : (isAdjacent ? 'metadata' : 'none')
 
@@ -319,14 +329,20 @@ export default function ReelsSection() {
                             <SwiperSlide key={reel.name || idx}>
                                 <div
                                     onClick={() => togglePlayPause(idx)}
-                                    className={`relative w-full rounded-[2.25rem] overflow-hidden shadow-xl border transition-all duration-500 cursor-pointer select-none bg-stone-950 group ${
+                                    className={`relative w-full rounded-[2rem] overflow-hidden border cursor-pointer select-none bg-stone-950 transition-colors duration-200 ${
                                         isActive
-                                            ? 'ring-2 ring-rose-400 border-white shadow-2xl scale-[1.02]'
-                                            : 'border-rose-100/80 shadow-md opacity-90 hover:opacity-100 hover:scale-[1.01]'
+                                            ? 'ring-2 ring-rose-400 border-white shadow-xl'
+                                            : 'border-rose-100/70 shadow-md'
                                     }`}
-                                    style={{ aspectRatio: '9/16' }}
+                                    style={{
+                                        aspectRatio: '9/16',
+                                        transform: 'translateZ(0)',
+                                        WebkitTransform: 'translateZ(0)',
+                                        backfaceVisibility: 'hidden',
+                                        WebkitBackfaceVisibility: 'hidden'
+                                    }}
                                 >
-                                    {/* Video Player Ultra Optimizado */}
+                                    {/* Video Player nativo con aceleración por hardware */}
                                     <video
                                         ref={el => {
                                             videoRefs.current[idx] = el
@@ -340,7 +356,6 @@ export default function ReelsSection() {
                                         playsInline
                                         // @ts-ignore
                                         webkit-playsinline="true"
-                                        autoPlay={idx === 0}
                                         muted={isMuted}
                                         preload={preloadMode}
                                         // @ts-ignore
@@ -354,22 +369,26 @@ export default function ReelsSection() {
                                         onPause={() =>
                                             setPlayingState(prev => (prev[idx] ? { [idx]: false } : prev))
                                         }
+                                        style={{
+                                            transform: 'translateZ(0)',
+                                            WebkitTransform: 'translateZ(0)'
+                                        }}
                                     />
 
-                                    {/* Gradiente estilo Instagram Reels */}
-                                    <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent via-55% to-black/85 pointer-events-none" />
+                                    {/* Overlay ligero optimizado sin backdrop-blur pesado para 60fps en celular */}
+                                    <div className="absolute inset-0 bg-gradient-to-b from-black/45 via-transparent via-50% to-black/85 pointer-events-none" />
 
                                     {/* Header de la tarjeta */}
-                                    <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-10 pointer-events-none">
-                                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/50 backdrop-blur-md border border-white/20 text-white text-[10px] font-bold">
+                                    <div className="absolute top-3.5 left-3.5 right-3.5 flex items-center justify-between z-10 pointer-events-none">
+                                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/75 border border-white/20 text-white text-[10px] font-bold">
                                             <Film className="w-3 h-3 text-rose-300" /> REEL #{idx + 1}
                                         </div>
 
-                                        {/* Botón de Sonido interactivo */}
+                                        {/* Botón de Sonido con fondo sólido translúcido (0% costo GPU) */}
                                         <button
                                             type="button"
                                             onClick={toggleSound}
-                                            className="pointer-events-auto w-8 h-8 rounded-full bg-black/60 backdrop-blur-md text-white flex items-center justify-center hover:bg-black/80 transition shadow-md border border-white/20"
+                                            className="pointer-events-auto w-8 h-8 rounded-full bg-black/75 text-white flex items-center justify-center hover:bg-black transition shadow border border-white/20"
                                             title={isMuted ? 'Activar sonido' : 'Silenciar'}
                                         >
                                             {isMuted ? (
@@ -382,23 +401,20 @@ export default function ReelsSection() {
 
                                     {/* Botón central de Play si está pausado */}
                                     {!isPlaying && (
-                                        <div className="absolute inset-0 m-auto w-14 h-14 rounded-full bg-white/90 text-stone-900 shadow-2xl flex items-center justify-center pointer-events-none transform scale-100 group-hover:scale-110 transition duration-300">
-                                            <Play className="w-6 h-6 ml-1 fill-current text-rose-600" />
+                                        <div className="absolute inset-0 m-auto w-13 h-13 rounded-full bg-white/95 text-stone-900 shadow-xl flex items-center justify-center pointer-events-none">
+                                            <Play className="w-5 h-5 ml-0.5 fill-current text-rose-600" />
                                         </div>
                                     )}
 
-                                    {/* Indicador de Reel Activo */}
+                                    {/* Indicador estático liviano de Reel Activo */}
                                     {isActive && isPlaying && (
                                         <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10">
-                                            <span className="flex h-2 w-2 relative">
-                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
-                                                <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500" />
-                                            </span>
+                                            <span className="inline-block w-2 h-2 rounded-full bg-rose-500 shadow-[0_0_8px_#f43f5e]" />
                                         </div>
                                     )}
 
                                     {/* Footer con información y CTA de WhatsApp */}
-                                    <div className="absolute bottom-4 left-4 right-4 z-10 flex flex-col gap-2 pointer-events-none">
+                                    <div className="absolute bottom-3.5 left-3.5 right-3.5 z-10 flex flex-col gap-2 pointer-events-none">
                                         <div>
                                             <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-rose-300">
                                                 Pintaditas Nails • Mili
@@ -413,7 +429,7 @@ export default function ReelsSection() {
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             onClick={e => e.stopPropagation()}
-                                            className="pointer-events-auto inline-flex items-center justify-center gap-1.5 w-full py-2 px-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold shadow-lg shadow-emerald-950/40 transition transform hover:-translate-y-0.5 active:translate-y-0"
+                                            className="pointer-events-auto inline-flex items-center justify-center gap-1.5 w-full py-2 px-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold shadow-md shadow-emerald-950/40 transition active:scale-95"
                                         >
                                             <MessageCircle className="w-3.5 h-3.5" />
                                             Pedir este diseño

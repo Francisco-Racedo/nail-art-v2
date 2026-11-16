@@ -36,7 +36,7 @@ export default function LoginPage() {
                         <span className="text-3xl">💅</span>
                     </div>
                     <h1 className="text-2xl font-bold text-zinc-900 font-serif">Panel Administración</h1>
-                    <p className="text-zinc-500 text-sm mt-1">Fran &amp; Romy Nails</p>
+                    <p className="text-zinc-500 text-sm mt-1">Pintitas Nails</p>
                 </div>
 
                 {/* Error */}

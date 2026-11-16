@@ -103,7 +103,7 @@ export default function AjustesClient({
 
     // 1. Estado de Ajustes Generales
     const [nombreNegocio, setNombreNegocio] = useState(
-        config?.nombre_negocio || 'Fran & Romy Nails'
+        config?.nombre_negocio || 'Pintitas Nails'
     )
     const [whatsappNumero, setWhatsappNumero] = useState(
         config?.whatsapp_numero || '5493813013850'
@@ -139,7 +139,7 @@ export default function AjustesClient({
     const [subiendoArchivo, setSubiendoArchivo] = useState(false)
 
     useEffect(() => {
-        setNombreNegocio(config?.nombre_negocio || 'Fran & Romy Nails')
+        setNombreNegocio(config?.nombre_negocio || 'Pintitas Nails')
         setWhatsappNumero(config?.whatsapp_numero || '5493813013850')
         setIntervaloMinutos(Number(config?.intervalo_minutos) || 120)
         setHoraInicio(config?.hora_inicio || '10:00')

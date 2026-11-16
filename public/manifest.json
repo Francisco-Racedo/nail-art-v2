@@ -1,7 +1,7 @@
 {
-  "name": "Fran & Romy Nails — Panel y Turnos",
-  "short_name": "F&R Nails",
-  "description": "Reserva de turnos y panel de gestión de Fran & Romy Nails",
+  "name": "PINTITAS NAILS | MANICURA PROFESIONAL EN LULES, TUCUMÁN",
+  "short_name": "Pintitas Nails",
+  "description": "Reserva de turnos y panel de gestión de Pintitas Nails",
   "start_url": "/admin/dashboard",
   "scope": "/",
   "display": "standalone",

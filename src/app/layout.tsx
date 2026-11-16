@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next"
 import { Geist, Cormorant_Garamond } from "next/font/google"
 import "./globals.css"
 import Providers from "./providers"
+import { getConfigCompleta } from "@/lib/reservas-server"
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -21,15 +22,20 @@ export const viewport: Viewport = {
   initialScale: 1,
 }
 
-export const metadata: Metadata = {
-  title: "Fran & Romy Nails | Manicuría Profesional en Lules, Tucumán",
-  description: "Especialistas en Kapping, Uñas Esculpidas, Semipermanente y Pedi Spa en Lules. Reservá tu turno online.",
-  manifest: "/manifest.json",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "default",
-    title: "F&R Nails",
-  },
+export async function generateMetadata(): Promise<Metadata> {
+  const cfg = await getConfigCompleta()
+  const nombre = (cfg.nombre_negocio || "Pintitas Nails").toUpperCase()
+  return {
+    title: `${nombre} | MANICURA PROFESIONAL EN LULES, TUCUMÁN`,
+    description:
+      "Especialistas en Kapping, Uñas Esculpidas, Semipermanente y Pedi Spa en Lules. Reservá tu turno online.",
+    manifest: "/manifest.json",
+    appleWebApp: {
+      capable: true,
+      statusBarStyle: "default",
+      title: cfg.nombre_negocio || "Pintitas Nails",
+    },
+  }
 }
 
 export default function RootLayout({

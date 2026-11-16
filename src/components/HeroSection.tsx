@@ -24,7 +24,7 @@ export default function HeroSection({ initialNombre }: { initialNombre?: string 
     const cms = config?.cms ? mergeCMSContenido(config.cms) : DEFAULT_CMS_CONTENIDO
     if (!cms.hero.visible) return null
 
-    const firmaNegocio = config?.nombre_negocio || initialNombre || 'Fran & Romy'
+    const firmaNegocio = config?.nombre_negocio || initialNombre || 'Pintitas Nails'
     const h = cms.hero
 
     return (

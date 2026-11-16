@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Sparkles, CalendarCheck } from 'lucide-react'
 import { DEFAULT_CMS_CONTENIDO, mergeCMSContenido } from '@/lib/cms-types'
@@ -16,13 +17,20 @@ export default function NavBar({ initialNombre }: { initialNombre?: string }) {
     })
 
     const cms = config?.cms ? mergeCMSContenido(config.cms) : DEFAULT_CMS_CONTENIDO
-    if (!cms.navbar.visible) return null
 
     const nombreNegocio = (
         config?.nombre_negocio ||
         initialNombre ||
-        'FRAN & ROMY NAILS'
+        'PINTITAS NAILS'
     ).toUpperCase()
+
+    useEffect(() => {
+        if (typeof document !== 'undefined' && nombreNegocio) {
+            document.title = `${nombreNegocio} | MANICURA PROFESIONAL EN LULES, TUCUMÁN`
+        }
+    }, [nombreNegocio])
+
+    if (!cms.navbar.visible) return null
 
     return (
         <nav className="sticky top-2 sm:top-4 z-50 px-2.5 sm:px-8 pt-2 sm:pt-4">

@@ -37,7 +37,7 @@ export const DEFAULT_CONFIG_COMPLETA: ConfigCompleta = {
     hora_inicio: '10:00',
     hora_fin: '22:00',
     intervalo_minutos: 120,
-    nombre_negocio: 'Fran & Romy Nails',
+    nombre_negocio: 'Pintitas Nails',
     whatsapp_numero: '5493813013850',
     pagos_habilitados: false,
     minutos_autoconfirmacion: 10,

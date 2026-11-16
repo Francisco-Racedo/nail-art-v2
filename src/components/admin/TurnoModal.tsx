@@ -1,14 +1,35 @@
 import React, { useState, useEffect } from 'react'
-import { Calendar as CalendarIcon, Clock, X, Trash2, CheckCircle2, AlertTriangle, CircleDot } from 'lucide-react'
+import {
+    Calendar as CalendarIcon,
+    Clock,
+    X,
+    Trash2,
+    CheckCircle2,
+    AlertTriangle,
+    CircleDot,
+    Sparkles,
+    Send
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
-import { ModalData, EstadoReserva, ESTADO_CONFIG, getHoyUTC3, checkCumple } from './agendaTypes'
-import { generarHorariosDisponibles } from '@/lib/utils'
+import {
+    ModalData,
+    EstadoReserva,
+    ESTADO_CONFIG,
+    getHoyUTC3,
+    checkCumple
+} from './agendaTypes'
+import { generarHorariosDisponibles, celularParaWhatsapp } from '@/lib/utils'
 
 interface TurnoModalProps {
-    modalData: ModalData;
-    setModalData: React.Dispatch<React.SetStateAction<ModalData | null>>;
-    config: any;
+    modalData: ModalData
+    setModalData: React.Dispatch<React.SetStateAction<ModalData | null>>
+    config: any
+    historialCliente?: {
+        totalTurnos: number
+        completados: number
+        ausencias: number
+    }
 }
 
 const parsePrecio = (str: string) => {
@@ -16,28 +37,62 @@ const parsePrecio = (str: string) => {
     return m ? parseInt(m[1].replace(/\./g, ''), 10) : 0
 }
 
-export default function TurnoModal({ modalData, setModalData, config }: TurnoModalProps) {
+export default function TurnoModal({
+    modalData,
+    setModalData,
+    config,
+    historialCliente
+}: TurnoModalProps) {
     const router = useRouter()
     const [confirmDelete, setConfirmDelete] = useState(false)
-    const [descuento, setDescuento] = useState<number>(0)
+    const [descuento, setDescuento] = useState<number>(modalData.descuento_aplicado || 0)
+    const [motivoDescuento, setMotivoDescuento] = useState<string>(
+        modalData.descuento_motivo ||
+            (checkCumple(modalData.fecha_nacimiento) ? 'Cumpleaños 🎂' : 'Cliente frecuente ⭐')
+    )
     const [showDescuentoForm, setShowDescuentoForm] = useState(false)
+    const [ocupaSiguiente, setOcupaSiguiente] = useState<boolean>(
+        !!modalData.ocupa_bloque_siguiente
+    )
 
-    // Estados Reprogramación
+    // Estados Reprogramación Manual
     const [isEditingDate, setIsEditingDate] = useState(false)
     const [nuevaFecha, setNuevaFecha] = useState(modalData.fecha)
     const [nuevoHorario, setNuevoHorario] = useState(modalData.hora)
-    const [ocupadosDelDia, setOcupadosDelDia] = useState<{ horario: string, estado: string }[]>([])
+    const [ocupadosDelDia, setOcupadosDelDia] = useState<{ horario: string; estado: string }[]>([])
+    const [horariosDelDia, setHorariosDelDia] = useState<string[]>([])
     const [isFetchingTimes, setIsFetchingTimes] = useState(false)
     const [isRescheduling, setIsRescheduling] = useState(false)
 
-    const estadoCfg = ESTADO_CONFIG[modalData.estado]
+    const estadoCfg = ESTADO_CONFIG[modalData.estado] || ESTADO_CONFIG.pendiente
+    const esCumple = checkCumple(modalData.fecha_nacimiento)
 
-    const getWppLink = () => {
+    const getOrigin = () => (typeof window !== 'undefined' ? window.location.origin : '')
+
+    const getWppLink = (tipo: 'confirmacion' | 'reprogramar' | 'cumple' = 'confirmacion') => {
         if (!modalData?.celular) return '#'
-        const cleared = modalData.celular.replace(/\D/g, '')
-        const num = cleared.startsWith('549') ? cleared : (cleared.startsWith('54') ? `549${cleared.substring(2)}` : `549${cleared}`)
+        const num = celularParaWhatsapp(modalData.celular)
         const fechaLatam = modalData.fecha.split('-').reverse().join('/')
-        const text = `Hola *${modalData.cliente}* 👋\nTe escribimos de FRAN & ROMY NAILS. Confirmamos tu turno para *${modalData.servicio.split('(')[0].trim()}* el día *${fechaLatam}* a las *${modalData.hora}*.\n\nPor favor, recordá asistir puntual. En caso de no poder venir, avísanos con anticipación.\n¡Te esperamos encantadas! 💅✨`
+        const srvLimpio = modalData.servicio.split('(')[0].trim()
+        const codigo = modalData.codigo || `T${modalData.id}`
+        const linkTurno = `${getOrigin()}/mi-turno/${codigo}`
+
+        if (tipo === 'reprogramar') {
+            const text = `Hola *${modalData.cliente}* 👋\nTe escribimos de *${config?.nombre_negocio || 'Fran & Romy Nails'}*.\nSurgió un imprevisto con tu turno del *${fechaLatam}* a las *${modalData.hora} hs* (${srvLimpio}).\n\nPodés elegir el nuevo día y horario que te quede más cómodo directamente desde este enlace:\n👉 ${linkTurno}\n\n¡Mil disculpas y muchas gracias! 💅✨`
+            return `https://wa.me/${num}?text=${encodeURIComponent(text)}`
+        }
+
+        if (tipo === 'cumple') {
+            const text = `¡Hola *${modalData.cliente}*! 🎂✨\nEn *${config?.nombre_negocio || 'Fran & Romy Nails'}* vimos que estás en tu semana de cumpleaños y queremos regalarte un beneficio especial en tu turno de *${srvLimpio}*. ¡Te esperamos! 💅🎉`
+            return `https://wa.me/${num}?text=${encodeURIComponent(text)}`
+        }
+
+        const descTxt =
+            (modalData.descuento_aplicado || 0) > 0
+                ? `\n🎁 *Beneficio aplicado:* ${modalData.descuento_aplicado}% OFF (${modalData.descuento_motivo || 'Promoción'})`
+                : ''
+
+        const text = `Hola *${modalData.cliente}* 👋\nTe escribimos de *${config?.nombre_negocio || 'Fran & Romy Nails'}*. Confirmamos tu turno para *${srvLimpio}* el día *${fechaLatam}* a las *${modalData.hora} hs*.${descTxt}\n\nEnlace de tu turno (estado o reprogramación):\n${linkTurno}\n\n¡Te esperamos! 💅✨`
         return `https://wa.me/${num}?text=${encodeURIComponent(text)}`
     }
 
@@ -50,21 +105,70 @@ export default function TurnoModal({ modalData, setModalData, config }: TurnoMod
                 body: JSON.stringify({ notificacion_enviada: true })
             })
             router.refresh()
-        } catch { }
+        } catch {}
     }
 
-    const iniciarBorrado = () => setConfirmDelete(true)
+    const toggleOcupaSiguiente = async (val: boolean) => {
+        setOcupaSiguiente(val)
+        try {
+            const res = await fetch(`/api/admin/reservas/${modalData.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ocupa_bloque_siguiente: val })
+            })
+            if (res.ok) {
+                setModalData(prev => (prev ? { ...prev, ocupa_bloque_siguiente: val } : null))
+                toast.success(
+                    val
+                        ? 'Se bloqueó también el bloque siguiente (+2 hs)'
+                        : 'El turno vuelve a ocupar 1 bloque (2 hs)'
+                )
+                router.refresh()
+            }
+        } catch {
+            toast.error('No se pudo actualizar la duración')
+        }
+    }
+
+    const guardarDescuentoOpcional = async () => {
+        const toastId = toast.loading('Guardando descuento...')
+        try {
+            const res = await fetch(`/api/admin/reservas/${modalData.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    descuento_aplicado: descuento,
+                    descuento_motivo: motivoDescuento
+                })
+            })
+            if (!res.ok) throw new Error()
+            setModalData(prev =>
+                prev
+                    ? {
+                          ...prev,
+                          descuento_aplicado: descuento,
+                          descuento_motivo: motivoDescuento
+                      }
+                    : null
+            )
+            setShowDescuentoForm(false)
+            toast.success('Descuento actualizado', { id: toastId })
+            router.refresh()
+        } catch {
+            toast.error('Error al aplicar descuento', { id: toastId })
+        }
+    }
 
     const liberarTurno = async () => {
         const idToDelete = modalData.id
         setConfirmDelete(false)
         setModalData(null)
-        const toastId = toast.loading('Liberando turno...')
+        const toastId = toast.loading('Eliminando turno...')
 
         try {
             const res = await fetch(`/api/admin/reservas/${idToDelete}`, { method: 'DELETE' })
             if (!res.ok) throw new Error('Falló servidor')
-            toast.success('Turno liberado correctamente', { id: toastId })
+            toast.success('Turno eliminado y horario liberado', { id: toastId })
             router.refresh()
         } catch {
             toast.error('Error al liberar turno', { id: toastId })
@@ -73,13 +177,15 @@ export default function TurnoModal({ modalData, setModalData, config }: TurnoMod
     }
 
     const actualizarEstado = async (nuevoEstado: EstadoReserva, customDesc?: number) => {
-        if (nuevoEstado === 'completado' && checkCumple(modalData.fecha_nacimiento) && !showDescuentoForm && customDesc === undefined) {
-            setShowDescuentoForm(true)
-            return
+        const payload: Record<string, unknown> = { estado: nuevoEstado }
+        if (customDesc !== undefined) {
+            payload.descuento_aplicado = customDesc
+            payload.descuento_motivo = motivoDescuento
         }
-
-        const payload: any = { estado: nuevoEstado }
-        if (customDesc !== undefined) payload.descuento_aplicado = customDesc
+        if (nuevoEstado === 'reprogramar') {
+            payload.motivo_reprogramacion =
+                'Surgió un imprevisto en el salón. Por favor elegí tu nuevo día y horario disponible.'
+        }
 
         const toastId = toast.loading('Actualizando estado...')
         try {
@@ -88,9 +194,19 @@ export default function TurnoModal({ modalData, setModalData, config }: TurnoMod
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             })
+            const data = await res.json()
             if (!res.ok) throw new Error()
             toast.success(`Estado → ${ESTADO_CONFIG[nuevoEstado].label}`, { id: toastId })
-            setModalData(prev => prev ? { ...prev, estado: nuevoEstado, descuento_aplicado: customDesc } : null)
+            setModalData(prev =>
+                prev
+                    ? {
+                          ...prev,
+                          estado: nuevoEstado,
+                          codigo: data.codigo || prev.codigo,
+                          ...(customDesc !== undefined ? { descuento_aplicado: customDesc } : {})
+                      }
+                    : null
+            )
             setShowDescuentoForm(false)
             router.refresh()
         } catch {
@@ -108,11 +224,24 @@ export default function TurnoModal({ modalData, setModalData, config }: TurnoMod
             .then(res => res.json())
             .then(data => {
                 if (!active) return
+                if (data.horariosBase) {
+                    setHorariosDelDia(data.horariosBase)
+                } else {
+                    setHorariosDelDia(
+                        generarHorariosDisponibles(
+                            config?.hora_inicio || '10:00',
+                            config?.hora_fin || '22:00',
+                            config?.intervalo_minutos || 120
+                        )
+                    )
+                }
                 if (data.ocupados) {
-                    setOcupadosDelDia(data.ocupados.map((o: any) => ({
-                        horario: o.horario.substring(0, 5),
-                        estado: o.estado || 'pendiente'
-                    })))
+                    setOcupadosDelDia(
+                        data.ocupados.map((o: any) => ({
+                            horario: o.horario.substring(0, 5),
+                            estado: o.estado || 'pendiente'
+                        }))
+                    )
                 } else {
                     setOcupadosDelDia([])
                 }
@@ -124,13 +253,15 @@ export default function TurnoModal({ modalData, setModalData, config }: TurnoMod
                 if (active) setIsFetchingTimes(false)
             })
 
-        return () => { active = false }
-    }, [isEditingDate, nuevaFecha])
+        return () => {
+            active = false
+        }
+    }, [isEditingDate, nuevaFecha, config])
 
     const handleFechaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const val = e.target.value
         if (val < getHoyUTC3()) {
-            toast.error("No puedes reprogramar a una fecha pasada.")
+            toast.error('No podés reprogramar a una fecha pasada.')
             return
         }
         setNuevaFecha(val)
@@ -148,165 +279,323 @@ export default function TurnoModal({ modalData, setModalData, config }: TurnoMod
                 toast.error(result.error, { id: toastId })
             } else {
                 toast.success('Turno reprogramado exitosamente', { id: toastId })
-                setModalData(prev => prev ? { ...prev, fecha: nuevaFecha, hora: nuevoHorario } : null)
+                setModalData(prev =>
+                    prev
+                        ? {
+                              ...prev,
+                              fecha: nuevaFecha,
+                              hora: nuevoHorario,
+                              reprogramado: true,
+                              codigo: result.codigo || prev.codigo
+                          }
+                        : null
+                )
                 setIsEditingDate(false)
                 router.refresh()
             }
-        } catch (e) {
+        } catch {
             toast.error('Error de red al reprogramar.', { id: toastId })
         } finally {
             setIsRescheduling(false)
         }
     }
 
+    const grillaHorariosModal =
+        horariosDelDia.length > 0
+            ? horariosDelDia
+            : generarHorariosDisponibles(
+                  config?.hora_inicio || '10:00',
+                  config?.hora_fin || '22:00',
+                  config?.intervalo_minutos || 120
+              )
+
     return (
         <div className="fixed inset-0 bg-stone-900/40 backdrop-blur-sm z-[100] flex items-end md:items-center justify-center animate-in fade-in duration-200 md:p-6">
-            <div className="absolute inset-0" onClick={() => { setModalData(null); setConfirmDelete(false) }} />
-            <div className="bg-gradient-to-br from-pink-100/95 via-orange-50/95 to-orange-100/95 backdrop-blur-xl border border-white/60 rounded-t-3xl md:rounded-3xl w-full md:w-auto md:min-w-[480px] md:max-w-lg shadow-2xl relative animate-bottom-sheet md:animate-none max-h-[85dvh] md:max-h-[88vh] flex flex-col overflow-hidden">
+            <div
+                className="absolute inset-0"
+                onClick={() => {
+                    setModalData(null)
+                    setConfirmDelete(false)
+                }}
+            />
+            <div className="bg-gradient-to-br from-pink-100/95 via-orange-50/95 to-orange-100/95 backdrop-blur-xl border border-white/60 rounded-t-3xl md:rounded-3xl w-full md:w-auto md:min-w-[500px] md:max-w-lg shadow-2xl relative animate-bottom-sheet md:animate-none max-h-[88dvh] md:max-h-[90vh] flex flex-col overflow-hidden">
+                <div className="p-6 pb-28 md:p-7 md:pb-8 overflow-y-auto overscroll-contain flex-1">
+                    <div
+                        className="w-12 h-1.5 bg-stone-200 rounded-full mx-auto mb-5 md:hidden cursor-pointer"
+                        onClick={() => {
+                            setModalData(null)
+                            setConfirmDelete(false)
+                        }}
+                    />
 
-                <div className="p-6 pb-32 md:p-8 md:pb-8 overflow-y-auto overscroll-contain flex-1 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-stone-300 [&::-webkit-scrollbar-thumb]:rounded-full">
-                    <div className="w-12 h-1.5 bg-stone-200 rounded-full mx-auto mb-6 md:hidden cursor-pointer hover:bg-stone-300 transition" onClick={() => { setModalData(null); setConfirmDelete(false) }} />
-
-                    <div className="flex justify-between items-start mb-4">
-                        <div className="w-12 h-12 bg-rose-50 rounded-2xl flex items-center justify-center text-rose-500 border border-rose-100 shadow-sm">
+                    <div className="flex justify-between items-start mb-3">
+                        <div className="w-11 h-11 bg-rose-50 rounded-2xl flex items-center justify-center text-rose-500 border border-rose-100 shadow-sm">
                             💅
                         </div>
-                        <button onClick={() => { setModalData(null); setConfirmDelete(false) }} className="text-stone-400 hover:text-stone-600 p-2 rounded-full hover:bg-stone-100 transition">
+                        <button
+                            onClick={() => {
+                                setModalData(null)
+                                setConfirmDelete(false)
+                            }}
+                            className="text-stone-400 hover:text-stone-600 p-2 rounded-full hover:bg-stone-100 transition"
+                        >
                             <X className="w-5 h-5" />
                         </button>
                     </div>
 
-                    <h3 className="font-bold text-2xl text-stone-900 tracking-tight mb-1">{modalData.cliente}</h3>
+                    <h3 className="font-bold text-2xl text-stone-900 tracking-tight mb-1">
+                        {modalData.cliente}
+                    </h3>
                     {modalData.celular && (
-                        <p className="text-stone-500 text-sm mb-3 font-medium">📱 {modalData.celular} {modalData.email && `• ✉️ ${modalData.email}`}</p>
+                        <p className="text-stone-600 text-sm mb-2 font-medium">
+                            📱 {modalData.celular}{' '}
+                            {modalData.email && `• ✉️ ${modalData.email}`}
+                        </p>
                     )}
 
-                    <div className="flex items-center flex-wrap gap-2 mb-4">
-                        <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest border ${estadoCfg?.bg} ${estadoCfg?.color} ${estadoCfg?.border}`}>
+                    {/* Ficha rápida del cliente (historial y cumpleaños) */}
+                    <div className="flex flex-wrap items-center gap-2 mb-4">
+                        <div
+                            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest border ${estadoCfg.bg} ${estadoCfg.color} ${estadoCfg.border}`}
+                        >
                             <CircleDot className="w-3 h-3" />
-                            {estadoCfg?.label}
+                            {estadoCfg.label}
                         </div>
                         {modalData.reprogramado && (
-                            <span className="flex items-center gap-1 bg-indigo-50 text-indigo-600 border border-indigo-200 px-2.5 py-1 rounded-md text-[10.5px] font-bold uppercase tracking-wider shrink-0 shadow-sm">
-                                <span>🔄</span> Reprogramado
+                            <span className="flex items-center gap-1 bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-1 rounded-full text-[11px] font-bold">
+                                🔄 Reprogramado
                             </span>
                         )}
-
-                        {((modalData.estado_pago === 'pagado_sena' || modalData.estado_pago === 'pagado_total') || (modalData.monto_sena ?? 0) > 0) && (
-                            <span className="px-3 py-1 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center gap-1">
-                                💳 SEÑA ACREDITADA
+                        {historialCliente && (
+                            <span className="bg-white/80 text-stone-700 border border-stone-200 px-2.5 py-1 rounded-full text-[11px] font-semibold">
+                                ⭐ {historialCliente.completados} servicios
+                                {historialCliente.ausencias > 0 &&
+                                    ` • ⚠️ ${historialCliente.ausencias} ausencias`}
+                            </span>
+                        )}
+                        {esCumple && (
+                            <span className="bg-rose-100 text-rose-700 border border-rose-300 px-2.5 py-1 rounded-full text-[11px] font-bold">
+                                🎂 ¡Semana de Cumpleaños!
                             </span>
                         )}
                     </div>
 
-                    <div className="bg-stone-50 border border-stone-200/80 rounded-2xl p-5 mb-5 shadow-sm">
-                        <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-4 flex items-center justify-center gap-2">
-                            <span className="w-8 h-[1px] bg-stone-200"></span>
-                            Detalle de Cobro
-                            <span className="w-8 h-[1px] bg-stone-200"></span>
-                        </p>
+                    {/* Acciones rápidas de WhatsApp al cliente */}
+                    {modalData.celular && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
+                            <a
+                                href={getWppLink('confirmacion')}
+                                onClick={marcarNotificacionEnviada}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20b857] text-white font-bold py-2.5 px-3 rounded-xl text-xs shadow-sm transition min-h-[42px]"
+                            >
+                                <Send className="w-3.5 h-3.5" />
+                                WhatsApp Confirmación
+                            </a>
+                            <a
+                                href={getWppLink('reprogramar')}
+                                onClick={() => {
+                                    if (modalData.estado !== 'reprogramar') {
+                                        actualizarEstado('reprogramar')
+                                    }
+                                }}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-3 rounded-xl text-xs shadow-sm transition min-h-[42px]"
+                            >
+                                🔄 Enviar link para elegir horario
+                            </a>
+                        </div>
+                    )}
+
+                    {/* Detalle de Cobro y Descuento Opcional */}
+                    <div className="bg-stone-50 border border-stone-200/80 rounded-2xl p-4 mb-4 shadow-sm">
+                        <div className="flex items-center justify-between mb-3">
+                            <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">
+                                Detalle del Servicio
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => setShowDescuentoForm(!showDescuentoForm)}
+                                className="text-xs font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1"
+                            >
+                                <Sparkles className="w-3.5 h-3.5" />
+                                {(modalData.descuento_aplicado || 0) > 0
+                                    ? `Editar descuento (${modalData.descuento_aplicado}%)`
+                                    : 'Aplicar descuento / promo'}
+                            </button>
+                        </div>
 
                         {(() => {
                             const srvName = modalData.servicio.split('(')[0].trim()
                             const precioBase = parsePrecio(modalData.servicio)
-                            const descuento = modalData.descuento_aplicado ?? 0
-                            const valorDescontado = Math.round(precioBase * (descuento / 100))
-                            const precioConDescuento = precioBase - valorDescontado
-                            const montoSena = modalData.monto_sena ?? 0
-                            const saldoRestante = Math.max(0, precioConDescuento - montoSena)
-
-                            const tieneDescuento = descuento > 0
-                            const tieneSeña = montoSena > 0
+                            const descActual = modalData.descuento_aplicado ?? 0
+                            const valorDescontado = Math.round(precioBase * (descActual / 100))
+                            const precioFinal = Math.max(0, precioBase - valorDescontado)
 
                             return (
                                 <div className="flex flex-col w-full">
-                                    <div className="flex justify-between items-center w-full mb-3">
-                                        <span className="text-stone-600 font-medium">{srvName}</span>
-                                        <span className="text-stone-900 font-bold">${precioBase.toLocaleString('es-AR')}</span>
+                                    <div className="flex justify-between items-center w-full mb-2">
+                                        <span className="text-stone-700 font-semibold text-sm">
+                                            {srvName}
+                                        </span>
+                                        <span className="text-stone-900 font-bold">
+                                            ${precioBase.toLocaleString('es-AR')}
+                                        </span>
                                     </div>
-                                    {tieneDescuento && (
-                                        <div className="flex justify-between items-center w-full mb-3">
-                                            <span className="text-rose-500 text-sm font-bold">Promo Cumpleaños (-{descuento}%)</span>
-                                            <span className="text-rose-500 text-sm font-bold">-${valorDescontado.toLocaleString('es-AR')}</span>
+                                    {descActual > 0 && (
+                                        <div className="flex justify-between items-center w-full mb-2">
+                                            <span className="text-rose-600 text-xs font-bold">
+                                                {modalData.descuento_motivo || 'Descuento'} (-
+                                                {descActual}%)
+                                            </span>
+                                            <span className="text-rose-600 text-xs font-bold">
+                                                -${valorDescontado.toLocaleString('es-AR')}
+                                            </span>
                                         </div>
                                     )}
-                                    {tieneSeña && (
-                                        <div className="flex justify-between items-center w-full mb-3">
-                                            <span className="text-emerald-500 text-sm font-bold">Seña ({modalData.metodo_pago === 'mp' ? 'MercadoPago' : 'Transferencia'})</span>
-                                            <span className="text-emerald-500 text-sm font-bold">-${montoSena.toLocaleString('es-AR')}</span>
-                                        </div>
-                                    )}
-                                    <div className="flex justify-between items-center w-full border-t border-stone-200 pt-4 mt-2">
-                                        <span className="text-stone-500 text-sm uppercase tracking-wide font-bold mt-1">Saldo a Cobrar</span>
-                                        <span className="text-4xl font-black text-rose-500 leading-none drop-shadow-sm">${saldoRestante.toLocaleString('es-AR')}</span>
+                                    <div className="flex justify-between items-center w-full border-t border-stone-200 pt-3 mt-1">
+                                        <span className="text-stone-500 text-xs uppercase tracking-wide font-bold">
+                                            Total a Cobrar
+                                        </span>
+                                        <span className="text-3xl font-black text-rose-500 leading-none">
+                                            ${precioFinal.toLocaleString('es-AR')}
+                                        </span>
                                     </div>
                                 </div>
                             )
                         })()}
+
+                        {showDescuentoForm && (
+                            <div className="mt-4 pt-3 border-t border-rose-200/70 flex flex-col gap-2.5">
+                                <div className="flex flex-wrap gap-1.5">
+                                    {[0, 10, 15, 20, 25].map(pct => (
+                                        <button
+                                            key={pct}
+                                            type="button"
+                                            onClick={() => setDescuento(pct)}
+                                            className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${
+                                                descuento === pct
+                                                    ? 'bg-rose-500 text-white border-rose-600'
+                                                    : 'bg-white text-stone-700 border-stone-200'
+                                            }`}
+                                        >
+                                            {pct === 0 ? 'Sin desc.' : `${pct}% OFF`}
+                                        </button>
+                                    ))}
+                                </div>
+                                <div className="flex gap-2">
+                                    <select
+                                        value={motivoDescuento}
+                                        onChange={e => setMotivoDescuento(e.target.value)}
+                                        className="flex-1 bg-white border border-stone-200 rounded-xl px-3 py-2 text-xs font-semibold text-stone-800"
+                                    >
+                                        <option value="Cumpleaños 🎂">Cumpleaños 🎂</option>
+                                        <option value="Cliente frecuente ⭐">
+                                            Cliente frecuente ⭐
+                                        </option>
+                                        <option value="Promoción especial ✨">
+                                            Promoción especial ✨
+                                        </option>
+                                    </select>
+                                    <button
+                                        type="button"
+                                        onClick={guardarDescuentoOpcional}
+                                        className="bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-sm"
+                                    >
+                                        Guardar
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
+                    {/* Opción para servicios que duran más de 2 hs */}
+                    <label className="flex items-center justify-between gap-3 bg-white/70 border border-stone-200/80 rounded-xl px-4 py-2.5 mb-4 cursor-pointer">
+                        <span className="text-xs font-semibold text-stone-700">
+                            ⏱️ Servicio largo: ocupar también el bloque siguiente (+2 hs)
+                        </span>
+                        <input
+                            type="checkbox"
+                            checked={ocupaSiguiente}
+                            onChange={e => toggleOcupaSiguiente(e.target.checked)}
+                            className="w-4 h-4 accent-pink-500 rounded"
+                        />
+                    </label>
+
+                    {/* Reprogramación directa por el dueño */}
                     {isEditingDate ? (
-                        <div className="bg-orange-50/80 border border-orange-200/60 rounded-2xl p-5 mb-5 shadow-sm animate-in fade-in flex flex-col gap-4 relative overflow-hidden">
-                            <div className="flex justify-between items-center mb-1">
-                                <p className="text-orange-700 font-bold flex items-center gap-2"><CalendarIcon className="w-4 h-4" /> Reprogramar Turno</p>
-                                <button onClick={() => { setIsEditingDate(false); setNuevaFecha(modalData.fecha); setNuevoHorario(modalData.hora) }} className="text-orange-900/40 hover:text-orange-900/80 transition">
-                                    <X className="w-5 h-5" />
+                        <div className="bg-orange-50/80 border border-orange-200/60 rounded-2xl p-4 mb-4 shadow-sm flex flex-col gap-3">
+                            <div className="flex justify-between items-center">
+                                <p className="text-orange-700 font-bold text-sm flex items-center gap-2">
+                                    <CalendarIcon className="w-4 h-4" /> Reprogramar Manualmente
+                                </p>
+                                <button
+                                    onClick={() => {
+                                        setIsEditingDate(false)
+                                        setNuevaFecha(modalData.fecha)
+                                        setNuevoHorario(modalData.hora)
+                                    }}
+                                    className="text-orange-900/50 hover:text-orange-900"
+                                >
+                                    <X className="w-4 h-4" />
                                 </button>
                             </div>
-                            <div className="flex flex-col gap-4">
-                                <div className="flex flex-col">
-                                    <label htmlFor="nuevaFechaInput" className="text-[10px] font-bold text-stone-500 uppercase tracking-widest mb-1.5 ml-1">Nueva Fecha</label>
+                            <div className="flex flex-col gap-3">
+                                <div>
+                                    <label
+                                        htmlFor="nuevaFechaInput"
+                                        className="text-[10px] font-bold text-stone-500 uppercase tracking-widest mb-1 block"
+                                    >
+                                        Nueva Fecha
+                                    </label>
                                     <input
                                         id="nuevaFechaInput"
                                         type="date"
                                         min={getHoyUTC3()}
                                         value={nuevaFecha}
                                         onChange={handleFechaChange}
-                                        className="w-full bg-white border border-orange-200 text-stone-900 rounded-xl px-4 py-3 text-sm font-bold outline-none ring-0 focus:border-rose-400 border-b-4 focus:ring-4 focus:ring-rose-400/10 transition"
+                                        className="w-full bg-white border border-orange-200 text-stone-900 rounded-xl px-3.5 py-2.5 text-sm font-bold"
                                     />
                                 </div>
-                                <div className="flex flex-col">
-                                    <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest mb-1.5 ml-1">Seleccionar Horario Disponible</label>
+                                <div>
+                                    <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest mb-1.5 block">
+                                        Seleccionar Horario Disponible
+                                    </label>
                                     {isFetchingTimes ? (
-                                        <div className="h-32 bg-white/50 border border-orange-100 rounded-xl flex flex-col items-center justify-center gap-3">
-                                            <div className="w-5 h-5 border-2 border-orange-400 border-t-transparent rounded-full animate-spin"></div>
-                                            <span className="text-xs text-stone-500 font-medium">Sincronizando disponibilidad...</span>
+                                        <div className="h-24 bg-white/50 border border-orange-100 rounded-xl flex items-center justify-center">
+                                            <span className="text-xs text-stone-500">
+                                                Consultando disponibilidad...
+                                            </span>
                                         </div>
                                     ) : (
-                                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                                            {generarHorariosDisponibles(config?.hora_inicio || '09:00', config?.hora_fin || '20:00', config?.intervalo_minutos || 90).map(t => {
-                                                const ocupadoInfo = ocupadosDelDia.find(o => o.horario === t)
-                                                const isSelf = t === modalData?.hora && modalData?.fecha === nuevaFecha
-
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {grillaHorariosModal.map(t => {
+                                                const ocupadoInfo = ocupadosDelDia.find(
+                                                    o => o.horario === t
+                                                )
+                                                const isSelf =
+                                                    t === modalData?.hora &&
+                                                    modalData?.fecha === nuevaFecha
                                                 const isLibre = !ocupadoInfo || isSelf
-                                                const isPendiente = ocupadoInfo?.estado === 'pendiente' && !isSelf
-                                                const isConfirmado = (ocupadoInfo?.estado === 'confirmado' || ocupadoInfo?.estado === 'completado') && !isSelf
                                                 const isSelected = nuevoHorario === t
-
-                                                let btnClass = ""
-                                                let icon = null
-
-                                                if (isConfirmado) {
-                                                    btnClass = "bg-stone-100/80 text-stone-400 border-stone-200 cursor-not-allowed opacity-75 line-through"
-                                                    icon = <span className="text-[10px]">🔒</span>
-                                                } else if (isPendiente) {
-                                                    btnClass = "bg-orange-50 text-orange-400 border-orange-200 cursor-not-allowed opacity-80"
-                                                } else {
-                                                    if (isSelected) {
-                                                        btnClass = "bg-emerald-500 text-white border-emerald-600 shadow-md ring-2 ring-emerald-500/20"
-                                                    } else {
-                                                        btnClass = "bg-white text-emerald-600 border-emerald-200 hover:bg-emerald-50 hover:-translate-y-0.5 hover:shadow-sm transition-all duration-200 border-b-2 hover:border-b-4 hover:border-emerald-300 active:translate-y-0"
-                                                    }
-                                                }
 
                                                 return (
                                                     <button
                                                         key={t}
+                                                        type="button"
                                                         disabled={!isLibre}
                                                         onClick={() => setNuevoHorario(t)}
-                                                        className={`py-2 px-1 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1 min-h-[40px] ${btnClass}`}
+                                                        className={`py-2 px-1 rounded-xl text-xs font-bold border min-h-[40px] ${
+                                                            !isLibre
+                                                                ? 'bg-stone-100 text-stone-400 border-stone-200 line-through cursor-not-allowed'
+                                                                : isSelected
+                                                                  ? 'bg-emerald-500 text-white border-emerald-600 shadow-sm'
+                                                                  : 'bg-white text-emerald-700 border-emerald-200 hover:bg-emerald-50'
+                                                        }`}
                                                     >
-                                                        {icon}{t}
+                                                        {t}
                                                     </button>
                                                 )
                                             })}
@@ -314,45 +603,77 @@ export default function TurnoModal({ modalData, setModalData, config }: TurnoMod
                                     )}
                                 </div>
                             </div>
-                            <button disabled={isRescheduling || !nuevoHorario} onClick={confirmarReprogramacion} className="w-full bg-gradient-to-r from-orange-400 to-rose-400 text-white font-bold py-3 mt-1 rounded-xl shadow-md hover:shadow-lg transition-all active:scale-95 disabled:opacity-50 flex justify-center items-center gap-2">
-                                {isRescheduling ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <><CheckCircle2 className="w-5 h-5" /> Confirmar Cambios</>}
+                            <button
+                                disabled={isRescheduling || !nuevoHorario}
+                                onClick={confirmarReprogramacion}
+                                className="w-full bg-gradient-to-r from-orange-400 to-rose-400 text-white font-bold py-2.5 rounded-xl shadow-md disabled:opacity-50 flex justify-center items-center gap-2 text-sm min-h-[44px]"
+                            >
+                                <CheckCircle2 className="w-4 h-4" /> Confirmar Nuevo Horario
                             </button>
                         </div>
                     ) : (
                         <>
-                            <div className="grid grid-cols-2 gap-4 mb-3">
-                                <div className="bg-white/60 border border-stone-200/60 rounded-xl p-4 shadow-sm">
-                                    <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5"><CalendarIcon className="w-3 h-3" /> Día</p>
-                                    <p className="text-stone-800 font-bold">{modalData.fecha.split('-').reverse().join('/')}</p>
+                            <div className="grid grid-cols-2 gap-3 mb-3">
+                                <div className="bg-white/70 border border-stone-200/60 rounded-xl p-3.5 shadow-sm">
+                                    <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-1 flex items-center gap-1">
+                                        <CalendarIcon className="w-3 h-3" /> Día
+                                    </p>
+                                    <p className="text-stone-800 font-bold text-sm">
+                                        {modalData.fecha.split('-').reverse().join('/')}
+                                    </p>
                                 </div>
-                                <div className="bg-white/60 border border-stone-200/60 rounded-xl p-4 shadow-sm">
-                                    <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5"><Clock className="w-3 h-3" /> Horario</p>
-                                    <p className="text-stone-800 font-bold">{modalData.hora}</p>
+                                <div className="bg-white/70 border border-stone-200/60 rounded-xl p-3.5 shadow-sm">
+                                    <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-1 flex items-center gap-1">
+                                        <Clock className="w-3 h-3" /> Horario
+                                    </p>
+                                    <p className="text-stone-800 font-bold text-sm">
+                                        {modalData.hora} hs
+                                    </p>
                                 </div>
                             </div>
-                            <button onClick={() => setIsEditingDate(true)} className="w-full py-2 bg-orange-50 text-orange-600 font-bold rounded-xl border border-orange-200 hover:bg-orange-100 transition shadow-sm mb-6 active:scale-95 text-sm flex justify-center items-center gap-2">
-                                <CalendarIcon className="w-4 h-4" /> Reprogramar Turno
+                            <button
+                                onClick={() => setIsEditingDate(true)}
+                                className="w-full py-2.5 bg-orange-50 text-orange-700 font-bold rounded-xl border border-orange-200 hover:bg-orange-100 transition shadow-sm mb-4 text-xs flex justify-center items-center gap-2 min-h-[42px]"
+                            >
+                                <CalendarIcon className="w-4 h-4" /> Cambiar fecha/hora manualmente
                             </button>
                         </>
                     )}
 
+                    {/* Cambio de Estado */}
                     <div className="flex flex-col gap-2 mb-4">
-                        <p className="text-[10px] font-bold text-stone-500 uppercase tracking-widest px-1">Cambiar Estado</p>
+                        <p className="text-[10px] font-bold text-stone-500 uppercase tracking-widest px-1">
+                            Cambiar Estado del Turno
+                        </p>
                         <div className="grid grid-cols-3 gap-2">
-                            {(['pendiente', 'confirmado', 'completado'] as EstadoReserva[]).map(e => {
+                            {(
+                                [
+                                    'pendiente',
+                                    'confirmado',
+                                    'completado',
+                                    'reprogramar',
+                                    'ausente',
+                                    'cancelado'
+                                ] as EstadoReserva[]
+                            ).map(e => {
                                 const cfg = ESTADO_CONFIG[e]
-                                const isCurrent = modalData.estado === e;
-                                const disableReverse = modalData.estado === 'completado' && e !== 'completado';
-                                const isDisabled = isCurrent || disableReverse;
+                                const isCurrent = modalData.estado === e
 
                                 return (
                                     <button
                                         key={e}
-                                        onClick={() => !isDisabled && actualizarEstado(e)}
-                                        disabled={isDisabled}
-                                        className={`py-2 px-2 rounded-xl text-xs font-bold border transition duration-200 shadow-sm ${isCurrent ? `${cfg.bg} ${cfg.color} ${cfg.border} cursor-default` : disableReverse ? 'bg-stone-100 border-stone-200 text-stone-400 opacity-50 cursor-not-allowed hidden' : `bg-white text-stone-500 border-stone-200 ${cfg.hoverCls}`}`}
+                                        type="button"
+                                        onClick={() => !isCurrent && actualizarEstado(e)}
+                                        disabled={isCurrent}
+                                        className={`py-2 px-2 rounded-xl text-xs font-bold border transition min-h-[40px] ${
+                                            isCurrent
+                                                ? `${cfg.bg} ${cfg.color} ${cfg.border} cursor-default`
+                                                : `bg-white text-stone-600 border-stone-200 ${cfg.hoverCls}`
+                                        }`}
                                     >
-                                        {isCurrent && <CheckCircle2 className="w-3 h-3 inline mr-1" />}
+                                        {isCurrent && (
+                                            <CheckCircle2 className="w-3 h-3 inline mr-1" />
+                                        )}
                                         {cfg.label}
                                     </button>
                                 )
@@ -360,65 +681,33 @@ export default function TurnoModal({ modalData, setModalData, config }: TurnoMod
                         </div>
                     </div>
 
-                    {showDescuentoForm && (
-                        <div className="bg-rose-50 border border-rose-200 rounded-2xl p-5 mb-5 shadow-sm animate-in fade-in flex flex-col gap-3">
-                            <p className="text-rose-600 font-bold flex items-center gap-2">🎂 Promo Cumpleaños Detectada</p>
-                            <p className="text-stone-600 text-sm font-medium">Descuento a aplicar:</p>
-                            <div className="flex gap-2 w-full">
-                                <input
-                                    type="number"
-                                    min="0" max="100"
-                                    value={descuento}
-                                    onChange={(e) => setDescuento(Number(e.target.value))}
-                                    className="bg-white border border-stone-200 text-stone-900 rounded-xl px-3 py-2 w-20 text-center font-bold outline-none ring-0 focus:border-rose-400"
-                                />
-                                <span className="text-rose-400 self-center font-black mr-2">%</span>
-                                <button
-                                    onClick={() => actualizarEstado('completado', descuento)}
-                                    className="flex-1 bg-rose-500 hover:bg-rose-600 text-white font-bold py-2 rounded-xl transition shadow-md"
-                                >
-                                    Confirmar
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                    {modalData.estado === 'confirmado' && modalData.celular && !modalData.notificacion_enviada && (
-                        <div className="mb-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                            <a href={getWppLink()} onClick={marcarNotificacionEnviada} target="_blank" rel="noopener noreferrer" className="w-full flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20b857] text-white font-bold py-3.5 rounded-xl transition shadow-lg shadow-[#25D366]/20">
-                                <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z" /></svg>
-                                Notificar por WhatsApp
-                            </a>
-                        </div>
-                    )}
-
-                    <div className="flex flex-col mt-6">
+                    {/* Eliminar registro */}
+                    <div className="flex flex-col mt-4">
                         {!confirmDelete ? (
                             <button
-                                onClick={iniciarBorrado}
-                                className="w-full flex items-center justify-center gap-2 bg-white text-stone-400 border border-stone-200 hover:bg-red-50 hover:text-red-700 hover:border-red-300 font-bold py-3 rounded-xl transition-all duration-300 hover:scale-[1.03] active:scale-95 shadow-sm hover:shadow-md"
+                                onClick={() => setConfirmDelete(true)}
+                                className="w-full flex items-center justify-center gap-2 bg-white text-stone-400 border border-stone-200 hover:bg-red-50 hover:text-red-700 hover:border-red-300 font-bold py-2.5 rounded-xl transition text-xs min-h-[42px]"
                             >
-                                <Trash2 className="w-4 h-4" /> Eliminar Turno
+                                <Trash2 className="w-4 h-4" /> Eliminar registro definitivamente
                             </button>
                         ) : (
-                            <div className="bg-red-50 border border-red-200 rounded-xl p-4 animate-in fade-in duration-200">
-                                <div className="flex items-center gap-2 text-red-600 font-bold mb-3">
-                                    <AlertTriangle className="w-5 h-5" />
-                                    <span>¿Confirmar eliminación?</span>
+                            <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                                <div className="flex items-center gap-2 text-red-600 font-bold mb-2 text-sm">
+                                    <AlertTriangle className="w-4 h-4" />
+                                    <span>¿Confirmar eliminación permanente?</span>
                                 </div>
-                                <p className="text-stone-600 text-sm mb-4 font-medium">Esta acción es irreversible. El turno será liberado para que otro cliente pueda agendarlo.</p>
                                 <div className="flex gap-2">
                                     <button
                                         onClick={() => setConfirmDelete(false)}
-                                        className="flex-1 bg-white border border-stone-200 text-stone-600 font-bold py-2 rounded-lg hover:bg-stone-100 transition text-sm"
+                                        className="flex-1 bg-white border border-stone-200 text-stone-600 font-bold py-2 rounded-lg text-xs"
                                     >
-                                        Cancelar
+                                        Volver
                                     </button>
                                     <button
                                         onClick={liberarTurno}
-                                        className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded-lg transition text-sm flex items-center justify-center gap-1.5 shadow-sm"
+                                        className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded-lg text-xs"
                                     >
-                                        <Trash2 className="w-4 h-4" /> Sí, eliminar
+                                        Sí, eliminar
                                     </button>
                                 </div>
                             </div>

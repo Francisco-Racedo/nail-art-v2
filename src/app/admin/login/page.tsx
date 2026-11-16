@@ -27,8 +27,8 @@ export default function LoginPage() {
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-rose-50 to-amber-50 flex items-center justify-center px-4">
-            <div className="bg-white rounded-3xl shadow-xl border border-rose-100 p-10 w-full max-w-md">
+        <div className="min-h-[100dvh] bg-gradient-to-br from-rose-50 to-amber-50 flex items-center justify-center px-4 py-8">
+            <div className="bg-white rounded-3xl shadow-xl border border-rose-100 p-6 sm:p-10 w-full max-w-md">
 
                 {/* Logo */}
                 <div className="text-center mb-8">

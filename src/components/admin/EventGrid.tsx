@@ -1,20 +1,35 @@
 import React from 'react'
-import { Calendar as CalendarIcon } from 'lucide-react'
-import { Reserva, ESTADO_CONFIG, checkCumple } from './agendaTypes'
+import { Calendar as CalendarIcon, Plus, Lock } from 'lucide-react'
+import { Reserva, ESTADO_CONFIG, checkCumple, getEstadoEfectivo } from './agendaTypes'
+import { generarHorariosDisponibles, parseReservaMeta } from '@/lib/utils'
 
 interface EventGridProps {
-    dayReservas: Reserva[];
-    selectedDateLabel: string;
-    config: any;
-    handleEventClick: (r: Reserva) => void;
+    dayReservas: Reserva[]
+    selectedDateStr: string
+    selectedDateLabel: string
+    isSunday: boolean
+    jornadaEspecial?: { fecha: string; tipo: 'cerrado' | 'reducido'; horarios?: string[]; motivo?: string }
+    config: any
+    handleEventClick: (r: Reserva) => void
+    onSelectFreeSlot?: (horario: string) => void
 }
 
-export default function EventGrid({ dayReservas, selectedDateLabel, config, handleEventClick }: EventGridProps) {
-    const calcularFin = (fecha: string, hora: string) => {
+export default function EventGrid({
+    dayReservas,
+    selectedDateLabel,
+    isSunday,
+    jornadaEspecial,
+    config,
+    handleEventClick,
+    onSelectFreeSlot
+}: EventGridProps) {
+    const intervalo = Number(config?.intervalo_minutos || 120)
+
+    const calcularFin = (hora: string) => {
         const parts = hora.split(':')
         let h = parseInt(parts[0], 10)
         let m = parseInt(parts[1], 10)
-        m += Number(config?.intervalo_minutos || 90)
+        m += intervalo
         h += Math.floor(m / 60)
         m = m % 60
         return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
@@ -22,90 +37,231 @@ export default function EventGrid({ dayReservas, selectedDateLabel, config, hand
 
     const getEventCardStyle = (estado: string) => {
         const base = 'border-r border-t border-b border-orange-200/50 shadow-sm border-l-[6px]'
-        if (estado === 'confirmado') return `${base} border-l-emerald-500 bg-white/90 backdrop-blur-sm`
-        if (estado === 'completado') return `${base} border-l-rose-500 bg-white/90 backdrop-blur-sm`
-        return `${base} border-l-amber-500 bg-white/90 backdrop-blur-sm`
+        if (estado === 'confirmado')
+            return `${base} border-l-emerald-500 bg-white/95 backdrop-blur-sm`
+        if (estado === 'completado')
+            return `${base} border-l-rose-500 bg-white/95 backdrop-blur-sm`
+        if (estado === 'reprogramar')
+            return `${base} border-l-indigo-500 bg-indigo-50/40 backdrop-blur-sm`
+        if (estado === 'cancelado' || estado === 'ausente')
+            return `${base} border-l-stone-400 bg-stone-50/80 opacity-75`
+        return `${base} border-l-amber-500 bg-white/95 backdrop-blur-sm`
     }
+
+    const todosLosHorarios = generarHorariosDisponibles(
+        config?.hora_inicio || '10:00',
+        config?.hora_fin || '22:00',
+        intervalo
+    )
+
+    const diaCerrado =
+        jornadaEspecial?.tipo === 'cerrado' || (isSunday && !jornadaEspecial)
+
+    const horariosGrilla = diaCerrado
+        ? []
+        : jornadaEspecial?.tipo === 'reducido' &&
+            Array.isArray(jornadaEspecial.horarios) &&
+            jornadaEspecial.horarios.length > 0
+          ? jornadaEspecial.horarios
+          : todosLosHorarios
+
+    // Detectar si un turno anterior tiene ocupaBloqueSiguiente
+    const bloqueadosPorTurnoLargo = new Map<string, Reserva>()
+    for (const r of dayReservas) {
+        const ef = getEstadoEfectivo(r)
+        if (ef === 'cancelado' || ef === 'reprogramar') continue
+        const meta = parseReservaMeta(r.mp_preference_id, r.id)
+        if (meta.ocupaBloqueSiguiente) {
+            const hNorm = (r.horario || '').replace(/^~/, '').split('#')[0].substring(0, 5)
+            const idx = todosLosHorarios.indexOf(hNorm)
+            if (idx >= 0 && idx + 1 < todosLosHorarios.length) {
+                bloqueadosPorTurnoLargo.set(todosLosHorarios[idx + 1], r)
+            }
+        }
+    }
+
+    // Construir lista combinada: todos los bloques de 2 hs del día + cualquier turno en horario histórico distinto
+    const horasSet = new Set<string>(horariosGrilla)
+    for (const r of dayReservas) {
+        const hClean = (r.horario || '').replace(/^~/, '').split('#')[0].substring(0, 5)
+        if (hClean) horasSet.add(hClean)
+    }
+    const listaHorasOrdenada = Array.from(horasSet).sort()
 
     return (
         <>
-            <div className="mb-6">
-                <h3 className="text-xl font-black text-stone-900 capitalize">
-                    Agenda Diaria
-                </h3>
-                <p className="text-stone-500 font-medium text-sm capitalize">{selectedDateLabel}</p>
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                    <h3 className="text-xl font-black text-stone-900 capitalize">
+                        Grilla Horaria del Día
+                    </h3>
+                    <p className="text-stone-500 font-medium text-sm capitalize">
+                        {selectedDateLabel} • Bloques de {intervalo / 60} hs
+                    </p>
+                </div>
+                <span className="text-xs font-bold px-3 py-1.5 rounded-full bg-stone-100 text-stone-700 border border-stone-200">
+                    {dayReservas.length} {dayReservas.length === 1 ? 'reserva' : 'reservas'} en esta fecha
+                </span>
             </div>
 
-            {dayReservas.length === 0 ? (
-                <div className="bg-stone-50 border border-stone-200 rounded-3xl p-10 text-center flex flex-col items-center justify-center min-h-[300px]">
-                    <CalendarIcon className="w-12 h-12 text-stone-300 mb-4" />
-                    <p className="text-stone-500 font-medium tracking-wide">No hay turnos agendados para este día.</p>
+            {diaCerrado && dayReservas.length === 0 ? (
+                <div className="bg-stone-50 border border-stone-200 rounded-3xl p-10 text-center flex flex-col items-center justify-center min-h-[220px]">
+                    <CalendarIcon className="w-10 h-10 text-stone-300 mb-3" />
+                    <p className="text-stone-700 font-bold text-base mb-1">
+                        {jornadaEspecial?.motivo || 'Domingo — Día de descanso'}
+                    </p>
+                    <p className="text-stone-500 font-medium text-xs">
+                        Este día se encuentra cerrado. Si trabajás de forma especial, podés
+                        habilitar turnos desde el botón &ldquo;Imprevisto / Feriado&rdquo;.
+                    </p>
                 </div>
             ) : (
                 <div className="flex flex-col gap-3">
-                    {dayReservas.map(reserva => {
-                        const finCalc = calcularFin(reserva.fecha, reserva.horario)
-                        const dynamicStyle = getEventCardStyle(reserva.estado)
-                        const esCumple = checkCumple(reserva.fecha_nacimiento)
-                        const estadoCfg = ESTADO_CONFIG[reserva.estado || 'pendiente']
-
-                        const hStartStr = reserva.horario.substring(0, 5)
-                        const hInt = parseInt(hStartStr.split(':')[0])
+                    {listaHorasOrdenada.map(hSlot => {
+                        const finCalc = calcularFin(hSlot)
+                        const hInt = parseInt(hSlot.split(':')[0], 10)
                         const hAmPm = hInt >= 12 ? 'p. m.' : 'a. m.'
 
-                        const senaPagada = (reserva.estado_pago === 'pagado_sena' || reserva.estado_pago === 'pagado_total') || (typeof reserva.monto_sena === 'number' && reserva.monto_sena > 0)
+                        // Buscar si hay reserva(s) en este bloque
+                        const reservasEnBloque = dayReservas.filter(r => {
+                            const hClean = (r.horario || '')
+                                .replace(/^~/, '')
+                                .split('#')[0]
+                                .substring(0, 5)
+                            return hClean === hSlot
+                        })
 
+                        const extendidoDe = bloqueadosPorTurnoLargo.get(hSlot)
+
+                        // Si hay reservas en este horario, renderizar sus tarjetas
+                        if (reservasEnBloque.length > 0) {
+                            return reservasEnBloque.map(reserva => {
+                                const estadoReal = getEstadoEfectivo(reserva)
+                                const dynamicStyle = getEventCardStyle(estadoReal)
+                                const esCumple = checkCumple(reserva.fecha_nacimiento)
+                                const estadoCfg =
+                                    ESTADO_CONFIG[estadoReal] || ESTADO_CONFIG.pendiente
+
+                                return (
+                                    <button
+                                        key={reserva.id}
+                                        type="button"
+                                        onClick={() => handleEventClick(reserva)}
+                                        className={`flex w-full ${dynamicStyle} rounded-xl p-0 text-left transition-all duration-200 hover:bg-rose-50 hover:border-rose-300 group overflow-hidden max-w-full shadow-sm`}
+                                    >
+                                        <div className="w-[96px] md:w-36 shrink-0 border-r border-stone-200 bg-stone-50/70 p-3 md:p-4 flex flex-col justify-center">
+                                            <span className="text-stone-900 font-bold text-xs md:text-base leading-tight">
+                                                {hSlot}{' '}
+                                                <span className="hidden md:inline">{hAmPm}</span>
+                                            </span>
+                                            <span className="text-stone-500 text-[10px] md:text-xs font-medium mt-0.5">
+                                                {hSlot} - {finCalc}
+                                            </span>
+                                        </div>
+                                        <div className="p-3 md:p-4 flex-1 flex flex-col justify-center relative bg-white min-w-0">
+                                            <div className="flex flex-wrap items-center gap-1.5 md:gap-2.5 mb-1">
+                                                <span className="text-stone-900 font-bold text-sm md:text-base tracking-tight truncate max-w-full">
+                                                    {reserva.nombre}
+                                                </span>
+                                                <span
+                                                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border shrink-0 ${estadoCfg.bg} ${estadoCfg.color} ${estadoCfg.border}`}
+                                                >
+                                                    {estadoCfg.label}
+                                                </span>
+                                                {reserva.reprogramado && (
+                                                    <span className="bg-indigo-100 text-indigo-700 text-[10px] px-2 py-0.5 rounded font-bold shrink-0">
+                                                        🔄 REPROGRAMADO
+                                                    </span>
+                                                )}
+                                                {esCumple && (
+                                                    <span
+                                                        title="¡Cumpleaños en la semana!"
+                                                        className="bg-rose-100 text-rose-700 text-[10px] px-2 py-0.5 rounded-full font-bold shrink-0"
+                                                    >
+                                                        🎂 Cumple
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center flex-wrap gap-2 mt-0.5">
+                                                <span className="text-stone-600 text-xs md:text-sm font-medium flex items-center gap-1 truncate max-w-full">
+                                                    <CalendarIcon className="w-3.5 h-3.5 shrink-0 text-pink-500" />
+                                                    <span className="truncate">
+                                                        {reserva.servicio.split('(')[0]}
+                                                    </span>
+                                                </span>
+                                                {(reserva.descuento_aplicado || 0) > 0 && (
+                                                    <span className="bg-rose-50 text-rose-600 border border-rose-200 text-[10px] px-2 py-0.5 rounded font-bold">
+                                                        🎁 -{reserva.descuento_aplicado}%
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </button>
+                                )
+                            })
+                        }
+
+                        // Si el bloque está ocupado por extensión de un servicio largo del turno anterior
+                        if (extendidoDe) {
+                            return (
+                                <div
+                                    key={`ext-${hSlot}`}
+                                    onClick={() => handleEventClick(extendidoDe)}
+                                    className="flex w-full border border-stone-200 border-l-[6px] border-l-stone-400 bg-stone-50/90 rounded-xl p-0 text-left cursor-pointer hover:bg-stone-100 transition overflow-hidden"
+                                >
+                                    <div className="w-[96px] md:w-36 shrink-0 border-r border-stone-200 bg-stone-100/70 p-3 md:p-4 flex flex-col justify-center">
+                                        <span className="text-stone-700 font-bold text-xs md:text-base leading-tight">
+                                            {hSlot} <span className="hidden md:inline">{hAmPm}</span>
+                                        </span>
+                                        <span className="text-stone-400 text-[10px] md:text-xs font-medium mt-0.5">
+                                            {hSlot} - {finCalc}
+                                        </span>
+                                    </div>
+                                    <div className="p-3 md:p-4 flex-1 flex items-center justify-between gap-2">
+                                        <span className="text-xs font-bold text-stone-600 flex items-center gap-1.5">
+                                            <Lock className="w-3.5 h-3.5 text-stone-400" />
+                                            Continuación de servicio largo ({extendidoDe.nombre})
+                                        </span>
+                                    </div>
+                                </div>
+                            )
+                        }
+
+                        // Bloque de 2 hs DISPONIBLE (Libre)
                         return (
-                            <button
-                                key={reserva.id}
-                                onClick={() => handleEventClick(reserva)}
-                                className={`flex w-full ${dynamicStyle} rounded-xl p-0 text-left transition-all duration-300 hover:bg-rose-100 hover:border-rose-300 hover:-translate-y-1 hover:shadow-md group overflow-hidden max-w-full shadow-sm`}
+                            <div
+                                key={`free-${hSlot}`}
+                                className="flex w-full border border-dashed border-emerald-300/90 border-l-[6px] border-l-emerald-400 bg-emerald-50/35 hover:bg-emerald-50/70 rounded-xl p-0 transition-all overflow-hidden"
                             >
-                                <div className="w-[84px] md:w-36 shrink-0 border-r border-stone-300 bg-stone-50/50 p-3 md:p-5 flex flex-col justify-center">
-                                    <span className="text-stone-900 font-bold text-[11px] md:text-base leading-tight">{hStartStr} <span className="hidden md:inline">{hAmPm}</span></span>
-                                    <span className="text-stone-500 text-[10px] md:text-xs font-medium md:font-normal mt-0.5">{reserva.horario.substring(0, 5)} - {finCalc}</span>
+                                <div className="w-[96px] md:w-36 shrink-0 border-r border-emerald-200/70 bg-emerald-50/60 p-3 md:p-4 flex flex-col justify-center">
+                                    <span className="text-emerald-900 font-bold text-xs md:text-base leading-tight">
+                                        {hSlot} <span className="hidden md:inline">{hAmPm}</span>
+                                    </span>
+                                    <span className="text-emerald-700/80 text-[10px] md:text-xs font-medium mt-0.5">
+                                        {hSlot} - {finCalc}
+                                    </span>
                                 </div>
-                                <div className="p-3 md:p-5 flex-1 flex flex-col justify-center relative bg-white min-w-0">
-                                    <div className="flex flex-wrap items-center gap-1.5 md:gap-3 mb-1.5 md:mb-1">
-                                        <span className="text-stone-900 font-bold text-sm md:text-lg tracking-tight truncate max-w-full">{reserva.nombre}</span>
-                                        <span className={`px-2 py-0.5 md:px-2.5 md:py-1 rounded-full text-[9px] md:text-xs font-bold md:font-semibold uppercase tracking-widest border shrink-0 ${estadoCfg.bg} ${estadoCfg.color} ${estadoCfg.border}`}>
-                                            {estadoCfg.label}
+                                <div className="p-3 md:p-4 flex-1 flex items-center justify-between gap-3">
+                                    <div>
+                                        <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-emerald-800">
+                                            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                                            Horario Disponible
                                         </span>
-                                        {reserva.reprogramado && (
-                                            <span className="bg-indigo-100 text-indigo-700 text-[10px] px-2 py-0.5 rounded font-bold shrink-0">
-                                                🔄 REPROGRAMADO
-                                            </span>
-                                        )}
-                                        {esCumple && <span title="¡Cumpleaños!" className="shrink-0">🎂</span>}
+                                        <p className="text-[11px] text-stone-500 hidden sm:block">
+                                            Bloque libre de 2 horas para reserva online o asignación manual
+                                        </p>
                                     </div>
-                                    <div className="flex items-center flex-wrap gap-1.5 md:gap-4 mt-1">
-                                        <span className="text-stone-600 text-[10px] md:text-sm font-medium flex items-center gap-1 md:gap-1.5 truncate max-w-full">
-                                            <CalendarIcon className="w-3 h-3 md:w-3.5 md:h-3.5 shrink-0" />
-                                            <span className="truncate">{reserva.servicio.split('(')[0]}</span>
-                                        </span>
-                                        {(!reserva.email || reserva.email === '') && (
-                                            <span className="text-stone-500 text-[9px] md:text-xs flex items-center gap-1 rounded bg-stone-50 font-medium md:border md:border-stone-200 px-1 md:px-2 py-0.5 shrink-0">
-                                                ✉️ <span className="hidden md:inline">Sin correo</span>
-                                            </span>
-                                        )}
-                                        {senaPagada && (
-                                            <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded text-[9px] md:text-xs font-bold shrink-0 flex items-center gap-1">
-                                                💳 <span className="hidden md:inline">SEÑA ACREDITADA</span><span className="md:hidden">SEÑA</span>
-                                            </span>
-                                        )}
-                                        {reserva.estado === 'pendiente' && reserva.metodo_pago === 'mp' && !senaPagada && (
-                                            <span className="bg-[#009EE3]/10 text-[#009EE3] border border-[#009EE3]/20 px-1.5 md:px-2 py-0.5 rounded font-bold text-[9px] md:text-xs shrink-0">
-                                                💳 <span className="hidden md:inline">Pagará con MP</span><span className="md:hidden">MP</span>
-                                            </span>
-                                        )}
-                                        {reserva.estado === 'pendiente' && reserva.metodo_pago === 'transferencia' && !senaPagada && (
-                                            <span className="bg-amber-500/10 text-amber-600 border border-amber-500/20 px-1.5 md:px-2 py-0.5 rounded font-bold text-[9px] md:text-xs shrink-0">
-                                                🏦 <span className="hidden md:inline">Pagará Transf.</span><span className="md:hidden">TRANSF</span>
-                                            </span>
-                                        )}
-                                    </div>
+                                    {onSelectFreeSlot && (
+                                        <button
+                                            type="button"
+                                            onClick={() => onSelectFreeSlot(hSlot)}
+                                            className="bg-white hover:bg-emerald-600 text-emerald-700 hover:text-white border border-emerald-300 text-xs font-bold px-3.5 py-2 rounded-xl shadow-sm transition flex items-center gap-1.5 shrink-0"
+                                        >
+                                            <Plus className="w-3.5 h-3.5" /> Asignar turno
+                                        </button>
+                                    )}
                                 </div>
-                            </button>
+                            </div>
                         )
                     })}
                 </div>

@@ -3,6 +3,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { Swiper, SwiperSlide } from 'swiper/react'
 import { EffectCoverflow, Autoplay, Pagination } from 'swiper/modules'
+import { Sparkles } from 'lucide-react'
+import { DEFAULT_CMS_CONTENIDO, mergeCMSContenido } from '@/lib/cms-types'
 import 'swiper/css'
 import 'swiper/css/effect-coverflow'
 import 'swiper/css/pagination'
@@ -17,21 +19,46 @@ export default function CarouselGaleria() {
     const { data: fotos = [], isLoading } = useQuery({
         queryKey: ['carousel'],
         queryFn: fetchCarousel,
-        staleTime: 10 * 60 * 1000, // Imágenes se refrescan solo cada 10 minutos
+        staleTime: 10 * 60 * 1000
     })
 
-    if (isLoading || fotos.length === 0) return null
+    const { data: config } = useQuery({
+        queryKey: ['config'],
+        queryFn: async () => {
+            const res = await fetch('/api/config', { cache: 'no-store' })
+            if (!res.ok) return null
+            return res.json()
+        },
+        staleTime: 10_000
+    })
+
+    const cms = config?.cms ? mergeCMSContenido(config.cms) : DEFAULT_CMS_CONTENIDO
+    if (!cms.galeria.visible || isLoading || fotos.length === 0) return null
+
+    const g = cms.galeria
 
     return (
-        <section id="galeria" className="pt-16 pb-8 bg-gradient-to-b from-[#FAECE3] to-stone-50 overflow-hidden">
-            <div className="container mx-auto px-6 mb-12 text-center">
-                <h2 className="text-3xl md:text-4xl font-light text-stone-800 tracking-wide" style={{ fontFamily: 'serif' }}>
-                    Últimos{' '}
-                    <span className="font-bold tracking-widest" style={{ background: 'linear-gradient(to right, #C59B27, #D4AF37, #C59B27)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
-                        Trabajos
+        <section
+            id="galeria"
+            className="py-16 md:py-20 bg-gradient-to-b from-[#FAF3EE] via-[#FDF9F6] to-[#FAF6F2] overflow-hidden border-y border-rose-200/40"
+        >
+            <div className="container mx-auto px-6 mb-10 text-center">
+                {g.badge && (
+                    <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-rose-100/70 border border-rose-200 text-rose-700 text-[10px] font-bold uppercase tracking-[0.25em] mb-3">
+                        <Sparkles className="w-3 h-3" /> {g.badge}
+                    </div>
+                )}
+                <h2 className="font-editorial text-4xl md:text-5xl font-semibold text-[#231C19] tracking-tight">
+                    {g.titulo}{' '}
+                    <span className="italic font-normal text-rose-gold-gradient">
+                        {g.titulo_resaltado}
                     </span>
                 </h2>
-                <p className="text-stone-500 mt-4 font-light text-sm tracking-wide">Desliza para ver la perfección en cada detalle.</p>
+                {g.subtitulo && (
+                    <p className="text-stone-500 mt-3 font-normal text-sm sm:text-base max-w-md mx-auto">
+                        {g.subtitulo}
+                    </p>
+                )}
             </div>
 
             <Swiper
@@ -40,20 +67,28 @@ export default function CarouselGaleria() {
                 grabCursor
                 centeredSlides
                 slidesPerView="auto"
-                coverflowEffect={{ rotate: 15, stretch: 0, depth: 100, modifier: 1, slideShadows: true }}
+                coverflowEffect={{
+                    rotate: 10,
+                    stretch: 0,
+                    depth: 110,
+                    modifier: 1,
+                    slideShadows: false
+                }}
                 loop={true}
-                autoplay={{ delay: 3000, disableOnInteraction: false }}
+                autoplay={{ delay: 3200, disableOnInteraction: false }}
                 pagination={{ clickable: true }}
                 className="w-full px-6 py-8"
             >
                 {(fotos.length < 6 ? [...fotos, ...fotos, ...fotos] : fotos).map((url, i) => (
-                    <SwiperSlide key={i} style={{ width: 280 }}>
-                        <img
-                            src={url}
-                            alt={`Trabajo ${i + 1}`}
-                            style={{ height: 380, width: '100%', objectFit: 'cover' }}
-                            className="rounded-3xl shadow-md hover:shadow-xl hover:scale-[1.02] transition-all duration-500 border border-white/60"
-                        />
+                    <SwiperSlide key={i} style={{ width: 290 }}>
+                        <div className="group relative rounded-[2rem] overflow-hidden p-1.5 bg-white shadow-xl shadow-rose-900/10 border border-rose-100 transition-all duration-500 hover:-translate-y-1.5">
+                            <img
+                                src={url}
+                                alt={`Diseño Nail Art ${i + 1}`}
+                                style={{ height: 380, width: '100%', objectFit: 'cover' }}
+                                className="rounded-[1.65rem] group-hover:scale-[1.03] transition-transform duration-700"
+                            />
+                        </div>
                     </SwiperSlide>
                 ))}
             </Swiper>

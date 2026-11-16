@@ -1,16 +1,11 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: ['192.168.100.131', 'localhost'],
-  transpilePackages: [
-    '@fullcalendar/common',
-    '@fullcalendar/core',
-    '@fullcalendar/react',
-    '@fullcalendar/daygrid',
-    '@fullcalendar/timegrid',
-    '@fullcalendar/list',
-    '@fullcalendar/interaction'
-  ]
+  turbopack: {
+    root: path.resolve(__dirname),
+  },
 };
 
 export default nextConfig;

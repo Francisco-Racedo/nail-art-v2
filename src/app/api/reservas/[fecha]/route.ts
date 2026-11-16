@@ -1,5 +1,10 @@
-import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { createServiceClient } from '@/lib/supabase/service'
+import {
+    getConfigCompleta,
+    autoConfirmarPendientesVencidos,
+    calcularDisponibilidadParaFecha
+} from '@/lib/reservas-server'
 
 export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
@@ -10,18 +15,26 @@ export async function GET(
 ) {
     try {
         const { fecha } = await params
-        const supabase = await createClient()
+        const cfg = await getConfigCompleta()
+        await autoConfirmarPendientesVencidos(cfg.minutos_autoconfirmacion)
 
+        const supabase = createServiceClient()
         const { data, error } = await supabase
             .from('reservas')
-            .select('horario, estado')
+            .select('id, horario, estado, mp_preference_id')
             .eq('fecha', fecha)
 
         if (error) throw error
-        const ocupados = (data ?? []).map((r: { horario: string, estado: string }) => ({ horario: r.horario, estado: r.estado || 'pendiente' }))
-        return NextResponse.json({ ocupados })
-    } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : 'Error'
-        return NextResponse.json({ error: msg }, { status: 500 })
+
+        const disp = calcularDisponibilidadParaFecha(fecha, cfg, data ?? [])
+        return NextResponse.json({
+            ocupados: disp.ocupados,
+            cerrado: disp.cerrado,
+            motivo: disp.motivo,
+            horariosBase: disp.horariosBase,
+            semaforo: disp.semaforo
+        })
+    } catch {
+        return NextResponse.json({ error: 'Error al consultar disponibilidad' }, { status: 500 })
     }
 }

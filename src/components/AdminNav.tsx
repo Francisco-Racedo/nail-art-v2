@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { CalendarDays, Image as ImageIcon, Settings, LogOut } from 'lucide-react'
+import { CalendarDays, Image as ImageIcon, Settings, LogOut, Users } from 'lucide-react'
 import { logout } from '@/app/admin/actions'
 
 export default function AdminNav() {
@@ -10,6 +10,7 @@ export default function AdminNav() {
 
     const navItems = [
         { name: 'Agenda', href: '/admin/dashboard', icon: CalendarDays },
+        { name: 'Clientes', href: '/admin/dashboard/clientes', icon: Users },
         { name: 'Carrusel', href: '/admin/dashboard/carrusel', icon: ImageIcon },
         { name: 'Ajustes', href: '/admin/dashboard/ajustes', icon: Settings },
     ]

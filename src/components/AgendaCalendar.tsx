@@ -920,36 +920,47 @@ export default function AgendaCalendar({
                     </div>
 
                     {/* Plantillas rápidas */}
-                    <div className="mb-4">
-                        <label className="block text-[11px] font-black uppercase text-stone-500 tracking-wider mb-2">
-                            Plantillas Rápidas:
-                        </label>
+                    <div className="mb-5 bg-stone-50 border border-stone-200/90 rounded-2xl p-3.5 sm:p-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-3">
+                            <span className="text-[11px] font-black uppercase text-stone-500 tracking-wider flex items-center gap-1.5">
+                                ⚡ Plantillas Rápidas de Horario:
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => setHorariosConfigSel([])}
+                                className="w-full sm:w-auto text-xs font-bold px-3.5 py-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 transition flex items-center justify-center gap-1.5 shadow-2xs"
+                                title="Desmarcar todos los turnos para indicar que el día no tendrá atención"
+                            >
+                                <X className="w-3.5 h-3.5 text-rose-600" />
+                                <span>Desmarcar todos (Cerrar día)</span>
+                            </button>
+                        </div>
                         <div className="flex flex-wrap gap-2">
                             <button
                                 type="button"
                                 onClick={() => setHorariosConfigSel([...HORARIOS_ESTANDAR_HABITUALES])}
-                                className="text-xs font-bold px-3 py-1.5 rounded-xl border border-stone-200 bg-stone-50 hover:bg-rose-50 hover:border-rose-300 text-stone-700 transition"
+                                className="text-xs font-bold px-3 py-1.5 rounded-xl border border-stone-200 bg-white hover:bg-rose-50 hover:border-rose-300 text-stone-700 transition shadow-2xs"
                             >
                                 🌿 Semana Completa (08:30 a 18:00)
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setHorariosConfigSel([...HORARIOS_DOMINGO_DICIEMBRE])}
-                                className="text-xs font-bold px-3 py-1.5 rounded-xl border border-stone-200 bg-stone-50 hover:bg-rose-50 hover:border-rose-300 text-stone-700 transition"
+                                className="text-xs font-bold px-3 py-1.5 rounded-xl border border-stone-200 bg-white hover:bg-rose-50 hover:border-rose-300 text-stone-700 transition shadow-2xs"
                             >
                                 ☀️ Horario Domingo (11:00 a 16:00)
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setHorariosConfigSel(['08:30', '10:00'])}
-                                className="text-xs font-bold px-3 py-1.5 rounded-xl border border-stone-200 bg-stone-50 hover:bg-rose-50 hover:border-rose-300 text-stone-700 transition"
+                                className="text-xs font-bold px-3 py-1.5 rounded-xl border border-stone-200 bg-white hover:bg-rose-50 hover:border-rose-300 text-stone-700 transition shadow-2xs"
                             >
                                 🌅 Solo Mañana
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setHorariosConfigSel(['13:30', '15:00', '16:30', '18:00'])}
-                                className="text-xs font-bold px-3 py-1.5 rounded-xl border border-stone-200 bg-stone-50 hover:bg-rose-50 hover:border-rose-300 text-stone-700 transition"
+                                className="text-xs font-bold px-3 py-1.5 rounded-xl border border-stone-200 bg-white hover:bg-rose-50 hover:border-rose-300 text-stone-700 transition shadow-2xs"
                             >
                                 🌆 Solo Tarde
                             </button>
@@ -960,16 +971,9 @@ export default function AgendaCalendar({
                                         prev.includes('21:00') ? prev : [...prev, '21:00'].sort()
                                     )
                                 }
-                                className="text-xs font-bold px-3 py-1.5 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-900 transition"
+                                className="text-xs font-bold px-3 py-1.5 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-900 transition shadow-2xs"
                             >
                                 🌙 + Turno Noche (21:00)
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setHorariosConfigSel([])}
-                                className="text-xs font-bold px-3 py-1.5 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 transition ml-auto"
-                            >
-                                ❌ Desmarcar todos (Cerrar día)
                             </button>
                         </div>
                     </div>

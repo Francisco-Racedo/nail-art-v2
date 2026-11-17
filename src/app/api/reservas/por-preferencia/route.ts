@@ -12,12 +12,14 @@ export async function GET(request: Request) {
     try {
         const supabase = await createClient()
 
-        // Buscamos la reserva por preferencia
-        const { data, error } = await supabase
+        // Buscamos la reserva por preferencia (soporta id directo o JSON de metadatos)
+        const { data: list, error } = await supabase
             .from('reservas')
             .select('nombre, servicio, fecha, horario, monto_sena, metodo_pago')
-            .eq('mp_preference_id', preference_id)
-            .single()
+            .or(`mp_preference_id.eq.${preference_id},mp_preference_id.ilike.%"mpPreferenceId":"${preference_id}"%`)
+            .limit(1)
+
+        const data = list?.[0]
 
         if (error || !data) {
             return NextResponse.json({ error: 'Reserva no encontrada' }, { status: 404 })

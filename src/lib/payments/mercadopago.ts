@@ -20,6 +20,25 @@ export function isPagosHabilitadosEnv(): boolean {
     return process.env.PAGOS_HABILITADOS === 'true' || process.env.NEXT_PUBLIC_PAGOS_HABILITADOS === 'true'
 }
 
+export function validarOrigenSeguro(origin?: string | null): string {
+    const defaultUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://pintaditas-nails.vercel.app'
+    if (!origin) return defaultUrl
+    try {
+        const parsed = new URL(origin)
+        if (
+            parsed.hostname === 'localhost' ||
+            parsed.hostname === '127.0.0.1' ||
+            parsed.hostname.endsWith('vercel.app') ||
+            parsed.hostname.includes('pintaditas')
+        ) {
+            return parsed.origin
+        }
+    } catch {
+        // Formato inválido
+    }
+    return defaultUrl
+}
+
 export async function crearPreferenciaMercadoPago(
     input: PreferenciaMPInput
 ): Promise<PreferenciaMPResult> {
@@ -27,6 +46,8 @@ export async function crearPreferenciaMercadoPago(
     if (!token) {
         throw new Error('Falta Token de Mercado Pago (MP_ACCESS_TOKEN)')
     }
+
+    const safeOrigin = validarOrigenSeguro(input.origin)
 
     const mpPayload = {
         items: [
@@ -39,9 +60,9 @@ export async function crearPreferenciaMercadoPago(
         ],
         ...(input.externalReference ? { external_reference: input.externalReference } : {}),
         back_urls: {
-            success: `${input.origin}/reserva/estado`,
-            pending: `${input.origin}/reserva/estado`,
-            failure: `${input.origin}/reserva/estado`
+            success: `${safeOrigin}/reserva/estado`,
+            pending: `${safeOrigin}/reserva/estado`,
+            failure: `${safeOrigin}/reserva/estado`
         },
         auto_return: 'approved'
     }

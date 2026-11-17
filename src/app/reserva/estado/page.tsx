@@ -43,7 +43,7 @@ function EstadoReservaContent() {
     const getWhatsappUrl = () => {
         if (!config || !reserva) return '#'
         const numero = config.whatsapp_numero || '5493813013850'
-        const negocio = config.nombre_negocio || 'Fran & Romy Nails'
+        const negocio = config.nombre_negocio || 'Pintaditas Nails'
         const fechaLatam = reserva.fecha.split('-').reverse().join('/')
 
         let msg = ''

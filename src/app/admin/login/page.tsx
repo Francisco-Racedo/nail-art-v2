@@ -58,7 +58,7 @@ export default function LoginPage() {
                             type="email"
                             required
                             autoComplete="email"
-                            placeholder="admin@franyromy.com"
+                            placeholder="admin@pintaditasnails.com"
                             className="w-full px-4 py-3 rounded-xl border border-zinc-200 bg-zinc-50 text-zinc-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition"
                         />
                     </div>

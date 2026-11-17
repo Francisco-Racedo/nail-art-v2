@@ -2,6 +2,18 @@ import { NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 
+const ALLOWED_MIME_TYPES: Record<string, string> = {
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+    'image/gif': 'gif',
+    'video/mp4': 'mp4',
+    'video/webm': 'webm',
+    'video/quicktime': 'mov'
+}
+
+const MAX_FILE_SIZE = 25 * 1024 * 1024 // 25 MB máximo
+
 export async function POST(request: Request) {
     try {
         const supabaseAuth = await createServerClient()
@@ -19,8 +31,27 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Archivo requerido' }, { status: 400 })
         }
 
-        const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '')
-        const fileName = `cms-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+        if (file.size > MAX_FILE_SIZE) {
+            return NextResponse.json(
+                { error: 'El archivo supera el tamaño máximo permitido (25 MB)' },
+                { status: 400 }
+            )
+        }
+
+        const rawType = (file.type || '').toLowerCase().trim()
+        const allowedExt = ALLOWED_MIME_TYPES[rawType]
+
+        if (!allowedExt) {
+            return NextResponse.json(
+                {
+                    error:
+                        'Tipo de archivo no permitido. Solo se aceptan imágenes (JPG, PNG, WebP) o videos (MP4, WebM, MOV).'
+                },
+                { status: 400 }
+            )
+        }
+
+        const fileName = `cms-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${allowedExt}`
 
         const arrayBuffer = await file.arrayBuffer()
         const buffer = Buffer.from(arrayBuffer)
@@ -29,7 +60,7 @@ export async function POST(request: Request) {
         const { error } = await supabaseAdmin.storage
             .from('carousel')
             .upload(fileName, buffer, {
-                contentType: file.type || 'application/octet-stream',
+                contentType: rawType,
                 upsert: true
             })
 

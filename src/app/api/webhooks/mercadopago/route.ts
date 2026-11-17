@@ -66,15 +66,22 @@ export async function POST(request: Request) {
         }
 
         const supabase = await createServiceClient()
+        const extRef = (payment.external_reference || '').trim()
 
-        const { data: reserva, error: findError } = await supabase
-            .from('reservas')
-            .select('id, estado_pago')
-            .eq('mp_preference_id', preferenceId)
-            .single()
+        let query = supabase.from('reservas').select('id, estado_pago')
+        if (preferenceId && extRef) {
+            query = query.or(`mp_preference_id.eq.${preferenceId},mp_preference_id.ilike.%"mpPreferenceId":"${preferenceId}"%,mp_preference_id.ilike.%"codigo":"${extRef}"%`)
+        } else if (preferenceId) {
+            query = query.or(`mp_preference_id.eq.${preferenceId},mp_preference_id.ilike.%"mpPreferenceId":"${preferenceId}"%`)
+        } else if (extRef) {
+            query = query.ilike('mp_preference_id', `%"codigo":"${extRef}"%`)
+        }
+
+        const { data: reservasEncontradas, error: findError } = await query.limit(1)
+        const reserva = reservasEncontradas?.[0]
 
         if (findError || !reserva) {
-            console.error('[Webhook MP] Reserva no encontrada para preference_id:', preferenceId)
+            console.error('[Webhook MP] Reserva no encontrada para preference_id:', preferenceId, 'o extRef:', extRef)
             // Devolvemos 200 para que MP no reintente indefinidamente
             return NextResponse.json({ received: true, note: 'Reserva no encontrada' }, { status: 200 })
         }

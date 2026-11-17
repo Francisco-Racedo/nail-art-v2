@@ -146,12 +146,21 @@ export async function guardarKvConfig(entries: { clave: string; valor: string }[
     if (error) throw error
 }
 
+let lastAutoConfirmTimestamp = 0
+
 /**
  * Auto-confirma cualquier turno en estado 'pendiente' que haya superado la ventana máxima
  * de confirmación (por defecto 10 minutos).
+ * Optimizado con un throttle en memoria (máximo 1 ejecución cada 60s) para evitar consultas redundantes a la BD.
  */
 export async function autoConfirmarPendientesVencidos(minutosMax = 10): Promise<number> {
     try {
+        const nowMs = Date.now()
+        if (nowMs - lastAutoConfirmTimestamp < 60_000) {
+            return 0
+        }
+        lastAutoConfirmTimestamp = nowMs
+
         const supabase = createServiceClient()
         const hoy = getHoyArgentina()
         const { data: pendientes, error } = await supabase
@@ -162,7 +171,6 @@ export async function autoConfirmarPendientesVencidos(minutosMax = 10): Promise<
 
         if (error || !pendientes || pendientes.length === 0) return 0
 
-        const nowMs = Date.now()
         const limitMs = Math.max(0, minutosMax) * 60 * 1000
         let confirmadosCount = 0
 

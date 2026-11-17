@@ -20,30 +20,77 @@ import {
 export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
 
+const miTurnoRateLimitMap = new Map<string, { count: number; resetAt: number }>()
+
+function checkMiTurnoRateLimit(ip: string, maxReqs = 30): boolean {
+    const now = Date.now()
+    const windowMs = 60 * 1000 // 1 minuto
+    const entry = miTurnoRateLimitMap.get(ip)
+    if (!entry || now > entry.resetAt) {
+        miTurnoRateLimitMap.set(ip, { count: 1, resetAt: now + windowMs })
+        return true
+    }
+    if (entry.count >= maxReqs) return false
+    entry.count += 1
+    return true
+}
+
 async function buscarReservaPorCodigo(codigo: string) {
     const supabase = createServiceClient()
-    const { data: todas, error } = await supabase
-        .from('reservas')
-        .select('*')
-        .order('id', { ascending: false })
-        .limit(300)
+    const codigoLimpio = (codigo || '').trim()
+    if (!codigoLimpio) return null
 
-    if (error || !todas) return null
+    // 1. Si el código corresponde a un ID numérico (ej. "T45" o "45")
+    const matchId = codigoLimpio.startsWith('T') ? parseInt(codigoLimpio.slice(1), 10) : parseInt(codigoLimpio, 10)
+    if (!isNaN(matchId) && matchId > 0) {
+        const { data: porId } = await supabase
+            .from('reservas')
+            .select('*')
+            .eq('id', matchId)
+            .maybeSingle()
 
-    for (const r of todas) {
-        const meta = parseReservaMeta(r.mp_preference_id, r.id)
-        if (meta.codigo === codigo || `T${r.id}` === codigo) {
-            return { reserva: r, meta }
+        if (porId) {
+            const meta = parseReservaMeta(porId.mp_preference_id, porId.id)
+            if (meta.codigo === codigoLimpio || `T${porId.id}` === codigoLimpio) {
+                return { reserva: porId, meta }
+            }
         }
     }
+
+    // 2. Búsqueda directa indexada por código exacto en el JSON de mp_preference_id
+    const { data: directa } = await supabase
+        .from('reservas')
+        .select('*')
+        .ilike('mp_preference_id', `%"codigo":"${codigoLimpio}"%`)
+        .order('id', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+    if (directa) {
+        const meta = parseReservaMeta(directa.mp_preference_id, directa.id)
+        return { reserva: directa, meta }
+    }
+
     return null
 }
 
 export async function GET(
-    _request: Request,
+    request: Request,
     { params }: { params: Promise<{ codigo: string }> }
 ) {
     try {
+        const ip =
+            request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+            request.headers.get('x-real-ip') ||
+            '127.0.0.1'
+
+        if (!checkMiTurnoRateLimit(ip, 30)) {
+            return NextResponse.json(
+                { error: 'Demasiadas consultas. Por favor aguardá unos instantes.' },
+                { status: 429 }
+            )
+        }
+
         const { codigo } = await params
         const cfg = await getConfigCompleta()
         await autoConfirmarPendientesVencidos(cfg.minutos_autoconfirmacion)
@@ -128,6 +175,18 @@ export async function PATCH(
     { params }: { params: Promise<{ codigo: string }> }
 ) {
     try {
+        const ip =
+            request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+            request.headers.get('x-real-ip') ||
+            '127.0.0.1'
+
+        if (!checkMiTurnoRateLimit(ip, 10)) {
+            return NextResponse.json(
+                { error: 'Demasiadas solicitudes. Por favor aguardá unos instantes.' },
+                { status: 429 }
+            )
+        }
+
         const { codigo } = await params
         const body = await request.json()
         const accion = body?.accion as 'reprogramar' | 'cancelar'

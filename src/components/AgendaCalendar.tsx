@@ -15,7 +15,6 @@ import {
 import WeekNavigator from './admin/WeekNavigator'
 import EventGrid from './admin/EventGrid'
 import TurnoModal from './admin/TurnoModal'
-import DashboardAnalytics from './DashboardAnalytics'
 import {
     Reserva,
     ModalData,
@@ -467,8 +466,6 @@ export default function AgendaCalendar({
 
     return (
         <div className="w-full">
-            <DashboardAnalytics reservas={reservasList} />
-
             <div className="w-full relative bg-white/90 backdrop-blur-sm p-4 md:p-6 rounded-[1.5rem] md:rounded-[2rem] border border-orange-200/50 shadow-md overflow-hidden">
                 {/* Barra de Pestañas (Tabs) de la Agenda */}
                 <div className="flex flex-wrap items-center gap-2 mb-6 pb-3 border-b border-stone-200">

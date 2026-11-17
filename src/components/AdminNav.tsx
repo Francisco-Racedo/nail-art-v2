@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { CalendarDays, Image as ImageIcon, Settings, LogOut, Users } from 'lucide-react'
+import { CalendarDays, Image as ImageIcon, Settings, LogOut, Users, TrendingUp } from 'lucide-react'
 import { logout } from '@/app/admin/actions'
 
 export default function AdminNav() {
@@ -10,6 +10,7 @@ export default function AdminNav() {
 
     const navItems = [
         { name: 'Agenda', href: '/admin/dashboard', icon: CalendarDays },
+        { name: 'Rendimiento', href: '/admin/dashboard/rendimiento', icon: TrendingUp },
         { name: 'Clientes', href: '/admin/dashboard/clientes', icon: Users },
         { name: 'Carrusel', href: '/admin/dashboard/carrusel', icon: ImageIcon },
         { name: 'Ajustes', href: '/admin/dashboard/ajustes', icon: Settings },
@@ -54,24 +55,24 @@ export default function AdminNav() {
 
             {/* Mobile Bottom Navigation */}
             <nav className="md:hidden fixed bottom-0 w-full bg-stone-900 border-t border-stone-800 pb-safe z-50 shadow-[0_-10px_40px_rgba(0,0,0,0.15)]">
-                <div className="flex justify-around items-center px-2 py-3 pb-4">
+                <div className="flex justify-around items-center px-1.5 py-2.5 pb-3">
                     {navItems.map((item) => {
                         const isActive = pathname === item.href
                         return (
                             <Link
                                 key={item.name}
                                 href={item.href}
-                                className={`flex flex-col items-center gap-1.5 transition-all duration-300 ${isActive ? 'text-rose-400 scale-110 drop-shadow-sm' : 'text-stone-500 hover:text-stone-300'}`}
+                                className={`flex flex-col items-center gap-1 transition-all duration-300 ${isActive ? 'text-rose-400 scale-105 drop-shadow-sm' : 'text-stone-500 hover:text-stone-300'}`}
                             >
-                                <item.icon className="w-6 h-6" strokeWidth={isActive ? 2.5 : 2} />
-                                <span className={`text-[10px] ${isActive ? 'font-bold' : 'font-medium'}`}>{item.name}</span>
+                                <item.icon className="w-5 h-5" strokeWidth={isActive ? 2.5 : 2} />
+                                <span className={`text-[9.5px] tracking-tight ${isActive ? 'font-bold' : 'font-medium'}`}>{item.name}</span>
                             </Link>
                         )
                     })}
                     <form action={logout}>
-                        <button type="submit" className="flex flex-col items-center gap-1.5 transition-all duration-300 text-stone-500 hover:text-rose-400 hover:bg-stone-800 p-2 rounded-lg -m-2">
-                            <LogOut className="w-6 h-6" strokeWidth={2} />
-                            <span className="text-[10px] font-medium">Salir</span>
+                        <button type="submit" className="flex flex-col items-center gap-1 transition-all duration-300 text-stone-500 hover:text-rose-400 p-1 rounded-lg">
+                            <LogOut className="w-5 h-5" strokeWidth={2} />
+                            <span className="text-[9.5px] font-medium">Salir</span>
                         </button>
                     </form>
                 </div>

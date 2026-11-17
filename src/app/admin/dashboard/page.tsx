@@ -1,6 +1,5 @@
 import { createClient as createServerClient } from '@/lib/supabase/server'
 import AgendaCalendar from '@/components/AgendaCalendar'
-import DashboardAnalytics from '@/components/DashboardAnalytics'
 import { getConfigCompleta, autoConfirmarPendientesVencidos } from '@/lib/reservas-server'
 
 export const dynamic = 'force-dynamic'

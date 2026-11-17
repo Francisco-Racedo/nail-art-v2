@@ -121,6 +121,7 @@ export interface CMSContenido {
         visible: boolean
         ubicacion: string
         derechos: string
+        copyright?: string
     }
     secciones_personalizadas: SeccionPersonalizada[]
 }
@@ -215,7 +216,8 @@ export const DEFAULT_CMS_CONTENIDO: CMSContenido = {
     footer: {
         visible: true,
         ubicacion: 'Bartolomé Mitre 155, B° 25 de Mayo • Lules, Tucumán',
-        derechos: 'Pintaditas Nails by Mili Tripolone • Estudio de Manicuría Profesional'
+        derechos: 'Pintaditas Nails by Mili Tripolone • Estudio de Manicuría Profesional',
+        copyright: '© 2026 Pintaditas Nails by Mili Tripolone • Todos los derechos reservados.'
     },
     secciones_personalizadas: []
 }
@@ -237,7 +239,14 @@ export function mergeCMSContenido(raw?: string | Partial<CMSContenido> | null): 
             galeria: { ...DEFAULT_CMS_CONTENIDO.galeria, ...(parsed.galeria || {}) },
             servicios: { ...DEFAULT_CMS_CONTENIDO.servicios, ...(parsed.servicios || {}) },
             reserva: { ...DEFAULT_CMS_CONTENIDO.reserva, ...(parsed.reserva || {}) },
-            footer: { ...DEFAULT_CMS_CONTENIDO.footer, ...(parsed.footer || {}) },
+            footer: {
+                ...DEFAULT_CMS_CONTENIDO.footer,
+                ...(parsed.footer || {}),
+                copyright:
+                    parsed.footer?.copyright !== undefined
+                        ? parsed.footer.copyright
+                        : DEFAULT_CMS_CONTENIDO.footer.copyright
+            },
             secciones_personalizadas: Array.isArray(parsed.secciones_personalizadas)
                 ? parsed.secciones_personalizadas
                 : []

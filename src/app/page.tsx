@@ -75,13 +75,15 @@ export default async function HomePage() {
                                     <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                                     Lunes a Sábado • {cfg.hora_inicio} a {cfg.hora_fin} hs
                                 </span>
-                                <span className="inline-flex items-center gap-1.5 bg-emerald-50/90 text-emerald-800 px-4 py-2 rounded-full border border-emerald-200/80 shadow-sm font-semibold">
-                                    💵 Efectivo y Transferencia
-                                </span>
                             </div>
                             {cms.footer.derechos && (
-                                <p className="mt-2 text-xs text-stone-400 font-light tracking-wide">
+                                <p className="mt-2 text-xs text-stone-500 font-medium tracking-wide">
                                     {cms.footer.derechos}
+                                </p>
+                            )}
+                            {cms.footer.copyright && (
+                                <p className="text-[11px] text-stone-400 font-light tracking-wider">
+                                    {cms.footer.copyright}
                                 </p>
                             )}
                         </div>

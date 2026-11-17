@@ -1203,7 +1203,44 @@ export default function TabCMSVisual({
                                 </button>
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {/* VISTA PREVIA EN VIVO DEL PIE DE PÁGINA */}
+                            <div className="p-5 rounded-2xl bg-gradient-to-b from-[#FAF6F2] to-[#F3E9E2] border border-rose-200/80 space-y-3">
+                                <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-rose-800">
+                                    <Eye className="w-3.5 h-3.5 text-rose-600" />
+                                    Vista Previa en Vivo: Pie de Página
+                                </span>
+
+                                <div className="p-6 rounded-2xl bg-white/80 border border-rose-200/60 text-center space-y-3 shadow-xs">
+                                    <div className="w-8 h-8 rounded-full bg-rose-100 border border-rose-200 flex items-center justify-center text-rose-600 mx-auto">
+                                        <Sparkles className="w-3.5 h-3.5" />
+                                    </div>
+                                    <p className="font-editorial text-xl font-bold tracking-wider text-[#231C19]">
+                                        {nombreNegocio || 'PINTADITAS NAILS'}{' '}
+                                        <span className="font-sans font-light italic text-sm text-rose-600/90 tracking-normal">
+                                            by Mili Tripolone
+                                        </span>
+                                    </p>
+                                    <div className="flex flex-wrap items-center justify-center gap-2 text-xs font-medium text-stone-600">
+                                        <span className="inline-flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-full border border-rose-200/80 shadow-xs">
+                                            <MapPin className="w-3.5 h-3.5 text-rose-500" />
+                                            {cms.footer.ubicacion || 'Bartolomé Mitre 155, B° 25 de Mayo • Lules, Tucumán'}
+                                        </span>
+                                        <span className="inline-flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-full border border-rose-200/80 shadow-xs">
+                                            Lunes a Sábado • 08:30 a 20:00 hs
+                                        </span>
+                                    </div>
+                                    {cms.footer.derechos && (
+                                        <p className="text-xs text-stone-500 font-medium">
+                                            {cms.footer.derechos}
+                                        </p>
+                                    )}
+                                    <p className="text-[11px] text-stone-400 font-light tracking-wide">
+                                        {cms.footer.copyright || '© 2026 Pintaditas Nails by Mili Tripolone • Todos los derechos reservados.'}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
                                     <label className={labelCls}>
                                         Dirección / Ubicación Mostrada
@@ -1217,13 +1254,16 @@ export default function TabCMSVisual({
                                                 footer: { ...p.footer, ubicacion: e.target.value }
                                             }))
                                         }
-                                        placeholder="Yerba Buena, Tucumán • Salón Privado"
+                                        placeholder="Bartolomé Mitre 155, B° 25 de Mayo • Lules, Tucumán"
                                         className={inputCls}
                                     />
+                                    <span className="text-[10px] text-stone-400 mt-1 block">
+                                        Genera el enlace directo a Google Maps para las clientas.
+                                    </span>
                                 </div>
                                 <div>
                                     <label className={labelCls}>
-                                        Texto de Derechos Reservados
+                                        Subtítulo / Especialidad del Salón
                                     </label>
                                     <input
                                         type="text"
@@ -1234,9 +1274,32 @@ export default function TabCMSVisual({
                                                 footer: { ...p.footer, derechos: e.target.value }
                                             }))
                                         }
-                                        placeholder="Todos los derechos reservados."
+                                        placeholder="Pintaditas Nails by Mili Tripolone • Estudio de Manicuría Profesional"
                                         className={inputCls}
                                     />
+                                    <span className="text-[10px] text-stone-400 mt-1 block">
+                                        Firma institucional del estudio de manicuría.
+                                    </span>
+                                </div>
+                                <div>
+                                    <label className={labelCls}>
+                                        Copyright & Derechos Reservados
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={cms.footer.copyright || ''}
+                                        onChange={e =>
+                                            setCms(p => ({
+                                                ...p,
+                                                footer: { ...p.footer, copyright: e.target.value }
+                                            }))
+                                        }
+                                        placeholder="© 2026 Pintaditas Nails. Todos los derechos reservados."
+                                        className={inputCls}
+                                    />
+                                    <span className="text-[10px] text-stone-400 mt-1 block">
+                                        Protección de propiedad intelectual de la marca y año en curso.
+                                    </span>
                                 </div>
                             </div>
                         </div>

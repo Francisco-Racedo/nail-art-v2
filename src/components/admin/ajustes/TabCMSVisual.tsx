@@ -917,18 +917,19 @@ export default function TabCMSVisual({
             )}
 
             {/* =========================================================================
-                3. GALERÍA LOOKBOOK
+                3. GALERÍA LOOKBOOK & NAILS EN MOVIMIENTO (REELS)
                ========================================================================= */}
             {subSeccion === 'lookbook' && (
                 <div className="space-y-6">
+                    {/* A. SECCIÓN GALERÍA LOOKBOOK */}
                     <div className="bg-white border border-stone-200/90 rounded-3xl p-6 sm:p-8 space-y-5 shadow-xs">
                         <div className="flex items-center justify-between pb-3 border-b border-stone-100">
                             <div>
                                 <h4 className="text-sm font-black text-stone-900 uppercase tracking-wider">
-                                    Sección Galería Lookbook
+                                    Sección Galería Lookbook (Fotos)
                                 </h4>
                                 <p className="text-xs text-stone-500">
-                                    Controlá la visibilidad de la galería de fotos y reels de Instagram.
+                                    Controlá el carrusel de fotografías destacadas de tus trabajos en el estudio.
                                 </p>
                             </div>
                             <button
@@ -964,7 +965,7 @@ export default function TabCMSVisual({
                                             galeria: { ...p.galeria, titulo: e.target.value }
                                         }))
                                     }
-                                    placeholder="Nuestros Trabajos &"
+                                    placeholder="Nuestros Últimos"
                                     className={inputCls}
                                 />
                             </div>
@@ -984,7 +985,7 @@ export default function TabCMSVisual({
                                             }
                                         }))
                                     }
-                                    placeholder="Inspiración Semanal"
+                                    placeholder="Diseños de Autor"
                                     className="w-full bg-white border border-rose-300 rounded-xl px-3 py-2 text-xs font-bold text-rose-900 focus:outline-none"
                                 />
                             </div>
@@ -999,15 +1000,185 @@ export default function TabCMSVisual({
                                             galeria: { ...p.galeria, subtitulo: e.target.value }
                                         }))
                                     }
-                                    placeholder="Mirá los sets más pedidos por nuestras clientas."
+                                    placeholder="Deslizá para inspirarte con trabajos reales realizados en nuestro estudio."
                                     className={inputCls}
                                 />
                             </div>
                         </div>
+                    </div>
+
+                    {/* B. SECCIÓN NAILS EN MOVIMIENTO (REELS EN VIDEO) */}
+                    <div className="bg-white border border-stone-200/90 rounded-3xl p-6 sm:p-8 space-y-5 shadow-xs">
+                        <div className="flex items-center justify-between pb-3 border-b border-stone-100">
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <Film className="w-4 h-4 text-rose-600" />
+                                    <h4 className="text-sm font-black text-stone-900 uppercase tracking-wider">
+                                        Sección Nails en Movimiento (Reels)
+                                    </h4>
+                                </div>
+                                <p className="text-xs text-stone-500">
+                                    Videos verticales continuos tipo Instagram Reels para lucir el brillo, relieves y terminación de tus uñas.
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    setCms(p => ({
+                                        ...p,
+                                        reels: {
+                                            ...p.reels,
+                                            visible: !p.reels.visible
+                                        }
+                                    }))
+                                }
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                                    cms.reels?.visible
+                                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                        : 'bg-rose-100 text-rose-800 border border-rose-300'
+                                }`}
+                            >
+                                {cms.reels?.visible ? 'Reels Visibles' : 'Reels Ocultos'}
+                            </button>
+                        </div>
+
+                        {/* LIVE PREVIEW DE NAILS EN MOVIMIENTO */}
+                        <div className="p-5 rounded-2xl bg-gradient-to-b from-[#FAF6F2] via-[#FDF8F5] to-[#FAF3EE] border border-rose-200/80 space-y-3">
+                            <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-rose-800">
+                                <Eye className="w-3.5 h-3.5 text-rose-600" />
+                                Vista Previa en Vivo: Nails en Movimiento
+                            </span>
+
+                            <div className="p-6 rounded-2xl bg-white/80 border border-rose-200/60 text-center space-y-2.5 shadow-xs max-w-xl mx-auto">
+                                {cms.reels?.badge && (
+                                    <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-rose-100/90 border border-rose-200 text-rose-700 text-[10px] font-bold uppercase tracking-[0.25em] shadow-xs">
+                                        <Sparkles className="w-3 h-3 text-rose-600" />
+                                        {cms.reels.badge}
+                                    </div>
+                                )}
+                                <h3 className="font-editorial text-2xl sm:text-3xl font-bold text-[#231C19]">
+                                    {cms.reels?.titulo || 'Reels &'}{' '}
+                                    <span className="italic font-normal text-rose-gold-gradient">
+                                        {cms.reels?.titulo_resaltado || 'Trabajos Reales'}
+                                    </span>
+                                </h3>
+                                {cms.reels?.subtitulo && (
+                                    <p className="text-xs text-stone-500 leading-relaxed max-w-md mx-auto">
+                                        {cms.reels.subtitulo}
+                                    </p>
+                                )}
+
+                                {/* Simulación visual de tarjetas de video vertical */}
+                                <div className="flex items-center justify-center gap-2.5 pt-3">
+                                    <div className="w-20 h-32 rounded-xl bg-stone-900 border border-rose-300/50 flex flex-col justify-between p-2 shadow-sm text-left">
+                                        <span className="text-[9px] text-white/80 font-bold">🎬 Reel #1</span>
+                                        <span className="text-[8px] text-rose-300">✨ En vivo</span>
+                                    </div>
+                                    <div className="w-24 h-36 rounded-xl bg-gradient-to-br from-stone-900 to-[#231C19] border-2 border-rose-400 flex flex-col justify-between p-2.5 shadow-md text-left scale-105">
+                                        <span className="text-[10px] text-white font-bold">▶ Reproduciendo</span>
+                                        <span className="text-[9px] text-emerald-400 font-semibold">📲 Pedir diseño</span>
+                                    </div>
+                                    <div className="w-20 h-32 rounded-xl bg-stone-900 border border-rose-300/50 flex flex-col justify-between p-2 shadow-sm text-left">
+                                        <span className="text-[9px] text-white/80 font-bold">🎬 Reel #2</span>
+                                        <span className="text-[8px] text-rose-300">✨ En vivo</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Controles de Nails en Movimiento */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label className={labelCls}>Insignia Superior (Badge)</label>
+                                <input
+                                    type="text"
+                                    value={cms.reels?.badge || ''}
+                                    onChange={e =>
+                                        setCms(p => ({
+                                            ...p,
+                                            reels: {
+                                                ...p.reels,
+                                                badge: e.target.value
+                                            }
+                                        }))
+                                    }
+                                    placeholder="NAILS EN MOVIMIENTO"
+                                    className={inputCls}
+                                />
+                                <span className="text-[10px] text-stone-400 mt-1 block">
+                                    Etiqueta con destello sobre el título.
+                                </span>
+                            </div>
+
+                            <div>
+                                <label className={labelCls}>Título Base (Serif)</label>
+                                <input
+                                    type="text"
+                                    value={cms.reels?.titulo || ''}
+                                    onChange={e =>
+                                        setCms(p => ({
+                                            ...p,
+                                            reels: {
+                                                ...p.reels,
+                                                titulo: e.target.value
+                                            }
+                                        }))
+                                    }
+                                    placeholder="Reels &"
+                                    className={inputCls}
+                                />
+                                <span className="text-[10px] text-stone-400 mt-1 block">
+                                    Texto inicial del título de los videos.
+                                </span>
+                            </div>
+
+                            <div className="p-3 rounded-2xl bg-rose-50/60 border border-rose-200/80">
+                                <label className="block text-[11px] font-bold text-rose-900 mb-1.5 uppercase tracking-wider">
+                                    Resaltado (Cursiva Oro Rosa)
+                                </label>
+                                <input
+                                    type="text"
+                                    value={cms.reels?.titulo_resaltado || ''}
+                                    onChange={e =>
+                                        setCms(p => ({
+                                            ...p,
+                                            reels: {
+                                                ...p.reels,
+                                                titulo_resaltado: e.target.value
+                                            }
+                                        }))
+                                    }
+                                    placeholder="Trabajos Reales"
+                                    className="w-full bg-white border border-rose-300 rounded-xl px-3 py-2 text-xs font-bold text-rose-900 focus:outline-none"
+                                />
+                                <span className="text-[10px] text-rose-700/80 mt-1 block">
+                                    Efecto caligráfico animado en oro rosa.
+                                </span>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className={labelCls}>Subtítulo Descriptivo</label>
+                            <input
+                                type="text"
+                                value={cms.reels?.subtitulo || ''}
+                                onChange={e =>
+                                    setCms(p => ({
+                                        ...p,
+                                        reels: {
+                                            ...p.reels,
+                                            subtitulo: e.target.value
+                                        }
+                                    }))
+                                }
+                                placeholder="Apreciá el brillo, los relieves y la terminación en video. Se reproducen de forma continua uno tras otro."
+                                className={inputCls}
+                            />
+                        </div>
 
                         <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200 text-xs text-stone-600 flex items-center justify-between">
                             <span>
-                                📸 <strong>¿Querés subir o cambiar las fotos del carrusel o reels?</strong> Podés hacerlo en la pestaña <strong>Carrusel</strong> del menú superior.
+                                🎬 <strong>¿Querés subir o cambiar los videos de tus Reels?</strong> Podés hacerlo directamente desde la pestaña <strong>Carrusel</strong> del menú superior seleccionando la pestaña Reels.
                             </span>
                         </div>
                     </div>

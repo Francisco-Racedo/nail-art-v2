@@ -88,6 +88,13 @@ export interface CMSContenido {
         titulo_resaltado: string
         subtitulo: string
     }
+    reels: {
+        visible: boolean
+        badge: string
+        titulo: string
+        titulo_resaltado: string
+        subtitulo: string
+    }
     servicios: {
         visible: boolean
         badge: string
@@ -180,6 +187,13 @@ export const DEFAULT_CMS_CONTENIDO: CMSContenido = {
         titulo_resaltado: 'Diseños de Autor',
         subtitulo: 'Deslizá para inspirarte con trabajos reales realizados en nuestro estudio.'
     },
+    reels: {
+        visible: true,
+        badge: 'NAILS EN MOVIMIENTO',
+        titulo: 'Reels &',
+        titulo_resaltado: 'Trabajos Reales',
+        subtitulo: 'Apreciá el brillo, los relieves y la terminación en video. Se reproducen de forma continua uno tras otro.'
+    },
     servicios: {
         visible: true,
         badge: 'Menú de Experiencias',
@@ -237,6 +251,7 @@ export function mergeCMSContenido(raw?: string | Partial<CMSContenido> | null): 
                     : DEFAULT_CMS_CONTENIDO.hero.pilares
             },
             galeria: { ...DEFAULT_CMS_CONTENIDO.galeria, ...(parsed.galeria || {}) },
+            reels: { ...DEFAULT_CMS_CONTENIDO.reels, ...(parsed.reels || {}) },
             servicios: { ...DEFAULT_CMS_CONTENIDO.servicios, ...(parsed.servicios || {}) },
             reserva: { ...DEFAULT_CMS_CONTENIDO.reserva, ...(parsed.reserva || {}) },
             footer: {

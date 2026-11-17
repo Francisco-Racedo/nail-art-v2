@@ -17,6 +17,7 @@ import {
     ChevronRight
 } from 'lucide-react'
 import { suscribirCambiosRealtime } from '@/lib/realtime'
+import { DEFAULT_CMS_CONTENIDO, mergeCMSContenido } from '@/lib/cms-types'
 
 import 'swiper/css'
 import 'swiper/css/navigation'
@@ -44,6 +45,19 @@ export default function ReelsSection() {
         refetchInterval: 10_000,
         refetchOnWindowFocus: true
     })
+
+    const { data: config } = useQuery({
+        queryKey: ['config'],
+        queryFn: async () => {
+            const res = await fetch('/api/config', { cache: 'no-store' })
+            if (!res.ok) return null
+            return res.json()
+        },
+        staleTime: 10_000
+    })
+
+    const cms = config?.cms ? mergeCMSContenido(config.cms) : DEFAULT_CMS_CONTENIDO
+    const whatsappNumero = config?.whatsapp_numero || '5493813013850'
 
     // Sincronización en tiempo real al subir/eliminar videos desde el panel
     useEffect(() => {
@@ -217,6 +231,7 @@ export default function ReelsSection() {
         }
     }
 
+    if (!cms.reels.visible) return null
     if (isLoading && reels.length === 0) return null
     if (reels.length === 0) return null
 
@@ -228,18 +243,22 @@ export default function ReelsSection() {
             style={{ contain: 'paint' }}
         >
             <div className="container mx-auto px-6 mb-8 text-center relative z-10">
-                <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-rose-100/90 border border-rose-200 text-rose-700 text-[10px] sm:text-xs font-bold uppercase tracking-[0.25em] mb-2.5 shadow-sm">
-                    <Sparkles className="w-3.5 h-3.5 text-rose-600" /> NAILS EN MOVIMIENTO
-                </div>
+                {cms.reels.badge && (
+                    <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-rose-100/90 border border-rose-200 text-rose-700 text-[10px] sm:text-xs font-bold uppercase tracking-[0.25em] mb-2.5 shadow-sm">
+                        <Sparkles className="w-3.5 h-3.5 text-rose-600" /> {cms.reels.badge}
+                    </div>
+                )}
                 <h2 className="font-editorial text-3xl sm:text-4xl md:text-5xl font-semibold text-[#231C19] tracking-tight">
-                    Reels &amp;{' '}
+                    {cms.reels.titulo}{' '}
                     <span className="italic font-normal text-rose-gold-gradient">
-                        Trabajos Reales
+                        {cms.reels.titulo_resaltado}
                     </span>
                 </h2>
-                <p className="text-stone-500 mt-2 font-normal text-xs sm:text-sm md:text-base max-w-lg mx-auto">
-                    Apreciá el brillo, los relieves y la terminación en video. Se reproducen de forma continua uno tras otro.
-                </p>
+                {cms.reels.subtitulo && (
+                    <p className="text-stone-500 mt-2 font-normal text-xs sm:text-sm md:text-base max-w-lg mx-auto">
+                        {cms.reels.subtitulo}
+                    </p>
+                )}
             </div>
 
             {/* Carrusel Swiper de Reels */}
@@ -425,7 +444,7 @@ export default function ReelsSection() {
                                         </div>
 
                                         <a
-                                            href={`https://wa.me/5493816988692?text=Hola%20Mili!%20Vi%20este%20dise%C3%B1o%20en%20los%20Reels%20de%20tu%20web%20y%20me%20encant%C3%B3!%20%C2%BFTen%C3%A9s%20turno%20disponible?`}
+                                            href={`https://wa.me/${whatsappNumero}?text=Hola!%20Vi%20este%20dise%C3%B1o%20en%20los%20Reels%20de%20tu%20web%20y%20me%20encant%C3%B3!%20%C2%BFTen%C3%A9s%20turno%20disponible?`}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             onClick={e => e.stopPropagation()}

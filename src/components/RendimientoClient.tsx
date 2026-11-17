@@ -8,9 +8,7 @@ import {
     YAxis,
     CartesianGrid,
     Tooltip,
-    ResponsiveContainer,
-    BarChart,
-    Bar
+    ResponsiveContainer
 } from 'recharts'
 import {
     TrendingUp,
@@ -19,14 +17,14 @@ import {
     DollarSign,
     Sparkles,
     CheckCircle2,
-    XCircle,
     Receipt,
-    Clock,
-    Flame
+    Flame,
+    ArrowRight,
+    Clock
 } from 'lucide-react'
 import {
     calcularDesgloseReserva,
-    getAhoraArgentina,
+    getPartesAhoraArgentina,
     getEstadoEfectivo
 } from '@/lib/utils'
 
@@ -34,53 +32,184 @@ interface RendimientoClientProps {
     reservas: any[]
 }
 
-type RangoTiempo = 7 | 15 | 30
-type ModoAnalisis = 'proyeccion' | 'historico'
+export type TipoFiltroPeriodo =
+    | 'semana_actual'
+    | 'semana_anterior'
+    | 'quincena'
+    | 'mes_actual'
+    | 'mes_anterior'
+
+const NOMBRES_MESES = [
+    'Enero',
+    'Febrero',
+    'Marzo',
+    'Abril',
+    'Mayo',
+    'Junio',
+    'Julio',
+    'Agosto',
+    'Septiembre',
+    'Octubre',
+    'Noviembre',
+    'Diciembre'
+]
+
+const DIAS_CORTO = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+
+function formatYYYYMMDD(d: Date): string {
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
+}
+
+function formatearDiaMes(d: Date): string {
+    const day = String(d.getDate()).padStart(2, '0')
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    return `${day}/${m}`
+}
 
 export default function RendimientoClient({ reservas }: RendimientoClientProps) {
-    const [modo, setModo] = useState<ModoAnalisis>('proyeccion')
-    const [rango, setRango] = useState<RangoTiempo>(7)
+    const [filtro, setFiltro] = useState<TipoFiltroPeriodo>('semana_actual')
 
     const stats = useMemo(() => {
-        const now = getAhoraArgentina()
-        now.setHours(0, 0, 0, 0)
+        // Obtenemos los componentes de fecha exactamente en el uso horario de Argentina (UTC-3)
+        const p = getPartesAhoraArgentina()
+        // Usamos mediodía (12:00) para evitar desfasajes por cambio de día o límites de zona horaria
+        const hoyArg = new Date(p.year, p.month - 1, p.day, 12, 0, 0)
+        const hoyISO = formatYYYYMMDD(hoyArg)
 
-        const getStr = (d: Date) =>
-            `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+        // En JS: 0 = Domingo, 1 = Lunes, 2 = Martes, ..., 6 = Sábado
+        const dayOfWeek = hoyArg.getDay()
+        // Días de diferencia hacia atrás para alcanzar el Lunes (00:00:00)
+        const diffALunes = dayOfWeek === 0 ? 6 : dayOfWeek - 1
 
-        let dateStrStart: string
-        let dateStrEnd: string
-        const daysMap = new Map<string, { ingresos: number; turnos: number }>()
+        let inicio: Date
+        let fin: Date
+        let labelPeriodo: string
 
-        if (modo === 'proyeccion') {
-            dateStrStart = getStr(now)
-            const limit = new Date(now)
-            limit.setDate(now.getDate() + rango)
-            dateStrEnd = getStr(limit)
-
-            for (let i = 0; i < rango; i++) {
-                const d = new Date(now)
-                d.setDate(now.getDate() + i)
-                daysMap.set(getStr(d), { ingresos: 0, turnos: 0 })
+        switch (filtro) {
+            case 'semana_actual': {
+                // Lunes de la semana en curso
+                inicio = new Date(
+                    hoyArg.getFullYear(),
+                    hoyArg.getMonth(),
+                    hoyArg.getDate() - diffALunes,
+                    12,
+                    0,
+                    0
+                )
+                // Domingo de la semana en curso (Lunes + 6 días)
+                fin = new Date(
+                    inicio.getFullYear(),
+                    inicio.getMonth(),
+                    inicio.getDate() + 6,
+                    12,
+                    0,
+                    0
+                )
+                labelPeriodo = `Semana actual: Lun ${formatearDiaMes(inicio)} al Dom ${formatearDiaMes(fin)}`
+                break
             }
-        } else {
-            const start = new Date(now)
-            start.setDate(now.getDate() - rango)
-            dateStrStart = getStr(start)
-            dateStrEnd = getStr(now)
 
-            for (let i = 0; i <= rango; i++) {
-                const d = new Date(start)
-                d.setDate(start.getDate() + i)
-                daysMap.set(getStr(d), { ingresos: 0, turnos: 0 })
+            case 'semana_anterior': {
+                // Lunes de la semana pasada (Lunes actual - 7 días)
+                const lunesActual = new Date(
+                    hoyArg.getFullYear(),
+                    hoyArg.getMonth(),
+                    hoyArg.getDate() - diffALunes,
+                    12,
+                    0,
+                    0
+                )
+                inicio = new Date(
+                    lunesActual.getFullYear(),
+                    lunesActual.getMonth(),
+                    lunesActual.getDate() - 7,
+                    12,
+                    0,
+                    0
+                )
+                // Domingo de la semana pasada (Lunes anterior + 6 días)
+                fin = new Date(
+                    inicio.getFullYear(),
+                    inicio.getMonth(),
+                    inicio.getDate() + 6,
+                    12,
+                    0,
+                    0
+                )
+                labelPeriodo = `Semana anterior: Lun ${formatearDiaMes(inicio)} al Dom ${formatearDiaMes(fin)}`
+                break
+            }
+
+            case 'quincena': {
+                const y = hoyArg.getFullYear()
+                const m = hoyArg.getMonth()
+                if (p.day <= 15) {
+                    inicio = new Date(y, m, 1, 12, 0, 0)
+                    fin = new Date(y, m, 15, 12, 0, 0)
+                    labelPeriodo = `1ª Quincena: 01/${String(m + 1).padStart(2, '0')} al 15/${String(m + 1).padStart(2, '0')}`
+                } else {
+                    inicio = new Date(y, m, 16, 12, 0, 0)
+                    const ultDia = new Date(y, m + 1, 0, 12, 0, 0).getDate()
+                    fin = new Date(y, m, ultDia, 12, 0, 0)
+                    labelPeriodo = `2ª Quincena: 16/${String(m + 1).padStart(2, '0')} al ${ultDia}/${String(m + 1).padStart(2, '0')}`
+                }
+                break
+            }
+
+            case 'mes_actual': {
+                const y = hoyArg.getFullYear()
+                const m = hoyArg.getMonth()
+                inicio = new Date(y, m, 1, 12, 0, 0)
+                const ultDia = new Date(y, m + 1, 0, 12, 0, 0).getDate()
+                fin = new Date(y, m, ultDia, 12, 0, 0)
+                labelPeriodo = `Mes en curso: ${NOMBRES_MESES[m]} (${formatearDiaMes(inicio)} al ${formatearDiaMes(fin)})`
+                break
+            }
+
+            case 'mes_anterior': {
+                const y = hoyArg.getFullYear()
+                const mAnt = hoyArg.getMonth() - 1
+                inicio = new Date(y, mAnt, 1, 12, 0, 0)
+                const ultDia = new Date(y, mAnt + 1, 0, 12, 0, 0).getDate()
+                fin = new Date(y, mAnt, ultDia, 12, 0, 0)
+                labelPeriodo = `Mes anterior: ${NOMBRES_MESES[inicio.getMonth()]} (${formatearDiaMes(inicio)} al ${formatearDiaMes(fin)})`
+                break
             }
         }
 
+        const startISO = formatYYYYMMDD(inicio)
+        const endISO = formatYYYYMMDD(fin)
+
+        // Pre-cargar todos los días del período en el mapa para garantizar continuidad en el gráfico
+        const daysMap = new Map<
+            string,
+            { ingresos: number; turnos: number; label: string; fecha: string }
+        >()
+
+        const cursor = new Date(inicio)
+        while (cursor <= fin) {
+            const fStr = formatYYYYMMDD(cursor)
+            const diaNombre = DIAS_CORTO[cursor.getDay()]
+            const label =
+                filtro === 'semana_actual' || filtro === 'semana_anterior'
+                    ? `${diaNombre} ${formatearDiaMes(cursor)}`
+                    : formatearDiaMes(cursor)
+
+            daysMap.set(fStr, { ingresos: 0, turnos: 0, label, fecha: fStr })
+            cursor.setDate(cursor.getDate() + 1)
+        }
+
+        // Filtrar reservas que caigan estrictamente dentro del rango calendario
         const filtered = reservas.filter(
-            r => r.fecha >= dateStrStart && r.fecha <= dateStrEnd
+            r => r.fecha >= startISO && r.fecha <= endISO
         )
 
         let ingresos = 0
+        let ingresosCompletadosHastaHoy = 0
+        let ingresosProyectadosResto = 0
         let totalBaseServicios = 0
         let totalAdicionales = 0
         let totalDescuentos = 0
@@ -110,13 +239,24 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
                 totalAdicionales += desglose.montoAdicionales
                 totalDescuentos += desglose.montoDescuento
 
+                if (r.fecha <= hoyISO) {
+                    ingresosCompletadosHastaHoy += desglose.totalFinal
+                } else {
+                    ingresosProyectadosResto += desglose.totalFinal
+                }
+
                 if (r.celular) {
                     clientesUnicos.add(r.celular.trim())
                 }
 
-                // Agrupar servicios
-                const nombreLimpio = (r.servicio || 'Servicio General').split('(')[0].trim()
-                const sActual = serviciosMap.get(nombreLimpio) || { count: 0, ingresos: 0 }
+                // Agrupamiento por servicio
+                const nombreLimpio = (r.servicio || 'Servicio General')
+                    .split('(')[0]
+                    .trim()
+                const sActual = serviciosMap.get(nombreLimpio) || {
+                    count: 0,
+                    ingresos: 0
+                }
                 sActual.count++
                 sActual.ingresos += desglose.totalFinal
                 serviciosMap.set(nombreLimpio, sActual)
@@ -129,19 +269,18 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
             }
         })
 
-        const dataChart = Array.from(daysMap.entries()).map(([f, info]) => {
-            const [, m, d] = f.split('-')
-            return {
-                fecha: f,
-                name: `${d}/${m}`,
-                ingresos: info.ingresos,
-                turnos: info.turnos
-            }
-        })
+        const dataChart = Array.from(daysMap.values()).map(item => ({
+            name: item.label,
+            fecha: item.fecha,
+            ingresos: item.ingresos,
+            turnos: item.turnos
+        }))
 
         const totalGestionados = completadosConf + canceladosRech + ausentesCount
         const ocupacion =
-            totalGestionados === 0 ? 0 : Math.round((completadosConf / totalGestionados) * 100)
+            totalGestionados === 0
+                ? 0
+                : Math.round((completadosConf / totalGestionados) * 100)
         const ticketPromedio =
             completadosConf > 0 ? Math.round(ingresos / completadosConf) : 0
 
@@ -151,12 +290,15 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
                 nombre,
                 count: data.count,
                 ingresos: data.ingresos,
-                porcentaje: ingresos > 0 ? Math.round((data.ingresos / ingresos) * 100) : 0
+                porcentaje:
+                    ingresos > 0 ? Math.round((data.ingresos / ingresos) * 100) : 0
             }))
             .sort((a, b) => b.ingresos - a.ingresos)
 
         return {
             ingresos,
+            ingresosCompletadosHastaHoy,
+            ingresosProyectadosResto,
             totalBaseServicios,
             totalAdicionales,
             totalDescuentos,
@@ -168,14 +310,17 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
             ticketPromedio,
             clientesAtendidos: clientesUnicos.size,
             dataChart,
-            rankingServicios
+            rankingServicios,
+            labelPeriodo,
+            rangoTexto: `${formatearDiaMes(inicio)} al ${formatearDiaMes(fin)}`,
+            esSemanaActual: filtro === 'semana_actual'
         }
-    }, [reservas, modo, rango])
+    }, [reservas, filtro])
 
     return (
         <div className="w-full space-y-6 animate-in fade-in duration-300">
             {/* Header del Panel */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-stone-200">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-stone-200">
                 <div>
                     <div className="flex items-center gap-2 text-rose-500 font-bold text-xs uppercase tracking-widest mb-1.5">
                         <TrendingUp className="w-4 h-4" />
@@ -184,85 +329,81 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
                     <h2 className="text-2xl sm:text-3xl font-black text-stone-900 tracking-tight">
                         Panel de Rendimiento
                     </h2>
-                    <p className="text-stone-500 text-xs sm:text-sm font-medium mt-0.5">
-                        Métricas financieras, tasa de ocupación y servicios más rentables de Pintaditas Nails.
-                    </p>
+                    <div className="mt-1 flex items-center gap-2">
+                        <span className="inline-flex items-center gap-1.5 bg-rose-50 border border-rose-200/90 text-rose-800 text-xs font-bold px-3 py-1 rounded-xl shadow-2xs">
+                            <CalendarDays className="w-3.5 h-3.5 text-rose-500" />
+                            {stats.labelPeriodo}
+                        </span>
+                    </div>
                 </div>
 
-                {/* Filtros de Modo y Rango */}
-                <div className="flex flex-wrap items-center gap-2.5">
-                    {/* Selector de Modo */}
-                    <div className="bg-stone-200/80 p-1 rounded-xl flex items-center shadow-inner">
-                        <button
-                            type="button"
-                            onClick={() => setModo('proyeccion')}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                                modo === 'proyeccion'
-                                    ? 'bg-white text-stone-900 shadow-sm'
-                                    : 'text-stone-600 hover:text-stone-900'
-                            }`}
-                        >
-                            🔮 Proyección
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setModo('historico')}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                                modo === 'historico'
-                                    ? 'bg-white text-stone-900 shadow-sm'
-                                    : 'text-stone-600 hover:text-stone-900'
-                            }`}
-                        >
-                            📅 Historial
-                        </button>
-                    </div>
-
-                    {/* Selector de Rango */}
-                    <div className="bg-white border border-stone-200 p-1 rounded-xl flex items-center shadow-sm">
-                        <button
-                            type="button"
-                            onClick={() => setRango(7)}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                                rango === 7
-                                    ? 'bg-rose-500 text-white shadow-sm'
-                                    : 'text-stone-600 hover:bg-stone-100'
-                            }`}
-                        >
-                            Semana (7d)
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setRango(15)}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                                rango === 15
-                                    ? 'bg-rose-500 text-white shadow-sm'
-                                    : 'text-stone-600 hover:bg-stone-100'
-                            }`}
-                        >
-                            Quincena (15d)
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setRango(30)}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                                rango === 30
-                                    ? 'bg-rose-500 text-white shadow-sm'
-                                    : 'text-stone-600 hover:bg-stone-100'
-                            }`}
-                        >
-                            Mes (30d)
-                        </button>
-                    </div>
+                {/* Filtros de Período Calendario */}
+                <div className="flex flex-wrap items-center gap-1.5 bg-stone-100 p-1.5 rounded-2xl border border-stone-200/80 shadow-inner">
+                    <button
+                        type="button"
+                        onClick={() => setFiltro('semana_actual')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                            filtro === 'semana_actual'
+                                ? 'bg-rose-500 text-white shadow-sm'
+                                : 'text-stone-600 hover:text-stone-900 hover:bg-stone-200/70'
+                        }`}
+                    >
+                        📅 Esta Semana
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setFiltro('semana_anterior')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                            filtro === 'semana_anterior'
+                                ? 'bg-rose-500 text-white shadow-sm'
+                                : 'text-stone-600 hover:text-stone-900 hover:bg-stone-200/70'
+                        }`}
+                    >
+                        ⏮️ Semana Anterior
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setFiltro('quincena')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                            filtro === 'quincena'
+                                ? 'bg-rose-500 text-white shadow-sm'
+                                : 'text-stone-600 hover:text-stone-900 hover:bg-stone-200/70'
+                        }`}
+                    >
+                        🌓 Quincena
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setFiltro('mes_actual')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                            filtro === 'mes_actual'
+                                ? 'bg-rose-500 text-white shadow-sm'
+                                : 'text-stone-600 hover:text-stone-900 hover:bg-stone-200/70'
+                        }`}
+                    >
+                        📆 Mes en Curso
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setFiltro('mes_anterior')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                            filtro === 'mes_anterior'
+                                ? 'bg-rose-500 text-white shadow-sm'
+                                : 'text-stone-600 hover:text-stone-900 hover:bg-stone-200/70'
+                        }`}
+                    >
+                        Mes Anterior
+                    </button>
                 </div>
             </div>
 
             {/* Tarjetas Principales de KPIs */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* 1. Facturación / Proyección Total */}
+                {/* 1. Facturación del Período */}
                 <div className="bg-white/95 backdrop-blur-sm border border-stone-200/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
                     <div className="flex items-center justify-between mb-3">
                         <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">
-                            {modo === 'proyeccion' ? 'Facturación Estimada' : 'Facturación Cobrada'}
+                            Facturación Total
                         </span>
                         <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100">
                             <DollarSign className="w-4 h-4" />
@@ -271,19 +412,37 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
                     <p className="text-2xl sm:text-3xl font-black text-stone-900 leading-none">
                         ${stats.ingresos.toLocaleString('es-AR')}
                     </p>
-                    <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-stone-500">
-                        <span>Base: ${stats.totalBaseServicios.toLocaleString('es-AR')}</span>
-                        {stats.totalAdicionales > 0 && (
-                            <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded font-bold">
-                                +${stats.totalAdicionales.toLocaleString('es-AR')} deco
-                            </span>
-                        )}
-                        {stats.totalDescuentos > 0 && (
-                            <span className="text-rose-600 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded font-bold">
-                                -${stats.totalDescuentos.toLocaleString('es-AR')} desc
-                            </span>
-                        )}
-                    </div>
+
+                    {stats.esSemanaActual ? (
+                        <div className="mt-2.5 flex flex-col gap-1 text-[11px] font-semibold text-stone-500 border-t border-stone-100 pt-2">
+                            <div className="flex justify-between">
+                                <span className="text-emerald-700">✓ Atendido hasta hoy:</span>
+                                <span className="font-bold text-stone-800">
+                                    ${stats.ingresosCompletadosHastaHoy.toLocaleString('es-AR')}
+                                </span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-sky-700">⏳ Por atender (resto semana):</span>
+                                <span className="font-bold text-stone-800">
+                                    ${stats.ingresosProyectadosResto.toLocaleString('es-AR')}
+                                </span>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-stone-500">
+                            <span>Base: ${stats.totalBaseServicios.toLocaleString('es-AR')}</span>
+                            {stats.totalAdicionales > 0 && (
+                                <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded font-bold">
+                                    +${stats.totalAdicionales.toLocaleString('es-AR')} deco
+                                </span>
+                            )}
+                            {stats.totalDescuentos > 0 && (
+                                <span className="text-rose-600 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded font-bold">
+                                    -${stats.totalDescuentos.toLocaleString('es-AR')} desc
+                                </span>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 {/* 2. Ticket Promedio */}
@@ -300,11 +459,11 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
                         ${stats.ticketPromedio.toLocaleString('es-AR')}
                     </p>
                     <p className="mt-2 text-xs font-medium text-stone-500">
-                        Promedio generado por cada turno realizado en este período.
+                        Promedio por cada clienta que se atendió en este período.
                     </p>
                 </div>
 
-                {/* 3. Tasa de Ocupación y Cumplimiento */}
+                {/* 3. Tasa de Efectividad y Ocupación */}
                 <div className="bg-white/95 backdrop-blur-sm border border-stone-200/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
                     <div className="flex items-center justify-between mb-3">
                         <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">
@@ -350,12 +509,12 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
                         {stats.clientesAtendidos}
                     </p>
                     <p className="mt-2 text-xs font-medium text-stone-500">
-                        Personas únicas con turnos confirmados en el intervalo.
+                        Personas únicas que reservaron en este intervalo.
                     </p>
                 </div>
             </div>
 
-            {/* Gráfico de Evolución y Desglose */}
+            {/* Gráfico y Composición */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Gráfico de Área (2 columnas) */}
                 <div className="lg:col-span-2 bg-white/95 backdrop-blur-sm border border-stone-200/80 rounded-2xl p-5 shadow-sm">
@@ -363,10 +522,10 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
                         <div>
                             <h3 className="text-sm font-bold text-stone-800 uppercase tracking-wider flex items-center gap-2">
                                 <TrendingUp className="w-4 h-4 text-emerald-500" />
-                                Curva de Facturación ({modo === 'proyeccion' ? 'Próximos' : 'Últimos'} {rango} días)
+                                Curva de Facturación ({stats.rangoTexto})
                             </h3>
                             <p className="text-xs text-stone-400 font-medium">
-                                Evolución diaria de ingresos brutos generados por turnos
+                                Recaudación diaria (comienza los Lunes a las 00:00:00 y finaliza los Domingos)
                             </p>
                         </div>
                     </div>
@@ -378,12 +537,22 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
                                 margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
                             >
                                 <defs>
-                                    <linearGradient id="rendimientoGradient" x1="0" y1="0" x2="0" y2="1">
+                                    <linearGradient
+                                        id="rendimientoGradient"
+                                        x1="0"
+                                        y1="0"
+                                        x2="0"
+                                        y2="1"
+                                    >
                                         <stop offset="5%" stopColor="#10b981" stopOpacity={0.25} />
                                         <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
                                     </linearGradient>
                                 </defs>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                <CartesianGrid
+                                    strokeDasharray="3 3"
+                                    vertical={false}
+                                    stroke="#f1f5f9"
+                                />
                                 <XAxis
                                     dataKey="name"
                                     stroke="#94a3b8"
@@ -407,11 +576,11 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
                                         padding: '10px 14px',
                                         boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
                                     }}
-                                    formatter={(value: any, name: any) => [
+                                    formatter={(value: any) => [
                                         `$${Number(value).toLocaleString('es-AR')}`,
                                         'Facturación'
                                     ]}
-                                    labelFormatter={(label: any) => `Fecha: ${label}`}
+                                    labelFormatter={(label: any) => `Día: ${label}`}
                                 />
                                 <Area
                                     type="monotone"
@@ -434,7 +603,7 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
                             Composición de Ingresos
                         </h3>
                         <p className="text-xs text-stone-400 font-medium mb-4">
-                            Desglose de origen de fondos
+                            Detalle de base, nail art y descuentos
                         </p>
 
                         <div className="space-y-3.5">
@@ -458,7 +627,7 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
                             <div>
                                 <div className="flex justify-between text-xs font-semibold text-stone-600 mb-1">
                                     <span className="flex items-center gap-1 text-emerald-700">
-                                        ✨ Adicionales / Nail Art:
+                                        ✨ Adicionales / Deco:
                                     </span>
                                     <span className="font-bold text-emerald-700">
                                         +${stats.totalAdicionales.toLocaleString('es-AR')}
@@ -498,7 +667,7 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
                     <div className="mt-6 pt-4 border-t border-stone-100 bg-stone-50/80 -mx-5 -mb-5 p-5 rounded-b-2xl">
                         <div className="flex items-center justify-between">
                             <span className="text-xs font-bold text-stone-700 uppercase tracking-wider">
-                                Total Neto Estimado:
+                                Total Neto:
                             </span>
                             <span className="text-xl font-black text-rose-600">
                                 ${stats.ingresos.toLocaleString('es-AR')}
@@ -508,7 +677,7 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
                 </div>
             </div>
 
-            {/* Ranking de Servicios más Solicitados */}
+            {/* Ranking de Servicios */}
             <div className="bg-white/95 backdrop-blur-sm border border-stone-200/80 rounded-2xl p-5 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
                     <div>
@@ -517,14 +686,14 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
                             Servicios Más Demandados y Rentables
                         </h3>
                         <p className="text-xs text-stone-400 font-medium">
-                            Distribución de preferencias y recaudación por cada categoría de servicio
+                            Distribución de preferencias y recaudación por cada categoría de servicio en este período
                         </p>
                     </div>
                 </div>
 
                 {stats.rankingServicios.length === 0 ? (
                     <p className="text-xs text-stone-400 py-6 text-center italic">
-                        No hay turnos registrados en este rango de fechas.
+                        No hay turnos registrados en este período.
                     </p>
                 ) : (
                     <div className="space-y-3">

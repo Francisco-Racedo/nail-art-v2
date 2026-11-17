@@ -95,7 +95,7 @@ export default function CarouselGaleria() {
                 pagination={{ clickable: true }}
                 className="w-full px-6 py-8"
             >
-                {(fotos.length < 6 ? [...fotos, ...fotos, ...fotos] : fotos).map((url, i) => (
+                {(fotos.length < 6 ? [...fotos, ...fotos, ...fotos] : fotos).map((url: string, i: number) => (
                     <SwiperSlide key={i} style={{ width: 290 }}>
                         <div className="group relative rounded-[2rem] overflow-hidden p-1.5 bg-white shadow-xl shadow-rose-900/10 border border-rose-100 transition-all duration-500 hover:-translate-y-1.5">
                             <img

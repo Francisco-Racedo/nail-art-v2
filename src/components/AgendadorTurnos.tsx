@@ -12,6 +12,7 @@ import { Sparkles, Calendar, User, Cake, Phone, Mail, CheckCircle2 } from 'lucid
 import CalendarioReserva from './CalendarioReserva'
 import {
     generarHorariosDisponibles,
+    generarHorariosBaseParaFecha,
     getHoyArgentina,
     getFinMesesSiguientesArgentina,
     ADICIONALES_CATALOGO,
@@ -104,7 +105,7 @@ export default function AgendadorTurnos() {
         queryFn: fetchConfig,
         staleTime: 60_000
     })
-    const { data: servicios = [] } = useQuery({
+    const { data: servicios = [] } = useQuery<Servicio[]>({
         queryKey: ['servicios'],
         queryFn: fetchServicios,
         staleTime: 60_000
@@ -211,11 +212,7 @@ export default function AgendadorTurnos() {
     const horariosBase: string[] =
         diaPuntual?.horariosBase ||
         infoDiaSeleccionado?.horariosBase ||
-        generarHorariosDisponibles(
-            config.hora_inicio,
-            config.hora_fin,
-            config.intervalo_minutos
-        )
+        generarHorariosBaseParaFecha(fecha, false)
 
     const ocupados: { horario: string; estado: string }[] =
         diaPuntual?.ocupados || infoDiaSeleccionado?.ocupados || []
@@ -342,7 +339,7 @@ export default function AgendadorTurnos() {
     }
 
     const grupos: Record<string, Servicio[]> = {}
-    servicios.forEach(s => {
+    servicios.forEach((s: Servicio) => {
         if (!grupos[s.categoria]) grupos[s.categoria] = []
         grupos[s.categoria].push(s)
     })
@@ -425,7 +422,7 @@ export default function AgendadorTurnos() {
                             />
 
                             <h3 className="block text-[#2C2421]/85 text-sm mb-2.5 font-semibold mt-5">
-                                Horarios Disponibles (turnos de 2 hs)
+                                Horarios Disponibles (turnos de 1h 30m)
                             </h3>
 
                             {fecha ? (

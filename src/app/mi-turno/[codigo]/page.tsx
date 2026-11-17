@@ -331,7 +331,7 @@ export default function MiTurnoPage() {
                         </div>
                         <div className="bg-stone-50 border border-stone-200/80 rounded-2xl p-4">
                             <p className="text-[11px] font-bold uppercase tracking-wider text-stone-400 mb-1">
-                                ⏰ Horario (2 hs)
+                                ⏰ Horario (1h 30m)
                             </p>
                             <p className="text-lg font-black text-stone-800">{turno.horario} hs</p>
                         </div>

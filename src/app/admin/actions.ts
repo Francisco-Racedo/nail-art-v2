@@ -345,6 +345,35 @@ export async function eliminarJornadaEspecialAction(fecha: string) {
     return { success: true, jornadas: nuevas }
 }
 
+export async function toggleTurnoNocturnoAction(fecha: string, habilitar?: boolean) {
+    const supabase = await createClient()
+    const {
+        data: { user }
+    } = await supabase.auth.getUser()
+    if (!user) return { error: 'No autorizado' }
+
+    const cfg = await getConfigCompleta()
+    const current = new Set(cfg.fechas_nocturno_habilitado || [])
+    const fNorm = (fecha || '').substring(0, 10)
+
+    const shouldEnable = habilitar !== undefined ? habilitar : !current.has(fNorm)
+    if (shouldEnable) {
+        current.add(fNorm)
+    } else {
+        current.delete(fNorm)
+    }
+
+    const nuevaLista = Array.from(current).sort()
+    await guardarKvConfig([
+        { clave: 'fechas_nocturno_habilitado', valor: JSON.stringify(nuevaLista) }
+    ])
+
+    revalidatePath('/', 'layout')
+    revalidatePath('/admin/dashboard')
+
+    return { success: true, habilitado: shouldEnable, fechas: nuevaLista }
+}
+
 export async function actualizarMesesVisiblesAction(meses: number) {
     const supabase = await createClient()
     const {

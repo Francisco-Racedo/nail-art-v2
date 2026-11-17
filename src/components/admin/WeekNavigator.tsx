@@ -175,7 +175,7 @@ export default function WeekNavigator({
                         Calendario de {monthTitle}
                     </h4>
                     <span className="text-[11px] text-stone-500 font-semibold">
-                        Tocá cualquier día para ver o asignar turnos (10:00 a 20:00 hs)
+                        Tocá cualquier día para ver o asignar turnos (08:30 a 20:00 hs)
                     </span>
                 </div>
 

@@ -109,10 +109,10 @@ export default function AjustesClient({
         config?.whatsapp_numero || '5493813013850'
     )
     const [intervaloMinutos, setIntervaloMinutos] = useState<number>(
-        Number(config?.intervalo_minutos) || 120
+        Number(config?.intervalo_minutos) || 90
     )
-    const [horaInicio, setHoraInicio] = useState(config?.hora_inicio || '10:00')
-    const [horaFin, setHoraFin] = useState(config?.hora_fin || '22:00')
+    const [horaInicio, setHoraInicio] = useState(config?.hora_inicio || '08:30')
+    const [horaFin, setHoraFin] = useState(config?.hora_fin || '20:00')
     const [mesesVisibles, setMesesVisibles] = useState<number>(
         Number(config?.meses_visibles_cliente) || 3
     )
@@ -141,9 +141,9 @@ export default function AjustesClient({
     useEffect(() => {
         setNombreNegocio(config?.nombre_negocio || 'Pintaditas Nails')
         setWhatsappNumero(config?.whatsapp_numero || '5493813013850')
-        setIntervaloMinutos(Number(config?.intervalo_minutos) || 120)
-        setHoraInicio(config?.hora_inicio || '10:00')
-        setHoraFin(config?.hora_fin || '22:00')
+        setIntervaloMinutos(Number(config?.intervalo_minutos) || 90)
+        setHoraInicio(config?.hora_inicio || '08:30')
+        setHoraFin(config?.hora_fin || '20:00')
         setMesesVisibles(Number(config?.meses_visibles_cliente) || 3)
         setMinutosAuto(config?.minutos_autoconfirmacion ?? 10)
         setPagosHabilitados(!!config?.pagos_habilitados)

@@ -182,10 +182,11 @@ export default function CalendarioReserva({
                         const parts = fStr.split('-').map(Number)
                         const dateObj = new Date(parts[0], parts[1] - 1, parts[2])
                         const esDomingo = dateObj.getDay() === 0
+                        const esDomDic = esDomingo && parts[1] === 12
 
-                        const cerrado = info ? info.cerrado : esDomingo
+                        const cerrado = info ? info.cerrado : (esDomingo && !esDomDic)
                         const semaforo =
-                            info?.semaforo || (esDomingo ? 'cerrado' : 'disponible')
+                            info?.semaforo || (esDomingo && !esDomDic ? 'cerrado' : 'disponible')
                         const sinTurnos = semaforo === 'completo'
                         const deshabilitado =
                             esPasado || fueraDeRango || cerrado || sinTurnos

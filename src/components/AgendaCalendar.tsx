@@ -26,11 +26,15 @@ import {
 } from './admin/agendaTypes'
 import {
     generarHorariosDisponibles,
+    generarHorariosBaseParaFecha,
     normalizarCelular,
     celularParaWhatsapp,
     getAhoraArgentina
 } from '@/lib/utils'
-import type { AvisoReprogramacionCliente } from '@/app/admin/actions'
+import {
+    toggleTurnoNocturnoAction,
+    type AvisoReprogramacionCliente
+} from '@/app/admin/actions'
 import { notificarCambioEnTiempoReal } from '@/app/providers'
 
 const monthNames = [
@@ -71,6 +75,41 @@ export default function AgendaCalendar({
         return new Date(now.getFullYear(), now.getMonth(), 1)
     })
     const [selectedDate, setSelectedDate] = useState(() => getAhoraArgentina())
+    const selectedDayStr = formatDateStr(selectedDate)
+
+    const isNocturnoHabilitado = useMemo(() => {
+        const fechas = config?.fechas_nocturno_habilitado
+        return Array.isArray(fechas) && fechas.includes(selectedDayStr)
+    }, [config?.fechas_nocturno_habilitado, selectedDayStr])
+
+    const [togglingNocturno, setTogglingNocturno] = useState(false)
+
+    const handleToggleNocturno = async () => {
+        try {
+            setTogglingNocturno(true)
+            const nuevoEstado = !isNocturnoHabilitado
+            const res = await toggleTurnoNocturnoAction(selectedDayStr, nuevoEstado)
+            if (res.error) {
+                toast.error(res.error)
+                return
+            }
+            if (config) {
+                config.fechas_nocturno_habilitado = res.fechas
+            }
+            notificarCambioEnTiempoReal('config', { fecha: selectedDayStr, nocturno: nuevoEstado })
+            toast.success(
+                nuevoEstado
+                    ? `Turno de las 21:00 hs HABILITADO para el ${selectedDayStr}`
+                    : `Turno de las 21:00 hs deshabilitado para el ${selectedDayStr}`
+            )
+            router.refresh()
+        } catch {
+            toast.error('Error al cambiar el estado del turno nocturno')
+        } finally {
+            setTogglingNocturno(false)
+        }
+    }
+
     const [mounted, setMounted] = useState(false)
     const [modalData, setModalData] = useState<ModalData | null>(null)
     const [vistaActiva, setVistaActiva] = useState<'calendario' | 'detalle_turno'>('calendario')
@@ -135,12 +174,11 @@ export default function AgendaCalendar({
 
     const horariosBaseConfig = useMemo(
         () =>
-            generarHorariosDisponibles(
-                config?.hora_inicio || '10:00',
-                config?.hora_fin || '22:00',
-                config?.intervalo_minutos || 120
+            generarHorariosBaseParaFecha(
+                selectedDayStr,
+                isNocturnoHabilitado
             ),
-        [config]
+        [selectedDayStr, isNocturnoHabilitado]
     )
 
     useEffect(() => {
@@ -270,8 +308,6 @@ export default function AgendaCalendar({
             toast.error('No se pudo confirmar el turno', { id: toastId })
         }
     }
-
-    const selectedDayStr = formatDateStr(selectedDate)
 
     const dayReservas = useMemo(() => {
         return reservasList
@@ -619,12 +655,36 @@ export default function AgendaCalendar({
                         </span>
                     ) : (
                         <span>
-                            Horario habitual: {config?.hora_inicio || '10:00'} a{' '}
-                            {config?.hora_fin || '22:00'} hs (6 bloques de 2 hs)
+                            Horario habitual: {config?.hora_inicio || '08:30'} a{' '}
+                            {config?.hora_fin || '20:00'} hs (Turnos de 1h 30m)
                         </span>
                     )}
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                    {/* Botón rápido para habilitar/deshabilitar el turno nocturno de las 21:00 hs */}
+                    <button
+                        type="button"
+                        onClick={handleToggleNocturno}
+                        disabled={togglingNocturno}
+                        className={`text-xs font-bold px-3 py-2 rounded-xl transition-all flex items-center gap-1.5 border shadow-sm ${
+                            isNocturnoHabilitado
+                                ? 'bg-amber-500 hover:bg-amber-600 text-stone-950 border-amber-400 ring-2 ring-amber-300/50'
+                                : 'bg-white hover:bg-stone-50 text-stone-700 border-stone-200'
+                        }`}
+                        title="Habilita o deshabilita el turno de las 21:00 hs para que los clientes puedan reservarlo online en esta fecha"
+                    >
+                        <span>🌙 Turno 21:00 hs:</span>
+                        <span
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
+                                isNocturnoHabilitado
+                                    ? 'bg-stone-950 text-amber-300'
+                                    : 'bg-stone-200 text-stone-600'
+                            }`}
+                        >
+                            {isNocturnoHabilitado ? 'Habilitado Online' : 'Deshabilitado'}
+                        </span>
+                    </button>
+
                     {jornadaEspecialDelDia && (
                         <button
                             type="button"

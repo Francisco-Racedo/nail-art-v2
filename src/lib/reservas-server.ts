@@ -1,6 +1,8 @@
 import { createServiceClient } from '@/lib/supabase/service'
 import {
     generarHorariosDisponibles,
+    generarHorariosBaseParaFecha,
+    esDomingoDiciembre,
     getAhoraArgentina,
     getHoyArgentina,
     getEstadoEfectivo,
@@ -16,7 +18,7 @@ import { CMSContenido, DEFAULT_CMS_CONTENIDO, mergeCMSContenido } from '@/lib/cm
 export interface JornadaEspecial {
     fecha: string // YYYY-MM-DD
     tipo: 'cerrado' | 'reducido'
-    horarios?: string[] // ej. ['10:00', '12:00', '14:00']
+    horarios?: string[] // ej. ['08:30', '10:00']
     motivo?: string
 }
 
@@ -31,19 +33,21 @@ export interface ConfigCompleta {
     minutos_autoconfirmacion: number
     meses_visibles_cliente: number
     jornadas_especiales: JornadaEspecial[]
+    fechas_nocturno_habilitado: string[]
     cms: CMSContenido
 }
 
 export const DEFAULT_CONFIG_COMPLETA: ConfigCompleta = {
-    hora_inicio: '10:00',
-    hora_fin: '22:00',
-    intervalo_minutos: 120,
+    hora_inicio: '08:30',
+    hora_fin: '20:00',
+    intervalo_minutos: 90,
     nombre_negocio: 'Pintaditas Nails',
     whatsapp_numero: '5493813013850',
     pagos_habilitados: false,
     minutos_autoconfirmacion: 10,
     meses_visibles_cliente: 3,
     jornadas_especiales: [],
+    fechas_nocturno_habilitado: [],
     cms: DEFAULT_CMS_CONTENIDO
 }
 
@@ -90,6 +94,15 @@ export async function getConfigCompleta(): Promise<ConfigCompleta> {
             } catch {}
         }
 
+        let fechasNocturno: string[] = []
+        const rawNocturno = kvMap.get('fechas_nocturno_habilitado')
+        if (rawNocturno) {
+            try {
+                const parsed = JSON.parse(rawNocturno)
+                if (Array.isArray(parsed)) fechasNocturno = parsed
+            } catch {}
+        }
+
         const pagosKv = kvMap.get('pagos_habilitados')
         const pagosHabilitados =
             pagosKv !== undefined ? pagosKv === 'true' : isPagosHabilitadosEnv()
@@ -117,6 +130,7 @@ export async function getConfigCompleta(): Promise<ConfigCompleta> {
             minutos_autoconfirmacion: isNaN(minAuto) ? 10 : minAuto,
             meses_visibles_cliente: isNaN(mesesVisibles) ? 3 : Math.max(1, Math.min(12, mesesVisibles)),
             jornadas_especiales: jornadas,
+            fechas_nocturno_habilitado: fechasNocturno,
             cms
         }
     } catch {
@@ -218,19 +232,15 @@ export function calcularDisponibilidadParaFecha(
     const partes = fecha.split('-').map(Number)
     const d = new Date(partes[0], partes[1] - 1, partes[2])
     const dayOfWeek = d.getDay() // 0 = Domingo
+    const mes = partes[1]
 
-    const jornada = cfg.jornadas_especiales.find(j => j.fecha === fecha)
+    const jornada = cfg.jornadas_especiales?.find(j => j.fecha === fecha)
     const feriadoNombre = FERIADOS_ARGENTINA[fecha]
-
-    const todosLosHorarios = generarHorariosDisponibles(
-        cfg.hora_inicio,
-        cfg.hora_fin,
-        cfg.intervalo_minutos
-    )
+    const esDomDic = mes === 12 && dayOfWeek === 0
 
     // Regla de cierre:
     // 1. Si hay jornada especial 'cerrado' -> cerrado
-    // 2. Si es domingo y no hay jornada especial 'reducido' que lo habilite -> cerrado
+    // 2. Si es domingo (y NO es domingo de diciembre con horario de verano) y no hay jornada especial que lo habilite -> cerrado
     if (jornada?.tipo === 'cerrado') {
         return {
             fecha,
@@ -245,7 +255,7 @@ export function calcularDisponibilidadParaFecha(
         }
     }
 
-    if (dayOfWeek === 0 && !jornada) {
+    if (dayOfWeek === 0 && !jornada && !esDomDic) {
         return {
             fecha,
             cerrado: true,
@@ -259,10 +269,14 @@ export function calcularDisponibilidadParaFecha(
         }
     }
 
+    const tieneNocturno =
+        Array.isArray(cfg.fechas_nocturno_habilitado) &&
+        cfg.fechas_nocturno_habilitado.includes(fecha)
+
     const horariosDelDia =
         jornada?.tipo === 'reducido' && Array.isArray(jornada.horarios) && jornada.horarios.length > 0
             ? jornada.horarios
-            : todosLosHorarios
+            : generarHorariosBaseParaFecha(fecha, tieneNocturno)
 
     const ocupadosMap = new Map<string, string>()
 
@@ -274,9 +288,9 @@ export function calcularDisponibilidadParaFecha(
 
         const meta = parseReservaMeta(r.mp_preference_id, r.id)
         if (meta.ocupaBloqueSiguiente) {
-            const idx = todosLosHorarios.indexOf(hNorm)
-            if (idx >= 0 && idx + 1 < todosLosHorarios.length) {
-                const sig = todosLosHorarios[idx + 1]
+            const idx = horariosDelDia.indexOf(hNorm)
+            if (idx >= 0 && idx + 1 < horariosDelDia.length) {
+                const sig = horariosDelDia[idx + 1]
                 if (!ocupadosMap.has(sig)) {
                     ocupadosMap.set(sig, efectivo)
                 }

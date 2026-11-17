@@ -30,7 +30,7 @@ export default async function AdminAgendaPage() {
                 </p>
                 <h2 className="text-3xl font-black text-stone-900 mb-2">Agenda y Turnos</h2>
                 <p className="text-stone-500 text-sm">
-                    Turnos de 2 hs (10:00 a 20:00), confirmación en máx.{' '}
+                    Turnos de 1h 30m (08:30 a 20:00), confirmación en máx.{' '}
                     {configData.minutos_autoconfirmacion} min, reprogramaciones e imprevistos.
                 </p>
             </div>

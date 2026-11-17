@@ -1019,11 +1019,10 @@ export default function TurnoModal({
                         <label className="flex items-center justify-between gap-3 bg-amber-50/70 border border-amber-200 rounded-2xl px-4 py-3 mb-4 cursor-pointer">
                             <div>
                                 <span className="text-xs font-bold text-stone-800 block">
-                                    ⏱️ Servicio largo: ocupar también el bloque siguiente (+2 hs)
+                                    ⏱️ Servicio largo: ocupar también el bloque siguiente (+1h 30m)
                                 </span>
                                 <span className="text-[11px] text-stone-500">
-                                    Activalo si el trabajo incluye retirado + diseño complejo de
-                                    más de 2 horas.
+                                    Activalo si el trabajo incluye retirado + diseño complejo (ej: 2 horas o más).
                                 </span>
                             </div>
                             <input

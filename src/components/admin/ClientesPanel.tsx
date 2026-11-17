@@ -964,7 +964,7 @@ export default function ClientesPanel({
 
                             <div>
                                 <label className="block text-xs font-bold text-stone-600 uppercase mb-1">
-                                    Bloque Horario (2 hs)
+                                    Bloque Horario (1h 30m)
                                 </label>
                                 <div className="grid grid-cols-3 gap-2">
                                     {horariosBase.map(h => (

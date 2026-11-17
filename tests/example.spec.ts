@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Sistema de Reserva de Turnos v3 (Fran & Romy Nails)', () => {
-  test('1. Calendario de 2 meses visible, sin cobro de seña y con bloques de 2 hs (10 a 20)', async ({ page }) => {
+  test('1. Calendario de 2 meses visible, sin cobro de seña y con bloques de 1h 30m (08:30 a 20:00)', async ({ page }) => {
     await page.goto('/');
 
     const tituloAgenda = page.locator('h2', { hasText: 'Agenda tu Turno' });
@@ -19,10 +19,11 @@ test.describe('Sistema de Reserva de Turnos v3 (Fran & Romy Nails)', () => {
     await expect(primerDiaLibre).toBeVisible();
     await primerDiaLibre.click();
 
-    // Verificar que aparecen los bloques de 2 hs de la Opción B (10:00 a 20:00)
+    // Verificar que aparecen los bloques de 1h 30m (08:30, 10:00, 18:00)
+    await expect(page.getByRole('button', { name: /08:30/ })).toBeVisible();
     await expect(page.getByRole('button', { name: /10:00/ })).toBeVisible();
-    await expect(page.getByRole('button', { name: /20:00/ })).toBeVisible();
-    // Verificar que el bug de las 21:00 ya no existe
+    await expect(page.getByRole('button', { name: /18:00/ })).toBeVisible();
+    // Verificar que el turno de las 21:00 está deshabilitado por defecto para clientes online
     await expect(page.getByRole('button', { name: /21:00/ })).toHaveCount(0);
   });
 

@@ -1,24 +1,89 @@
+export const HORARIOS_ESTANDAR_HABITUALES = [
+    '08:30',
+    '10:00',
+    '13:30',
+    '15:00',
+    '16:30',
+    '18:00'
+]
+
+export const HORARIO_NOCTURNO_EXTRA = '21:00'
+
+export const HORARIOS_DOMINGO_DICIEMBRE = [
+    '11:00',
+    '12:30',
+    '14:00',
+    '16:00'
+]
+
+export function esDomingoDiciembre(fecha: string): boolean {
+    const partes = (fecha || '').substring(0, 10).split('-').map(Number)
+    if (partes.length < 3 || isNaN(partes[0])) return false
+    const d = new Date(partes[0], partes[1] - 1, partes[2])
+    return partes[1] === 12 && d.getDay() === 0
+}
+
+export function generarHorariosBaseParaFecha(
+    fecha: string,
+    nocturnoHabilitado = false
+): string[] {
+    const partes = (fecha || '').substring(0, 10).split('-').map(Number)
+    if (partes.length < 3 || isNaN(partes[0])) return [...HORARIOS_ESTANDAR_HABITUALES]
+    const d = new Date(partes[0], partes[1] - 1, partes[2])
+    const dayOfWeek = d.getDay() // 0 = Domingo
+    const mes = partes[1]
+
+    if (dayOfWeek === 0) {
+        // Domingo
+        if (mes === 12) {
+            // Domingos de Diciembre: temporada verano reducida 11:00 a 16:00 hs (último turno 16:00)
+            const dom = [...HORARIOS_DOMINGO_DICIEMBRE]
+            if (nocturnoHabilitado && !dom.includes(HORARIO_NOCTURNO_EXTRA)) {
+                dom.push(HORARIO_NOCTURNO_EXTRA)
+            }
+            return dom
+        }
+        // Resto del año: domingos cerrados
+        return []
+    }
+
+    // Lunes a Sábado:
+    const base = [...HORARIOS_ESTANDAR_HABITUALES]
+    if (nocturnoHabilitado && !base.includes(HORARIO_NOCTURNO_EXTRA)) {
+        base.push(HORARIO_NOCTURNO_EXTRA)
+    }
+    return base
+}
+
 export function generarHorariosDisponibles(
     horaInicio: string,
     horaFin: string,
     intervaloMinutos: number | string
 ): string[] {
-    const horarios: string[] = []
-    const [hi, mi] = (horaInicio || '10:00').split(':').map(Number)
-    const [hf, mf] = (horaFin || '22:00').split(':').map(Number)
-
     const intervalo =
         typeof intervaloMinutos === 'string'
-            ? parseInt(intervaloMinutos, 10) || 120
-            : Math.max(15, intervaloMinutos || 120)
+            ? parseInt(intervaloMinutos, 10) || 90
+            : Math.max(15, intervaloMinutos || 90)
+
+    // Si coincide con la configuración por defecto de verano (08:30 a 20:00 / 22:00 con 90m),
+    // devolvemos los turnos estándar de mañana y tarde
+    if (
+        (horaInicio === '08:30' || !horaInicio) &&
+        (horaFin === '20:00' || horaFin === '22:00' || !horaFin) &&
+        intervalo === 90
+    ) {
+        return [...HORARIOS_ESTANDAR_HABITUALES]
+    }
+
+    const horarios: string[] = []
+    const [hi, mi] = (horaInicio || '08:30').split(':').map(Number)
+    const [hf, mf] = (horaFin || '20:00').split(':').map(Number)
 
     const inicioMins = (hi || 0) * 60 + (mi || 0)
     const finMins = (hf || 0) * 60 + (mf || 0)
 
     let mins = inicioMins
 
-    // Un bloque solo se ofrece si termina a más tardar en horaFin (mins + intervalo <= finMins).
-    // Ej.: 10:00 a 22:00 con bloques de 120 min -> 10:00, 12:00, 14:00, 16:00, 18:00, 20:00 (termina 22:00).
     while (mins + intervalo <= finMins) {
         horarios.push(
             `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`

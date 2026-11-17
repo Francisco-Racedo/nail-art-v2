@@ -11,6 +11,7 @@ import {
 import { Reserva, ESTADO_CONFIG, checkCumple, getEstadoEfectivo } from './agendaTypes'
 import {
     generarHorariosDisponibles,
+    generarHorariosBaseParaFecha,
     parseReservaMeta,
     calcularDesgloseReserva,
     obtenerLabelsAdicionales
@@ -39,6 +40,7 @@ const parsePrecioGrilla = (str: string) => {
 
 export default function EventGrid({
     dayReservas,
+    selectedDateStr,
     selectedDateLabel,
     isSunday,
     jornadaEspecial,
@@ -46,7 +48,7 @@ export default function EventGrid({
     handleEventClick,
     onSelectFreeSlot
 }: EventGridProps) {
-    const intervalo = Number(config?.intervalo_minutos || 120)
+    const intervalo = Number(config?.intervalo_minutos || 90)
 
     const calcularFin = (hora: string, dobleBloque = false) => {
         const parts = hora.split(':')
@@ -72,14 +74,18 @@ export default function EventGrid({
         return `${base} border-l-amber-500 bg-white/95 backdrop-blur-sm`
     }
 
-    const todosLosHorarios = generarHorariosDisponibles(
-        config?.hora_inicio || '10:00',
-        config?.hora_fin || '22:00',
-        intervalo
-    )
-
+    const esDomDic = isSunday && selectedDateStr.split('-')[1] === '12'
     const diaCerrado =
-        jornadaEspecial?.tipo === 'cerrado' || (isSunday && !jornadaEspecial)
+        jornadaEspecial?.tipo === 'cerrado' || (isSunday && !jornadaEspecial && !esDomDic)
+
+    const isNocturnoHabilitado =
+        Array.isArray(config?.fechas_nocturno_habilitado) &&
+        config.fechas_nocturno_habilitado.includes(selectedDateStr)
+
+    const todosLosHorarios = generarHorariosBaseParaFecha(
+        selectedDateStr,
+        isNocturnoHabilitado
+    )
 
     const horariosGrilla = diaCerrado
         ? []
@@ -126,7 +132,7 @@ export default function EventGrid({
                         Grilla Horaria del Día
                     </h3>
                     <p className="text-stone-500 font-medium text-sm capitalize">
-                        {selectedDateLabel} • Bloques de {intervalo / 60} hs (Hora Argentina)
+                        {selectedDateLabel} • Turnos de 1h 30m (Hora Argentina)
                     </p>
                 </div>
                 <span className="text-xs font-bold px-3 py-1.5 rounded-full bg-stone-100 text-stone-700 border border-stone-200">
@@ -324,7 +330,7 @@ export default function EventGrid({
                                             Horario Disponible
                                         </span>
                                         <p className="text-[11px] text-stone-500 hidden sm:block">
-                                            Bloque libre de 2 horas para reserva online o
+                                            Bloque libre de 1h 30m para reserva online o
                                             asignación manual
                                         </p>
                                     </div>

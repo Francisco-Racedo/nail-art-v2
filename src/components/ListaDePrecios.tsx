@@ -98,7 +98,7 @@ export default function ListaDePrecios() {
         data: servicios = [],
         isLoading,
         error
-    } = useQuery({
+    } = useQuery<Servicio[]>({
         queryKey: ['servicios'],
         queryFn: fetchServicios,
         staleTime: 60_000
@@ -118,11 +118,11 @@ export default function ListaDePrecios() {
     const sv = cms.servicios
 
     const serviciosLisas = servicios.filter(
-        s => s.categoria === 'Servicios Base (Lisas)' || s.categoria === 'Manos'
+        (s: Servicio) => s.categoria === 'Servicios Base (Lisas)' || s.categoria === 'Manos'
     )
-    const serviciosConDeco = servicios.filter(s => s.categoria === 'Con 2 Decos Simples')
+    const serviciosConDeco = servicios.filter((s: Servicio) => s.categoria === 'Con 2 Decos Simples')
     const adicionales = servicios.filter(
-        s => s.categoria === 'Adicionales & Nail Art' || s.categoria === 'Promos'
+        (s: Servicio) => s.categoria === 'Adicionales & Nail Art' || s.categoria === 'Promos'
     )
 
     return (
@@ -187,7 +187,7 @@ export default function ListaDePrecios() {
                                                 </span>
                                             </div>
                                             <div className="space-y-3.5">
-                                                {serviciosLisas.map((s, i) => (
+                                                {serviciosLisas.map((s: Servicio, i: number) => (
                                                     <ServiceCard key={s.id} s={s} index={i} />
                                                 ))}
                                             </div>
@@ -209,7 +209,7 @@ export default function ListaDePrecios() {
                                                 </span>
                                             </div>
                                             <div className="space-y-3.5">
-                                                {serviciosConDeco.map((s, i) => (
+                                                {serviciosConDeco.map((s: Servicio, i: number) => (
                                                     <ServiceCard key={s.id} s={s} index={i} />
                                                 ))}
                                             </div>
@@ -252,7 +252,7 @@ export default function ListaDePrecios() {
                                                     </p>
 
                                                     <div className="space-y-2">
-                                                        {adicionales.map(s => {
+                                                        {adicionales.map((s: Servicio) => {
                                                             const esRangoDibujo =
                                                                 s.nombre
                                                                     .toLowerCase()

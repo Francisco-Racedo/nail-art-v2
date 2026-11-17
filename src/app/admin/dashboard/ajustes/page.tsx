@@ -18,7 +18,7 @@ export default async function AdminAjustesPage() {
             <div className="mb-6">
                 <h2 className="text-2xl font-bold text-stone-900 mb-1">Ajustes & Servicios</h2>
                 <p className="text-stone-500 text-sm">
-                    Configuración en tiempo real del negocio, horarios (bloques de 2 hs), meses del
+                    Configuración en tiempo real del negocio, horarios (turnos de 1h 30m), meses del
                     calendario y catálogo de servicios.
                 </p>
             </div>

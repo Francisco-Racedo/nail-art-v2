@@ -19,13 +19,17 @@ import {
     CheckCircle2,
     Receipt,
     Flame,
+    Search,
+    MessageCircle,
     ArrowRight,
-    Clock
+    Layers,
+    Filter
 } from 'lucide-react'
 import {
     calcularDesgloseReserva,
     getPartesAhoraArgentina,
-    getEstadoEfectivo
+    getEstadoEfectivo,
+    obtenerLabelsAdicionales
 } from '@/lib/utils'
 
 interface RendimientoClientProps {
@@ -38,6 +42,7 @@ export type TipoFiltroPeriodo =
     | 'quincena'
     | 'mes_actual'
     | 'mes_anterior'
+    | 'todos'
 
 const NOMBRES_MESES = [
     'Enero',
@@ -71,17 +76,17 @@ function formatearDiaMes(d: Date): string {
 
 export default function RendimientoClient({ reservas }: RendimientoClientProps) {
     const [filtro, setFiltro] = useState<TipoFiltroPeriodo>('semana_actual')
+    const [busqueda, setBusqueda] = useState('')
+    const [filtroEstado, setFiltroEstado] = useState<'todos' | 'confirmado' | 'completado' | 'cancelado'>('todos')
 
     const stats = useMemo(() => {
-        // Obtenemos los componentes de fecha exactamente en el uso horario de Argentina (UTC-3)
+        // Componentes de fecha exactamente en el uso horario de Argentina (UTC-3)
         const p = getPartesAhoraArgentina()
-        // Usamos mediodía (12:00) para evitar desfasajes por cambio de día o límites de zona horaria
         const hoyArg = new Date(p.year, p.month - 1, p.day, 12, 0, 0)
         const hoyISO = formatYYYYMMDD(hoyArg)
 
         // En JS: 0 = Domingo, 1 = Lunes, 2 = Martes, ..., 6 = Sábado
         const dayOfWeek = hoyArg.getDay()
-        // Días de diferencia hacia atrás para alcanzar el Lunes (00:00:00)
         const diffALunes = dayOfWeek === 0 ? 6 : dayOfWeek - 1
 
         let inicio: Date
@@ -90,7 +95,6 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
 
         switch (filtro) {
             case 'semana_actual': {
-                // Lunes de la semana en curso
                 inicio = new Date(
                     hoyArg.getFullYear(),
                     hoyArg.getMonth(),
@@ -99,7 +103,6 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
                     0,
                     0
                 )
-                // Domingo de la semana en curso (Lunes + 6 días)
                 fin = new Date(
                     inicio.getFullYear(),
                     inicio.getMonth(),
@@ -113,7 +116,6 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
             }
 
             case 'semana_anterior': {
-                // Lunes de la semana pasada (Lunes actual - 7 días)
                 const lunesActual = new Date(
                     hoyArg.getFullYear(),
                     hoyArg.getMonth(),
@@ -130,7 +132,6 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
                     0,
                     0
                 )
-                // Domingo de la semana pasada (Lunes anterior + 6 días)
                 fin = new Date(
                     inicio.getFullYear(),
                     inicio.getMonth(),
@@ -178,31 +179,67 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
                 labelPeriodo = `Mes anterior: ${NOMBRES_MESES[inicio.getMonth()]} (${formatearDiaMes(inicio)} al ${formatearDiaMes(fin)})`
                 break
             }
+
+            case 'todos': {
+                // Historial completo desde el primer registro hasta el último
+                const fechasOrdenadas = (reservas || [])
+                    .map(r => r.fecha)
+                    .filter(Boolean)
+                    .sort()
+
+                if (fechasOrdenadas.length > 0) {
+                    const [y1, m1, d1] = fechasOrdenadas[0].split('-').map(Number)
+                    const [y2, m2, d2] = fechasOrdenadas[fechasOrdenadas.length - 1].split('-').map(Number)
+                    inicio = new Date(y1, m1 - 1, d1, 12, 0, 0)
+                    fin = new Date(y2, m2 - 1, d2, 12, 0, 0)
+                } else {
+                    inicio = new Date(hoyArg)
+                    fin = new Date(hoyArg)
+                }
+                labelPeriodo = `Historial Completo (${fechasOrdenadas.length} turnos registrados)`
+                break
+            }
         }
 
         const startISO = formatYYYYMMDD(inicio)
         const endISO = formatYYYYMMDD(fin)
 
-        // Pre-cargar todos los días del período en el mapa para garantizar continuidad en el gráfico
+        // Turnos adicionales del mes actual que caen fuera de "Esta Semana"
+        // (por ejemplo si hay un turno el 28 de Noviembre mientras estamos en la semana del 16 al 22)
+        const inicioMesActualISO = `${p.year}-${String(p.month).padStart(2, '0')}-01`
+        const finMesActualISO = `${p.year}-${String(p.month).padStart(2, '0')}-${new Date(p.year, p.month, 0).getDate()}`
+        
+        const turnosMesFueraDeEstaSemana = (reservas || []).filter(r => {
+            if (filtro !== 'semana_actual') return false
+            const ef = getEstadoEfectivo(r)
+            if (ef !== 'confirmado' && ef !== 'completado') return false
+            return r.fecha >= inicioMesActualISO && r.fecha <= finMesActualISO && (r.fecha < startISO || r.fecha > endISO)
+        })
+
+        // Pre-cargar días para el gráfico
         const daysMap = new Map<
             string,
             { ingresos: number; turnos: number; label: string; fecha: string }
         >()
 
-        const cursor = new Date(inicio)
-        while (cursor <= fin) {
-            const fStr = formatYYYYMMDD(cursor)
-            const diaNombre = DIAS_CORTO[cursor.getDay()]
-            const label =
-                filtro === 'semana_actual' || filtro === 'semana_anterior'
-                    ? `${diaNombre} ${formatearDiaMes(cursor)}`
-                    : formatearDiaMes(cursor)
+        // Solo expandimos días individuales si el rango es de hasta 60 días
+        const diffDias = Math.round((fin.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24))
+        if (diffDias <= 60) {
+            const cursor = new Date(inicio)
+            while (cursor <= fin) {
+                const fStr = formatYYYYMMDD(cursor)
+                const diaNombre = DIAS_CORTO[cursor.getDay()]
+                const label =
+                    filtro === 'semana_actual' || filtro === 'semana_anterior'
+                        ? `${diaNombre} ${formatearDiaMes(cursor)}`
+                        : formatearDiaMes(cursor)
 
-            daysMap.set(fStr, { ingresos: 0, turnos: 0, label, fecha: fStr })
-            cursor.setDate(cursor.getDate() + 1)
+                daysMap.set(fStr, { ingresos: 0, turnos: 0, label, fecha: fStr })
+                cursor.setDate(cursor.getDate() + 1)
+            }
         }
 
-        // Filtrar reservas que caigan estrictamente dentro del rango calendario
+        // Filtrar reservas que caigan estrictamente dentro del rango
         const filtered = reservas.filter(
             r => r.fecha >= startISO && r.fecha <= endISO
         )
@@ -220,8 +257,10 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
         const serviciosMap = new Map<string, { count: number; ingresos: number }>()
         const clientesUnicos = new Set<string>()
 
-        filtered.forEach(r => {
+        // Lista detallada de turnos con desglose financiero individual
+        const turnosDetalle = filtered.map(r => {
             const estadoReal = getEstadoEfectivo(r)
+            const desglose = calcularDesgloseReserva(r)
             const esActivoOCompletado =
                 estadoReal === 'confirmado' || estadoReal === 'completado'
 
@@ -233,7 +272,6 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
 
             if (esActivoOCompletado) {
                 completadosConf++
-                const desglose = calcularDesgloseReserva(r)
                 ingresos += desglose.totalFinal
                 totalBaseServicios += desglose.precioBaseServicio
                 totalAdicionales += desglose.montoAdicionales
@@ -249,7 +287,6 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
                     clientesUnicos.add(r.celular.trim())
                 }
 
-                // Agrupamiento por servicio
                 const nombreLimpio = (r.servicio || 'Servicio General')
                     .split('(')[0]
                     .trim()
@@ -267,6 +304,25 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
                     dEntry.turnos += 1
                 }
             }
+
+            return {
+                id: r.id,
+                nombre: r.nombre || 'Clienta sin nombre',
+                celular: r.celular || '',
+                fecha: r.fecha,
+                horario: (r.horario || '10:00').substring(0, 5),
+                servicio: (r.servicio || 'Servicio').split('(')[0].trim(),
+                adicionales: obtenerLabelsAdicionales(desglose.adicionalesIds),
+                precioBase: desglose.precioBaseServicio,
+                montoAdicionales: desglose.montoAdicionales,
+                montoDescuento: desglose.montoDescuento,
+                totalFinal: desglose.totalFinal,
+                estado: estadoReal,
+                metodoPago: r.metodo_pago || 'efectivo'
+            }
+        }).sort((a, b) => {
+            if (a.fecha !== b.fecha) return a.fecha.localeCompare(b.fecha)
+            return a.horario.localeCompare(b.horario)
         })
 
         const dataChart = Array.from(daysMap.values()).map(item => ({
@@ -284,7 +340,6 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
         const ticketPromedio =
             completadosConf > 0 ? Math.round(ingresos / completadosConf) : 0
 
-        // Ranking de servicios ordenados por facturación
         const rankingServicios = Array.from(serviciosMap.entries())
             .map(([nombre, data]) => ({
                 nombre,
@@ -311,11 +366,29 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
             clientesAtendidos: clientesUnicos.size,
             dataChart,
             rankingServicios,
+            turnosDetalle,
             labelPeriodo,
             rangoTexto: `${formatearDiaMes(inicio)} al ${formatearDiaMes(fin)}`,
-            esSemanaActual: filtro === 'semana_actual'
+            esSemanaActual: filtro === 'semana_actual',
+            turnosMesFueraDeEstaSemana
         }
     }, [reservas, filtro])
+
+    // Filtrar la lista de turnos según el buscador y estado
+    const turnosFiltrados = useMemo(() => {
+        return stats.turnosDetalle.filter(t => {
+            const matchesBusqueda =
+                !busqueda ||
+                t.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+                t.servicio.toLowerCase().includes(busqueda.toLowerCase()) ||
+                t.fecha.includes(busqueda)
+
+            const matchesEstado =
+                filtroEstado === 'todos' || t.estado === filtroEstado
+
+            return matchesBusqueda && matchesEstado
+        })
+    }, [stats.turnosDetalle, busqueda, filtroEstado])
 
     return (
         <div className="w-full space-y-6 animate-in fade-in duration-300">
@@ -394,8 +467,42 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
                     >
                         Mes Anterior
                     </button>
+                    <button
+                        type="button"
+                        onClick={() => setFiltro('todos')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                            filtro === 'todos'
+                                ? 'bg-stone-900 text-white shadow-sm'
+                                : 'text-stone-600 hover:text-stone-900 hover:bg-stone-200/70'
+                        }`}
+                    >
+                        📚 Historial Completo
+                    </button>
                 </div>
             </div>
+
+            {/* Aviso inteligente cuando hay turnos en el mes fuera de esta semana */}
+            {stats.turnosMesFueraDeEstaSemana.length > 0 && (
+                <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                    <div className="flex items-center gap-2.5">
+                        <span className="text-xl">💡</span>
+                        <div className="text-xs text-amber-900">
+                            <span className="font-bold">
+                                Tenés {stats.turnosMesFueraDeEstaSemana.length} turno(s) más agendado(s) más adelante en este mes
+                            </span>{' '}
+                            (ej: {stats.turnosMesFueraDeEstaSemana.map(t => `${t.fecha.split('-').reverse().slice(0, 2).join('/')} • ${t.nombre}`).join(', ')}).
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setFiltro('mes_actual')}
+                        className="self-start sm:self-auto px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs rounded-xl transition shadow-xs flex items-center gap-1.5 shrink-0"
+                    >
+                        <span>Ver Mes en Curso</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                </div>
+            )}
 
             {/* Tarjetas Principales de KPIs */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -459,7 +566,7 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
                         ${stats.ticketPromedio.toLocaleString('es-AR')}
                     </p>
                     <p className="mt-2 text-xs font-medium text-stone-500">
-                        Promedio por cada clienta que se atendió en este período.
+                        Promedio generado por cada turno realizado en este período.
                     </p>
                 </div>
 
@@ -514,6 +621,166 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
                 </div>
             </div>
 
+            {/* TABLA DETALLADA DE TURNOS Y COBROS DEL PERÍODO */}
+            <div className="bg-white/95 backdrop-blur-sm border border-stone-200/80 rounded-2xl p-5 shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-stone-100">
+                    <div>
+                        <h3 className="text-sm font-bold text-stone-900 uppercase tracking-wider flex items-center gap-2">
+                            <Layers className="w-4 h-4 text-rose-500" />
+                            Detalle de Turnos y Cobros del Período ({turnosFiltrados.length})
+                        </h3>
+                        <p className="text-xs text-stone-500 font-medium">
+                            Registro nominal de clientas, servicios realizados, adicionales y montos cobrados
+                        </p>
+                    </div>
+
+                    {/* Filtros locales de la tabla */}
+                    <div className="flex flex-wrap items-center gap-2">
+                        <div className="relative">
+                            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+                            <input
+                                type="text"
+                                placeholder="Buscar clienta o servicio..."
+                                value={busqueda}
+                                onChange={e => setBusqueda(e.target.value)}
+                                className="pl-8 pr-3 py-1.5 text-xs bg-stone-50 border border-stone-200 rounded-xl text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-rose-400 w-48 sm:w-56"
+                            />
+                        </div>
+                        <select
+                            value={filtroEstado}
+                            onChange={e => setFiltroEstado(e.target.value as any)}
+                            className="text-xs bg-stone-50 border border-stone-200 rounded-xl px-2.5 py-1.5 text-stone-700 font-semibold focus:outline-none focus:ring-2 focus:ring-rose-400 cursor-pointer"
+                        >
+                            <option value="todos">Todos los estados</option>
+                            <option value="confirmado">Solo Confirmados</option>
+                            <option value="completado">Solo Completados</option>
+                            <option value="cancelado">Solo Cancelados</option>
+                        </select>
+                    </div>
+                </div>
+
+                {turnosFiltrados.length === 0 ? (
+                    <div className="py-12 text-center">
+                        <p className="text-stone-400 text-sm font-medium">
+                            No se encontraron turnos en este período con los filtros aplicados.
+                        </p>
+                        {filtro !== 'mes_actual' && (
+                            <button
+                                type="button"
+                                onClick={() => setFiltro('mes_actual')}
+                                className="mt-3 text-xs font-bold text-rose-600 hover:text-rose-700 underline"
+                            >
+                                Cambiar a "Mes en Curso" para ver todos los turnos del mes
+                            </button>
+                        )}
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="border-b border-stone-200/80 text-[11px] font-bold text-stone-500 uppercase tracking-wider">
+                                    <th className="py-2.5 px-3">Fecha y Hora</th>
+                                    <th className="py-2.5 px-3">Clienta</th>
+                                    <th className="py-2.5 px-3">Servicio Principal & Deco</th>
+                                    <th className="py-2.5 px-3">Estado</th>
+                                    <th className="py-2.5 px-3 text-right">Cobro Total</th>
+                                    <th className="py-2.5 px-3 text-center">Contacto</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-stone-100 text-xs">
+                                {turnosFiltrados.map(t => {
+                                    const fechaLatam = t.fecha.split('-').reverse().join('/')
+                                    const badgeClasses: Record<string, string> = {
+                                        confirmado: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+                                        completado: 'bg-blue-50 text-blue-800 border-blue-200',
+                                        pendiente: 'bg-amber-50 text-amber-800 border-amber-200',
+                                        cancelado: 'bg-rose-50 text-rose-800 border-rose-200 line-through'
+                                    }
+
+                                    return (
+                                        <tr
+                                            key={t.id}
+                                            className="hover:bg-rose-50/40 transition-colors"
+                                        >
+                                            <td className="py-3 px-3 whitespace-nowrap">
+                                                <div className="font-bold text-stone-900">
+                                                    {fechaLatam}
+                                                </div>
+                                                <div className="text-[11px] text-stone-500 font-semibold">
+                                                    {t.horario} hs
+                                                </div>
+                                            </td>
+
+                                            <td className="py-3 px-3">
+                                                <div className="font-bold text-stone-900">
+                                                    {t.nombre}
+                                                </div>
+                                                <div className="text-[11px] text-stone-500">
+                                                    {t.celular || 'Sin WhatsApp'}
+                                                </div>
+                                            </td>
+
+                                            <td className="py-3 px-3">
+                                                <div className="font-bold text-stone-800">
+                                                    {t.servicio}
+                                                </div>
+                                                {t.adicionales.length > 0 && (
+                                                    <div className="text-[11px] font-semibold text-rose-600 mt-0.5">
+                                                        ✨ +{t.adicionales.join(', ')} (+${t.montoAdicionales.toLocaleString('es-AR')})
+                                                    </div>
+                                                )}
+                                                {t.montoDescuento > 0 && (
+                                                    <div className="text-[10px] text-emerald-700 font-medium">
+                                                        🎁 Descuento: -${t.montoDescuento.toLocaleString('es-AR')}
+                                                    </div>
+                                                )}
+                                            </td>
+
+                                            <td className="py-3 px-3 whitespace-nowrap">
+                                                <span
+                                                    className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+                                                        badgeClasses[t.estado] || 'bg-stone-100 text-stone-600 border-stone-200'
+                                                    }`}
+                                                >
+                                                    {t.estado}
+                                                </span>
+                                            </td>
+
+                                            <td className="py-3 px-3 text-right whitespace-nowrap">
+                                                <div className="font-black text-stone-900 text-sm">
+                                                    ${t.totalFinal.toLocaleString('es-AR')}
+                                                </div>
+                                                <div className="text-[10px] text-stone-400">
+                                                    Base: ${t.precioBase.toLocaleString('es-AR')}
+                                                </div>
+                                            </td>
+
+                                            <td className="py-3 px-3 text-center whitespace-nowrap">
+                                                {t.celular ? (
+                                                    <a
+                                                        href={`https://wa.me/${t.celular.replace(/\D/g, '')}?text=${encodeURIComponent(
+                                                            `Hola ${t.nombre}! Te escribo de Pintaditas Nails por tu turno del ${fechaLatam} a las ${t.horario}hs 💅`
+                                                        )}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-bold text-[11px] shadow-2xs transition"
+                                                    >
+                                                        <MessageCircle className="w-3 h-3" />
+                                                        <span>WhatsApp</span>
+                                                    </a>
+                                                ) : (
+                                                    <span className="text-stone-300 text-xs">—</span>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    )
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
+
             {/* Gráfico y Composición */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Gráfico de Área (2 columnas) */}
@@ -525,7 +792,7 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
                                 Curva de Facturación ({stats.rangoTexto})
                             </h3>
                             <p className="text-xs text-stone-400 font-medium">
-                                Recaudación diaria (comienza los Lunes a las 00:00:00 y finaliza los Domingos)
+                                Recaudación diaria en el ciclo evaluado
                             </p>
                         </div>
                     </div>

@@ -205,7 +205,11 @@ export default function WeekNavigator({
                         const esDomDic = isSunday && dateObj.getMonth() === 11
                         const jornada = jornadasMap.get(fStr)
                         const isClosed =
-                            jornada?.tipo === 'cerrado' || (isSunday && !jornada && !esDomDic)
+                            jornada?.tipo === 'cerrado' ||
+                            (jornada?.tipo === 'reducido' &&
+                                Array.isArray((jornada as any).horarios) &&
+                                (jornada as any).horarios.length === 0) ||
+                            (isSunday && !jornada && !esDomDic)
                         const st = statsPorFecha.get(fStr)
 
                         let cardCls =

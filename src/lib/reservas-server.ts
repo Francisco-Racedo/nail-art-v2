@@ -247,9 +247,12 @@ export function calcularDisponibilidadParaFecha(
     const esDomDic = mes === 12 && dayOfWeek === 0
 
     // Regla de cierre:
-    // 1. Si hay jornada especial 'cerrado' -> cerrado
+    // 1. Si hay jornada especial 'cerrado' o 'reducido' sin horarios seleccionados -> cerrado
     // 2. Si es domingo (y NO es domingo de diciembre con horario de verano) y no hay jornada especial que lo habilite -> cerrado
-    if (jornada?.tipo === 'cerrado') {
+    if (
+        jornada?.tipo === 'cerrado' ||
+        (jornada?.tipo === 'reducido' && Array.isArray(jornada.horarios) && jornada.horarios.length === 0)
+    ) {
         return {
             fecha,
             cerrado: true,

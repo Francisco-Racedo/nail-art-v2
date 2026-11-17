@@ -10,7 +10,11 @@ import {
     RefreshCw,
     Send,
     Plus,
-    X
+    X,
+    Clock,
+    SlidersHorizontal,
+    Sun,
+    Moon
 } from 'lucide-react'
 import WeekNavigator from './admin/WeekNavigator'
 import EventGrid from './admin/EventGrid'
@@ -27,6 +31,7 @@ import {
     generarHorariosDisponibles,
     generarHorariosBaseParaFecha,
     HORARIOS_ESTANDAR_HABITUALES,
+    HORARIOS_DOMINGO_DICIEMBRE,
     normalizarCelular,
     celularParaWhatsapp,
     getAhoraArgentina
@@ -158,30 +163,31 @@ export default function AgendaCalendar({
     >([])
     const [guardandoManual, setGuardandoManual] = useState(false)
 
-    // Panel de Imprevistos / Reprogramación Masiva y Feriados
-    const [showImprevisto, setShowImprevisto] = useState(false)
-    const [modoMasivo, setModoMasivo] = useState<
-        'cliente_elige' | 'mover_dia' | 'feriado_reducido'
-    >('cliente_elige')
+    // Panel de Configuración de Horarios del Día (Horario Especial / Reducido / Cerrado)
+    const [showConfigHorarios, setShowConfigHorarios] = useState(false)
+    const [horariosConfigSel, setHorariosConfigSel] = useState<string[]>([])
+    const [motivoConfigDia, setMotivoConfigDia] = useState('')
+    const [guardandoConfigDia, setGuardandoConfigDia] = useState(false)
+
+    // Panel de Reprogramación Masiva por Imprevisto (cuando hay turnos de clientes afectados)
+    const [showReprogramarImprevisto, setShowReprogramarImprevisto] = useState(false)
+    const [modoMasivo, setModoMasivo] = useState<'cliente_elige' | 'mover_dia'>('cliente_elige')
     const [motivoImprevisto, setMotivoImprevisto] = useState('')
     const [desdeHoraFiltro, setDesdeHoraFiltro] = useState('')
     const [fechaDestinoMasiva, setFechaDestinoMasiva] = useState('')
     const [bloquearDiaCheck, setBloquearDiaCheck] = useState(true)
-    const [horariosReducidosSel, setHorariosReducidosSel] = useState<string[]>(() =>
-        HORARIOS_ESTANDAR_HABITUALES.slice(0, 3)
-    )
     const [procesandoMasivo, setProcesandoMasivo] = useState(false)
     const [avisosCola, setAvisosCola] = useState<AvisoReprogramacionCliente[]>([])
     const [avisadosSet, setAvisadosSet] = useState<Record<number, boolean>>({})
 
-    const horariosBaseConfig = useMemo(
-        () =>
-            generarHorariosBaseParaFecha(
-                selectedDayStr,
-                isNocturnoHabilitado
-            ),
-        [selectedDayStr, isNocturnoHabilitado]
-    )
+    // Estado reactivo local de jornadas especiales para reflejar cambios instantáneamente
+    const [localJornadas, setLocalJornadas] = useState<any[]>(() => config?.jornadas_especiales || [])
+
+    useEffect(() => {
+        if (config?.jornadas_especiales) {
+            setLocalJornadas(config.jornadas_especiales)
+        }
+    }, [config?.jornadas_especiales])
 
     useEffect(() => {
         setMounted(true)
@@ -321,9 +327,102 @@ export default function AgendaCalendar({
     }, [reservasList, selectedDayStr])
 
     const jornadaEspecialDelDia = useMemo(() => {
-        const list = config?.jornadas_especiales || []
+        const list = localJornadas || []
         return list.find((j: any) => j.fecha === selectedDayStr)
-    }, [config, selectedDayStr])
+    }, [localJornadas, selectedDayStr])
+
+    // Sincronizar automáticamente la selección de horarios cuando cambia el día seleccionado o su jornada
+    useEffect(() => {
+        if (jornadaEspecialDelDia) {
+            if (jornadaEspecialDelDia.tipo === 'reducido') {
+                setHorariosConfigSel(
+                    Array.isArray(jornadaEspecialDelDia.horarios) ? [...jornadaEspecialDelDia.horarios] : []
+                )
+            } else {
+                setHorariosConfigSel([])
+            }
+            setMotivoConfigDia(jornadaEspecialDelDia.motivo || '')
+        } else {
+            const isSun = selectedDate.getDay() === 0
+            const isSunDec = isSun && selectedDate.getMonth() === 11
+            if (isSunDec) {
+                setHorariosConfigSel([...HORARIOS_DOMINGO_DICIEMBRE])
+            } else if (isSun) {
+                setHorariosConfigSel([])
+            } else {
+                setHorariosConfigSel([...HORARIOS_ESTANDAR_HABITUALES])
+            }
+            setMotivoConfigDia('')
+        }
+    }, [selectedDayStr, jornadaEspecialDelDia, selectedDate])
+
+    const infoEstadoDia = useMemo(() => {
+        const isSun = selectedDate.getDay() === 0
+        const isSunDec = isSun && selectedDate.getMonth() === 11
+        if (jornadaEspecialDelDia?.tipo === 'cerrado') {
+            return {
+                badge: '🔴 Cerrado',
+                detalle: jornadaEspecialDelDia.motivo || 'Feriado / Sin atención',
+                tipo: 'cerrado'
+            }
+        }
+        if (jornadaEspecialDelDia?.tipo === 'reducido') {
+            const count = Array.isArray(jornadaEspecialDelDia.horarios)
+                ? jornadaEspecialDelDia.horarios.length
+                : 0
+            if (count === 0) {
+                return {
+                    badge: '🔴 Cerrado',
+                    detalle: jornadaEspecialDelDia.motivo || 'Sin horarios habilitados',
+                    tipo: 'cerrado'
+                }
+            }
+            return {
+                badge: `⚡ Especial: ${count} turnos`,
+                detalle: (jornadaEspecialDelDia.horarios || []).join(', ') + ' hs',
+                tipo: 'reducido'
+            }
+        }
+        if (isSunDec) {
+            return {
+                badge: '☀️ Domingo Verano',
+                detalle: '11:00 a 16:00 hs (4 turnos)',
+                tipo: 'habitual'
+            }
+        }
+        if (isSun) {
+            return {
+                badge: '⚪ Domingo Habitual',
+                detalle: 'Cerrado',
+                tipo: 'cerrado'
+            }
+        }
+        return {
+            badge: '🟢 Horario Habitual',
+            detalle: '08:30 a 18:00 hs (6 turnos)',
+            tipo: 'habitual'
+        }
+    }, [selectedDate, jornadaEspecialDelDia])
+
+    const formatearFin = (h: string) => {
+        const parts = (h || '08:30').split(':')
+        let hora = parseInt(parts[0], 10) || 0
+        let min = parseInt(parts[1], 10) || 0
+        min += 90
+        hora += Math.floor(min / 60)
+        min = min % 60
+        return `${String(hora).padStart(2, '0')}:${String(min).padStart(2, '0')} hs`
+    }
+
+    const toggleSlot = (h: string) => {
+        setHorariosConfigSel(prev => {
+            if (prev.includes(h)) {
+                return prev.filter(x => x !== h)
+            } else {
+                return [...prev, h].sort()
+            }
+        })
+    }
 
     const handleCrearTurnoManual = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -360,33 +459,65 @@ export default function AgendaCalendar({
         setGuardandoManual(false)
     }
 
-    const ejecutarAccionDia = async () => {
-        setProcesandoMasivo(true)
-        const toastId = toast.loading('Aplicando cambios en la jornada...')
+    const guardarHorariosDia = async () => {
+        setGuardandoConfigDia(true)
+        const toastId = toast.loading('Guardando horarios para este día...')
         try {
-            const {
-                reprogramarMasivoImprevisto,
-                guardarJornadaEspecialAction
-            } = await import('@/app/admin/actions')
+            const { guardarJornadaEspecialAction } = await import('@/app/admin/actions')
+            const tipoFinal = horariosConfigSel.length === 0 ? 'cerrado' : 'reducido'
+            const horariosOrdenados = [...horariosConfigSel].sort()
+            const motivoFinal =
+                motivoConfigDia ||
+                (tipoFinal === 'cerrado'
+                    ? 'Día cerrado'
+                    : selectedDate.getDay() === 0
+                      ? 'Atención en domingo'
+                      : 'Horario especial')
 
-            if (modoMasivo === 'feriado_reducido') {
-                const res = await guardarJornadaEspecialAction({
-                    fecha: selectedDayStr,
-                    tipo: horariosReducidosSel.length === 0 ? 'cerrado' : 'reducido',
-                    horarios: horariosReducidosSel,
-                    motivo: motivoImprevisto || 'Feriado / Horario reducido'
+            const res = await guardarJornadaEspecialAction({
+                fecha: selectedDayStr,
+                tipo: tipoFinal,
+                horarios: tipoFinal === 'cerrado' ? [] : horariosOrdenados,
+                motivo: motivoFinal
+            })
+
+            if (res.error) {
+                toast.error(res.error, { id: toastId })
+            } else {
+                setLocalJornadas(prev => {
+                    const resto = prev.filter((j: any) => j.fecha !== selectedDayStr)
+                    return [
+                        ...resto,
+                        {
+                            fecha: selectedDayStr,
+                            tipo: tipoFinal,
+                            horarios: tipoFinal === 'cerrado' ? [] : horariosOrdenados,
+                            motivo: motivoFinal
+                        }
+                    ]
                 })
-                if (res.error) {
-                    toast.error(res.error, { id: toastId })
-                } else {
-                    toast.success('Jornada especial guardada para este día', { id: toastId })
-                    setShowImprevisto(false)
-                    router.refresh()
-                    notificarCambioEnTiempoReal('config')
-                }
-                setProcesandoMasivo(false)
-                return
+                toast.success(
+                    tipoFinal === 'cerrado'
+                        ? 'Día configurado como CERRADO'
+                        : `Horarios guardados: ${horariosOrdenados.length} turnos habilitados`,
+                    { id: toastId }
+                )
+                setShowConfigHorarios(false)
+                router.refresh()
+                notificarCambioEnTiempoReal('config')
             }
+        } catch {
+            toast.error('Error al guardar la configuración de horarios', { id: toastId })
+        } finally {
+            setGuardandoConfigDia(false)
+        }
+    }
+
+    const ejecutarReprogramacionMasiva = async () => {
+        setProcesandoMasivo(true)
+        const toastId = toast.loading('Aplicando reprogramación por imprevisto...')
+        try {
+            const { reprogramarMasivoImprevisto } = await import('@/app/admin/actions')
 
             const res = await reprogramarMasivoImprevisto({
                 fecha: selectedDayStr,
@@ -402,26 +533,44 @@ export default function AgendaCalendar({
             } else {
                 toast.success(
                     res.avisos && res.avisos.length > 0
-                        ? `Se actualizaron ${res.avisos.length} turnos. Avisales por WhatsApp abajo.`
+                        ? `Se reprogramaron ${res.avisos.length} turnos. Avisales por WhatsApp abajo.`
                         : res.mensaje || 'Cambios aplicados',
                     { id: toastId }
                 )
                 setAvisosCola(res.avisos || [])
                 router.refresh()
                 notificarCambioEnTiempoReal('reservas')
+                if (bloquearDiaCheck) {
+                    setLocalJornadas(prev => {
+                        const resto = prev.filter((j: any) => j.fecha !== selectedDayStr)
+                        return [
+                            ...resto,
+                            {
+                                fecha: selectedDayStr,
+                                tipo: 'cerrado',
+                                horarios: [],
+                                motivo: motivoImprevisto || 'Cerrado por imprevisto'
+                            }
+                        ]
+                    })
+                    notificarCambioEnTiempoReal('config')
+                }
             }
         } catch {
-            toast.error('Error al procesar la acción', { id: toastId })
+            toast.error('Error al procesar la reprogramación masiva', { id: toastId })
+        } finally {
+            setProcesandoMasivo(false)
         }
-        setProcesandoMasivo(false)
     }
 
     const restaurarDiaNormal = async () => {
-        const toastId = toast.loading('Restaurando horario normal...')
+        const toastId = toast.loading('Restaurando horario habitual...')
         try {
             const { eliminarJornadaEspecialAction } = await import('@/app/admin/actions')
             await eliminarJornadaEspecialAction(selectedDayStr)
+            setLocalJornadas(prev => prev.filter((j: any) => j.fecha !== selectedDayStr))
             toast.success('Día restaurado a su horario habitual', { id: toastId })
+            setShowConfigHorarios(false)
             router.refresh()
             notificarCambioEnTiempoReal('config')
         } catch {
@@ -643,28 +792,50 @@ export default function AgendaCalendar({
                 selectedDate={selectedDate}
                 setSelectedDate={handleSelectDate}
                 reservas={reservasList}
-                jornadasEspeciales={config?.jornadas_especiales || []}
+                jornadasEspeciales={localJornadas}
                 mesesVisiblesCliente={mesesCliente}
                 onChangeMesesVisiblesCliente={handleCambiarMesesCliente}
             />
 
-            {/* Barra de herramientas del día: Imprevistos / Reprogramación Masiva / Feriados */}
-            <div className="mb-5 flex flex-wrap items-center justify-between gap-2 bg-stone-50 border border-stone-200/80 rounded-2xl p-3">
-                <div className="flex items-center gap-2 text-xs font-semibold text-stone-700">
-                    {jornadaEspecialDelDia ? (
-                        <span className="bg-rose-100 text-rose-800 border border-rose-300 px-3 py-1 rounded-full font-bold">
-                            📌 Día especial: {jornadaEspecialDelDia.tipo.toUpperCase()} (
-                            {jornadaEspecialDelDia.motivo || 'Sin motivo'})
-                        </span>
-                    ) : (
-                        <span>
-                            Horario habitual: {config?.hora_inicio || '08:30'} a{' '}
-                            {config?.hora_fin || '20:00'} hs (Turnos de 1h 30m)
-                        </span>
-                    )}
+            {/* Barra de herramientas del día */}
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-3 bg-stone-50 border border-stone-200/80 rounded-2xl p-3.5 shadow-sm">
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <span
+                        className={`px-3 py-1 rounded-full font-bold border flex items-center gap-1.5 ${
+                            infoEstadoDia.tipo === 'cerrado'
+                                ? 'bg-rose-100 text-rose-800 border-rose-300'
+                                : infoEstadoDia.tipo === 'reducido'
+                                  ? 'bg-amber-100 text-amber-900 border-amber-300'
+                                  : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                        }`}
+                    >
+                        {infoEstadoDia.badge}
+                    </span>
+                    <span className="text-stone-600 font-medium hidden sm:inline">
+                        {infoEstadoDia.detalle}
+                    </span>
                 </div>
+
                 <div className="flex flex-wrap items-center gap-2">
-                    {/* Botón rápido para habilitar/deshabilitar el turno nocturno de las 21:00 hs */}
+                    {/* Botón 1: Configurar Horarios del Día */}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setShowConfigHorarios(!showConfigHorarios)
+                            setShowReprogramarImprevisto(false)
+                        }}
+                        className={`text-xs font-bold px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5 border shadow-sm ${
+                            showConfigHorarios
+                                ? 'bg-stone-900 text-white border-stone-900 ring-2 ring-rose-400/50'
+                                : 'bg-white hover:bg-stone-50 text-stone-800 border-stone-300'
+                        }`}
+                        title="Elegí qué bloques de horarios habilitar o cerrar para este día"
+                    >
+                        <SlidersHorizontal className="w-3.5 h-3.5 text-rose-500" />
+                        <span>Configurar Horarios del Día</span>
+                    </button>
+
+                    {/* Botón 2: Turno nocturno 21:00 hs */}
                     <button
                         type="button"
                         onClick={handleToggleNocturno}
@@ -684,200 +855,456 @@ export default function AgendaCalendar({
                                     : 'bg-stone-200 text-stone-600'
                             }`}
                         >
-                            {isNocturnoHabilitado ? 'Habilitado Online' : 'Deshabilitado'}
+                            {isNocturnoHabilitado ? 'Habilitado' : 'Deshabilitado'}
                         </span>
                     </button>
 
+                    {/* Botón 3: Reprogramar por Imprevisto */}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setShowReprogramarImprevisto(!showReprogramarImprevisto)
+                            setShowConfigHorarios(false)
+                            setAvisosCola([])
+                        }}
+                        className={`text-xs font-bold px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5 border shadow-sm ${
+                            showReprogramarImprevisto
+                                ? 'bg-indigo-600 text-white border-indigo-700'
+                                : 'bg-white hover:bg-stone-50 text-indigo-700 border-indigo-200'
+                        }`}
+                        title="Reprogramación masiva en caso de imprevistos con clientas agendadas"
+                    >
+                        <RefreshCw className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>Reprogramar por Imprevisto</span>
+                        {dayReservas.length > 0 && (
+                            <span className="bg-indigo-100 text-indigo-800 text-[10px] px-1.5 py-0.2 rounded-full font-black">
+                                {dayReservas.length}
+                            </span>
+                        )}
+                    </button>
+
+                    {/* Botón 4: Restaurar Horario Habitual (si el día está personalizado) */}
                     {jornadaEspecialDelDia && (
                         <button
                             type="button"
                             onClick={restaurarDiaNormal}
-                            className="text-xs font-bold text-stone-600 hover:text-stone-900 bg-white border border-stone-200 px-3 py-2 rounded-xl"
+                            className="text-xs font-bold text-stone-600 hover:text-stone-900 bg-white border border-stone-200 hover:bg-stone-100 px-3 py-2 rounded-xl"
+                            title="Quitar cambios especiales y volver al horario estándar de este día"
                         >
-                            Restaurar horario normal
+                            Restaurar Habitual
                         </button>
                     )}
-                    <button
-                        type="button"
-                        onClick={() => {
-                            setShowImprevisto(!showImprevisto)
-                            setAvisosCola([])
-                        }}
-                        className="bg-gradient-to-r from-indigo-500 to-rose-500 hover:from-indigo-600 hover:to-rose-600 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-sm flex items-center gap-1.5"
-                    >
-                        <RefreshCw className="w-3.5 h-3.5" />
-                        Imprevisto / Feriado / Reprogramar Día
-                    </button>
                 </div>
             </div>
 
-            {showImprevisto && (
-                <div className="mb-6 bg-indigo-50/70 border border-indigo-200 rounded-2xl p-4 sm:p-5 animate-in fade-in">
-                    <h4 className="text-sm font-black text-indigo-950 mb-3 flex items-center gap-2">
-                        <CalendarOff className="w-4 h-4 text-indigo-600" />
-                        Gestión de Imprevistos y Feriados ({selectedDateLabel})
-                    </h4>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
-                        <button
-                            type="button"
-                            onClick={() => setModoMasivo('cliente_elige')}
-                            className={`p-3 rounded-xl text-xs font-bold border text-left transition ${
-                                modoMasivo === 'cliente_elige'
-                                    ? 'bg-indigo-600 text-white border-indigo-700 shadow-sm'
-                                    : 'bg-white text-stone-700 border-stone-200'
-                            }`}
-                        >
-                            1. El cliente elige nuevo horario (Link)
-                            <span className="block text-[10px] font-normal opacity-80 mt-0.5">
-                                Libera los turnos y genera el link de autogestión por WhatsApp.
-                            </span>
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setModoMasivo('mover_dia')}
-                            className={`p-3 rounded-xl text-xs font-bold border text-left transition ${
-                                modoMasivo === 'mover_dia'
-                                    ? 'bg-indigo-600 text-white border-indigo-700 shadow-sm'
-                                    : 'bg-white text-stone-700 border-stone-200'
-                            }`}
-                        >
-                            2. Mover día completo a otra fecha
-                            <span className="block text-[10px] font-normal opacity-80 mt-0.5">
-                                Traslada todos los turnos manteniendo sus horarios.
-                            </span>
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setModoMasivo('feriado_reducido')}
-                            className={`p-3 rounded-xl text-xs font-bold border text-left transition ${
-                                modoMasivo === 'feriado_reducido'
-                                    ? 'bg-indigo-600 text-white border-indigo-700 shadow-sm'
-                                    : 'bg-white text-stone-700 border-stone-200'
-                            }`}
-                        >
-                            3. Feriado / Turnos Reducidos
-                            <span className="block text-[10px] font-normal opacity-80 mt-0.5">
-                                Elegí qué bloques de 2 hs se habilitan o cerrá el día.
-                            </span>
-                        </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+            {/* Panel de Configuración de Horarios del Día */}
+            {showConfigHorarios && (
+                <div className="mb-6 bg-white border-2 border-rose-300/80 rounded-3xl p-5 sm:p-6 shadow-md animate-in fade-in">
+                    <div className="flex items-start justify-between gap-4 mb-4 pb-4 border-b border-stone-100">
                         <div>
-                            <label className="block text-[11px] font-bold text-stone-600 uppercase mb-1">
-                                Motivo (visible para el cliente)
-                            </label>
-                            <input
-                                type="text"
-                                value={motivoImprevisto}
-                                onChange={e => setMotivoImprevisto(e.target.value)}
-                                placeholder="Ej: Feriado / Imprevisto personal"
-                                className="w-full bg-white border border-indigo-200 rounded-xl px-3 py-2 text-xs text-stone-800"
-                            />
+                            <h4 className="text-base font-black text-stone-900 flex items-center gap-2">
+                                <Clock className="w-5 h-5 text-rose-500" />
+                                Configuración de Horarios: {selectedDateLabel}
+                            </h4>
+                            <p className="text-xs text-stone-500 mt-0.5">
+                                Seleccioná con 1 toque qué turnos estarán habilitados para reserva y atención en esta fecha, o cerrá el día completo.
+                            </p>
                         </div>
-
-                        {modoMasivo !== 'feriado_reducido' && (
-                            <div>
-                                <label className="block text-[11px] font-bold text-stone-600 uppercase mb-1">
-                                    Afectar turnos desde las (opcional, vacío = todo el día)
-                                </label>
-                                <select
-                                    value={desdeHoraFiltro}
-                                    onChange={e => setDesdeHoraFiltro(e.target.value)}
-                                    className="w-full bg-white border border-indigo-200 rounded-xl px-3 py-2 text-xs text-stone-800"
-                                >
-                                    <option value="">
-                                        Todo el día ({dayReservas.length} turnos)
-                                    </option>
-                                    {horariosBaseConfig.map(h => (
-                                        <option key={h} value={h}>
-                                            Desde las {h} hs en adelante
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                        )}
+                        <button
+                            type="button"
+                            onClick={() => setShowConfigHorarios(false)}
+                            className="text-stone-400 hover:text-stone-700 p-1 rounded-lg"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
                     </div>
 
-                    {modoMasivo === 'mover_dia' && (
-                        <div className="mb-4">
-                            <label className="block text-[11px] font-bold text-stone-600 uppercase mb-1">
-                                Nueva fecha de destino para todos los turnos
-                            </label>
-                            <input
-                                type="date"
-                                min={getHoyUTC3()}
-                                value={fechaDestinoMasiva}
-                                onChange={e => setFechaDestinoMasiva(e.target.value)}
-                                className="bg-white border border-indigo-200 rounded-xl px-3 py-2 text-xs font-bold text-stone-800"
-                            />
+                    {/* Plantillas rápidas */}
+                    <div className="mb-4">
+                        <label className="block text-[11px] font-black uppercase text-stone-500 tracking-wider mb-2">
+                            Plantillas Rápidas:
+                        </label>
+                        <div className="flex flex-wrap gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setHorariosConfigSel([...HORARIOS_ESTANDAR_HABITUALES])}
+                                className="text-xs font-bold px-3 py-1.5 rounded-xl border border-stone-200 bg-stone-50 hover:bg-rose-50 hover:border-rose-300 text-stone-700 transition"
+                            >
+                                🌿 Semana Completa (08:30 a 18:00)
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setHorariosConfigSel([...HORARIOS_DOMINGO_DICIEMBRE])}
+                                className="text-xs font-bold px-3 py-1.5 rounded-xl border border-stone-200 bg-stone-50 hover:bg-rose-50 hover:border-rose-300 text-stone-700 transition"
+                            >
+                                ☀️ Horario Domingo (11:00 a 16:00)
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setHorariosConfigSel(['08:30', '10:00'])}
+                                className="text-xs font-bold px-3 py-1.5 rounded-xl border border-stone-200 bg-stone-50 hover:bg-rose-50 hover:border-rose-300 text-stone-700 transition"
+                            >
+                                🌅 Solo Mañana
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setHorariosConfigSel(['13:30', '15:00', '16:30', '18:00'])}
+                                className="text-xs font-bold px-3 py-1.5 rounded-xl border border-stone-200 bg-stone-50 hover:bg-rose-50 hover:border-rose-300 text-stone-700 transition"
+                            >
+                                🌆 Solo Tarde
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    setHorariosConfigSel(prev =>
+                                        prev.includes('21:00') ? prev : [...prev, '21:00'].sort()
+                                    )
+                                }
+                                className="text-xs font-bold px-3 py-1.5 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-900 transition"
+                            >
+                                🌙 + Turno Noche (21:00)
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setHorariosConfigSel([])}
+                                className="text-xs font-bold px-3 py-1.5 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 transition ml-auto"
+                            >
+                                ❌ Desmarcar todos (Cerrar día)
+                            </button>
                         </div>
-                    )}
+                    </div>
 
-                    {modoMasivo === 'feriado_reducido' && (
-                        <div className="mb-4">
-                            <p className="text-xs font-bold text-stone-700 mb-2">
-                                Seleccioná los bloques habilitados para este día (si desmarcás
-                                todos, el día queda CERRADO):
+                    {/* Bloques de turnos organizados */}
+                    <div className="space-y-4 mb-5">
+                        {/* Bloques de Semana */}
+                        <div>
+                            <p className="text-[11px] font-bold text-stone-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                <Sun className="w-3.5 h-3.5 text-amber-500" />
+                                Turnos de Semana y Sábados (Turnos de 1h 30m):
                             </p>
-                            <div className="flex flex-wrap gap-2">
-                                {horariosBaseConfig.map(h => {
-                                    const activo = horariosReducidosSel.includes(h)
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
+                                {HORARIOS_ESTANDAR_HABITUALES.map(h => {
+                                    const activo = horariosConfigSel.includes(h)
+                                    const fin = formatearFin(h)
                                     return (
                                         <button
                                             key={h}
                                             type="button"
-                                            onClick={() =>
-                                                setHorariosReducidosSel(prev =>
-                                                    prev.includes(h)
-                                                        ? prev.filter(x => x !== h)
-                                                        : [...prev, h].sort()
-                                                )
-                                            }
-                                            className={`px-3 py-2 rounded-xl text-xs font-bold border ${
+                                            onClick={() => toggleSlot(h)}
+                                            className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between ${
                                                 activo
-                                                    ? 'bg-emerald-500 text-white border-emerald-600'
-                                                    : 'bg-white text-stone-500 border-stone-200'
+                                                    ? 'bg-emerald-500 text-white border-emerald-600 shadow-sm'
+                                                    : 'bg-white hover:bg-stone-50 text-stone-600 border-stone-200'
                                             }`}
                                         >
-                                            {h} hs
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-sm font-black">{h} hs</span>
+                                                {activo && (
+                                                    <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                                                )}
+                                            </div>
+                                            <span
+                                                className={`text-[10px] mt-1 ${
+                                                    activo ? 'text-emerald-100' : 'text-stone-400'
+                                                }`}
+                                            >
+                                                Hasta las {fin}
+                                            </span>
                                         </button>
                                     )
                                 })}
                             </div>
                         </div>
-                    )}
 
-                    {modoMasivo !== 'feriado_reducido' && (
-                        <label className="flex items-center gap-2 text-xs font-semibold text-stone-700 mb-4 cursor-pointer">
-                            <input
-                                type="checkbox"
-                                checked={bloquearDiaCheck}
-                                onChange={e => setBloquearDiaCheck(e.target.checked)}
-                                className="w-4 h-4 accent-indigo-600 rounded"
-                            />
-                            Cerrar este día en el calendario público para que nadie más reserve
+                        {/* Bloques de Domingo */}
+                        <div>
+                            <p className="text-[11px] font-bold text-stone-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                <CalendarOff className="w-3.5 h-3.5 text-rose-500" />
+                                Turnos de Domingos / Horario Verano (11:00 a 16:00 hs):
+                            </p>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                {HORARIOS_DOMINGO_DICIEMBRE.map(h => {
+                                    const activo = horariosConfigSel.includes(h)
+                                    const fin = formatearFin(h)
+                                    return (
+                                        <button
+                                            key={h}
+                                            type="button"
+                                            onClick={() => toggleSlot(h)}
+                                            className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between ${
+                                                activo
+                                                    ? 'bg-emerald-500 text-white border-emerald-600 shadow-sm'
+                                                    : 'bg-white hover:bg-stone-50 text-stone-600 border-stone-200'
+                                            }`}
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-sm font-black">{h} hs</span>
+                                                {activo && (
+                                                    <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                                                )}
+                                            </div>
+                                            <span
+                                                className={`text-[10px] mt-1 ${
+                                                    activo ? 'text-emerald-100' : 'text-stone-400'
+                                                }`}
+                                            >
+                                                Hasta las {fin}
+                                            </span>
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Turno Nocturno Extra */}
+                        <div>
+                            <p className="text-[11px] font-bold text-stone-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                <Moon className="w-3.5 h-3.5 text-indigo-500" />
+                                Turno Nocturno Extra:
+                            </p>
+                            <div className="w-full sm:w-1/3">
+                                {(() => {
+                                    const h = '21:00'
+                                    const activo = horariosConfigSel.includes(h)
+                                    const fin = formatearFin(h)
+                                    return (
+                                        <button
+                                            key={h}
+                                            type="button"
+                                            onClick={() => toggleSlot(h)}
+                                            className={`w-full p-3 rounded-2xl border text-left transition flex flex-col justify-between ${
+                                                activo
+                                                    ? 'bg-amber-500 text-stone-950 border-amber-600 shadow-sm font-bold'
+                                                    : 'bg-white hover:bg-stone-50 text-stone-600 border-stone-200'
+                                            }`}
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-sm font-black">🌙 21:00 hs</span>
+                                                {activo && (
+                                                    <CheckCircle2 className="w-3.5 h-3.5 text-stone-950" />
+                                                )}
+                                            </div>
+                                            <span
+                                                className={`text-[10px] mt-1 ${
+                                                    activo ? 'text-stone-900' : 'text-stone-400'
+                                                }`}
+                                            >
+                                                Hasta las {fin}
+                                            </span>
+                                        </button>
+                                    )
+                                })()}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Motivo o detalle visible para el cliente */}
+                    <div className="mb-4">
+                        <label className="block text-[11px] font-bold text-stone-600 uppercase mb-1">
+                            Motivo / Aclaración (visible para clientas al consultar o reservar):
                         </label>
-                    )}
+                        <input
+                            type="text"
+                            value={motivoConfigDia}
+                            onChange={e => setMotivoConfigDia(e.target.value)}
+                            placeholder="Ej: Horario especial de domingo / Feriado / Atención reducida"
+                            className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3.5 py-2 text-xs text-stone-800"
+                        />
+                    </div>
 
-                    <div className="flex items-center gap-2">
+                    {/* Resumen del resultado */}
+                    <div className="p-3.5 rounded-2xl mb-5 bg-stone-50 border border-stone-200 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            {horariosConfigSel.length > 0 ? (
+                                <span className="text-xs font-bold text-emerald-800 flex items-center gap-1.5">
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                                    {horariosConfigSel.length}{' '}
+                                    {horariosConfigSel.length === 1 ? 'turno habilitado' : 'turnos habilitados'}:{' '}
+                                    <span className="font-semibold text-stone-700">
+                                        {[...horariosConfigSel].sort().join(', ')} hs
+                                    </span>
+                                </span>
+                            ) : (
+                                <span className="text-xs font-bold text-rose-700 flex items-center gap-1.5">
+                                    <AlertCircle className="w-4 h-4 text-rose-600" />
+                                    Día CERRADO (no habrá turnos disponibles para clientas en esta fecha)
+                                </span>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Botones de acción */}
+                    <div className="flex flex-wrap items-center gap-2">
                         <button
                             type="button"
-                            disabled={procesandoMasivo}
-                            onClick={ejecutarAccionDia}
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-sm disabled:opacity-50"
+                            disabled={guardandoConfigDia}
+                            onClick={guardarHorariosDia}
+                            className="bg-stone-900 hover:bg-stone-800 text-white text-xs font-black px-6 py-2.5 rounded-xl shadow-sm disabled:opacity-50 flex items-center gap-2"
                         >
-                            {procesandoMasivo ? 'Aplicando...' : 'Aplicar cambios ahora'}
+                            {guardandoConfigDia ? 'Guardando...' : 'Aplicar y Guardar Horarios'}
                         </button>
+                        {jornadaEspecialDelDia && (
+                            <button
+                                type="button"
+                                onClick={restaurarDiaNormal}
+                                className="bg-white border border-stone-200 hover:bg-stone-50 text-stone-700 text-xs font-bold px-4 py-2.5 rounded-xl"
+                            >
+                                Restaurar Horario Habitual
+                            </button>
+                        )}
                         <button
                             type="button"
-                            onClick={() => setShowImprevisto(false)}
-                            className="bg-white border border-stone-200 text-stone-600 text-xs font-semibold px-4 py-2.5 rounded-xl"
+                            onClick={() => setShowConfigHorarios(false)}
+                            className="text-stone-500 hover:text-stone-800 text-xs font-semibold px-4 py-2.5 ml-auto"
                         >
-                            Cerrar
+                            Cancelar
                         </button>
                     </div>
+                </div>
+            )}
+
+            {/* Panel de Reprogramación Masiva por Imprevisto */}
+            {showReprogramarImprevisto && (
+                <div className="mb-6 bg-indigo-50/80 border-2 border-indigo-300 rounded-3xl p-5 sm:p-6 shadow-md animate-in fade-in">
+                    <div className="flex items-start justify-between gap-4 mb-4 pb-4 border-b border-indigo-200/60">
+                        <div>
+                            <h4 className="text-base font-black text-indigo-950 flex items-center gap-2">
+                                <RefreshCw className="w-5 h-5 text-indigo-600" />
+                                Reprogramación Masiva por Imprevisto ({selectedDateLabel})
+                            </h4>
+                            <p className="text-xs text-indigo-700/80 mt-0.5">
+                                Gestioná avisos urgentes o traslado en lote para clientas con turnos tomados en esta fecha.
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setShowReprogramarImprevisto(false)}
+                            className="text-indigo-400 hover:text-indigo-700 p-1 rounded-lg"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
+
+                    {dayReservas.length === 0 ? (
+                        <div className="bg-white/80 border border-indigo-100 rounded-2xl p-6 text-center">
+                            <AlertCircle className="w-8 h-8 text-indigo-400 mx-auto mb-2" />
+                            <p className="text-xs font-bold text-indigo-900 mb-1">
+                                No hay turnos registrados en este día
+                            </p>
+                            <p className="text-[11px] text-stone-500 max-w-md mx-auto">
+                                No hay clientas con reservas para reprogramar. Si querés cambiar los horarios de atención o cerrar el día, utilizá el botón <b>&ldquo;Configurar Horarios del Día&rdquo;</b>.
+                            </p>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
+                                <button
+                                    type="button"
+                                    onClick={() => setModoMasivo('cliente_elige')}
+                                    className={`p-3 rounded-2xl text-xs font-bold border text-left transition ${
+                                        modoMasivo === 'cliente_elige'
+                                            ? 'bg-indigo-600 text-white border-indigo-700 shadow-sm'
+                                            : 'bg-white text-stone-700 border-stone-200'
+                                    }`}
+                                >
+                                    1. El cliente elige nuevo horario (Link WhatsApp)
+                                    <span className="block text-[10px] font-normal opacity-80 mt-0.5">
+                                        Libera los turnos y genera enlaces de autogestión directa.
+                                    </span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setModoMasivo('mover_dia')}
+                                    className={`p-3 rounded-2xl text-xs font-bold border text-left transition ${
+                                        modoMasivo === 'mover_dia'
+                                            ? 'bg-indigo-600 text-white border-indigo-700 shadow-sm'
+                                            : 'bg-white text-stone-700 border-stone-200'
+                                    }`}
+                                >
+                                    2. Mover día completo a otra fecha
+                                    <span className="block text-[10px] font-normal opacity-80 mt-0.5">
+                                        Traslada todos los turnos manteniendo su horario original.
+                                    </span>
+                                </button>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                                <div>
+                                    <label className="block text-[11px] font-bold text-stone-600 uppercase mb-1">
+                                        Motivo (visible para la clienta en el mensaje)
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={motivoImprevisto}
+                                        onChange={e => setMotivoImprevisto(e.target.value)}
+                                        placeholder="Ej: Imprevisto de fuerza mayor / Problema edilicio"
+                                        className="w-full bg-white border border-indigo-200 rounded-xl px-3 py-2 text-xs text-stone-800"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-[11px] font-bold text-stone-600 uppercase mb-1">
+                                        Afectar turnos desde las (opcional, vacío = todo el día)
+                                    </label>
+                                    <select
+                                        value={desdeHoraFiltro}
+                                        onChange={e => setDesdeHoraFiltro(e.target.value)}
+                                        className="w-full bg-white border border-indigo-200 rounded-xl px-3 py-2 text-xs text-stone-800"
+                                    >
+                                        <option value="">Todo el día ({dayReservas.length} turnos)</option>
+                                        {dayReservas.map(r => (
+                                            <option key={r.id} value={(r.horario || '').substring(0, 5)}>
+                                                Desde las {(r.horario || '').substring(0, 5)} hs en adelante
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {modoMasivo === 'mover_dia' && (
+                                <div className="mb-4">
+                                    <label className="block text-[11px] font-bold text-stone-600 uppercase mb-1">
+                                        Nueva fecha de destino para todos los turnos
+                                    </label>
+                                    <input
+                                        type="date"
+                                        min={getHoyUTC3()}
+                                        value={fechaDestinoMasiva}
+                                        onChange={e => setFechaDestinoMasiva(e.target.value)}
+                                        className="bg-white border border-indigo-200 rounded-xl px-3 py-2 text-xs font-bold text-stone-800"
+                                    />
+                                </div>
+                            )}
+
+                            <label className="flex items-center gap-2 text-xs font-semibold text-stone-700 mb-4 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={bloquearDiaCheck}
+                                    onChange={e => setBloquearDiaCheck(e.target.checked)}
+                                    className="w-4 h-4 accent-indigo-600 rounded"
+                                />
+                                Cerrar este día en el calendario público para que nadie más reserve
+                            </label>
+
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    disabled={procesandoMasivo}
+                                    onClick={ejecutarReprogramacionMasiva}
+                                    className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-sm disabled:opacity-50"
+                                >
+                                    {procesandoMasivo ? 'Procesando...' : 'Aplicar Reprogramación'}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowReprogramarImprevisto(false)}
+                                    className="bg-white border border-stone-200 text-stone-600 text-xs font-semibold px-4 py-2.5 rounded-xl"
+                                >
+                                    Cerrar
+                                </button>
+                            </div>
+                        </>
+                    )}
 
                     {/* Cola de avisos por WhatsApp generada tras aplicar reprogramación masiva */}
                     {avisosCola.length > 0 && (
@@ -1011,7 +1438,10 @@ export default function AgendaCalendar({
                 selectedDateLabel={selectedDateLabel}
                 isSunday={selectedDate.getDay() === 0}
                 jornadaEspecial={jornadaEspecialDelDia}
-                config={config}
+                config={{
+                    ...config,
+                    jornadas_especiales: localJornadas
+                }}
                 handleEventClick={handleEventClick}
                 onSelectFreeSlot={h => setSlotLibreElegido(h)}
             />

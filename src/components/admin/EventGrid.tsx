@@ -76,7 +76,11 @@ export default function EventGrid({
 
     const esDomDic = isSunday && selectedDateStr.split('-')[1] === '12'
     const diaCerrado =
-        jornadaEspecial?.tipo === 'cerrado' || (isSunday && !jornadaEspecial && !esDomDic)
+        jornadaEspecial?.tipo === 'cerrado' ||
+        (jornadaEspecial?.tipo === 'reducido' &&
+            Array.isArray(jornadaEspecial.horarios) &&
+            jornadaEspecial.horarios.length === 0) ||
+        (isSunday && !jornadaEspecial && !esDomDic)
 
     const isNocturnoHabilitado =
         Array.isArray(config?.fechas_nocturno_habilitado) &&

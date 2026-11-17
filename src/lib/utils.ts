@@ -16,6 +16,31 @@ export const HORARIOS_DOMINGO_DICIEMBRE = [
     '16:00'
 ]
 
+export const TODOS_LOS_HORARIOS_SISTEMA = [
+    '08:30',
+    '10:00',
+    '11:00',
+    '12:30',
+    '13:30',
+    '14:00',
+    '15:00',
+    '16:00',
+    '16:30',
+    '18:00',
+    '21:00'
+]
+
+export function formatearBloqueHorario(horario: string, intervaloMinutos = 90): string {
+    const parts = (horario || '08:30').split(':')
+    let h = parseInt(parts[0], 10) || 0
+    let m = parseInt(parts[1], 10) || 0
+    m += intervaloMinutos
+    h += Math.floor(m / 60)
+    m = m % 60
+    const fin = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+    return `${horario} a ${fin} hs`
+}
+
 export function esDomingoDiciembre(fecha: string): boolean {
     const partes = (fecha || '').substring(0, 10).split('-').map(Number)
     if (partes.length < 3 || isNaN(partes[0])) return false

@@ -27,6 +27,7 @@ import {
 import {
     generarHorariosDisponibles,
     generarHorariosBaseParaFecha,
+    HORARIOS_ESTANDAR_HABITUALES,
     normalizarCelular,
     celularParaWhatsapp,
     getAhoraArgentina
@@ -167,7 +168,9 @@ export default function AgendaCalendar({
     const [desdeHoraFiltro, setDesdeHoraFiltro] = useState('')
     const [fechaDestinoMasiva, setFechaDestinoMasiva] = useState('')
     const [bloquearDiaCheck, setBloquearDiaCheck] = useState(true)
-    const [horariosReducidosSel, setHorariosReducidosSel] = useState<string[]>([])
+    const [horariosReducidosSel, setHorariosReducidosSel] = useState<string[]>(() =>
+        HORARIOS_ESTANDAR_HABITUALES.slice(0, 3)
+    )
     const [procesandoMasivo, setProcesandoMasivo] = useState(false)
     const [avisosCola, setAvisosCola] = useState<AvisoReprogramacionCliente[]>([])
     const [avisadosSet, setAvisadosSet] = useState<Record<number, boolean>>({})
@@ -182,10 +185,6 @@ export default function AgendaCalendar({
     )
 
     useEffect(() => {
-        const localNow = getAhoraArgentina()
-        setViewDate(new Date(localNow.getFullYear(), localNow.getMonth(), 1))
-        setSelectedDate(localNow)
-        setHorariosReducidosSel(horariosBaseConfig.slice(0, 3))
         setMounted(true)
 
         fetch('/api/servicios')
@@ -194,7 +193,14 @@ export default function AgendaCalendar({
                 if (Array.isArray(data)) setServiciosLista(data)
             })
             .catch(() => {})
-    }, [horariosBaseConfig])
+    }, [])
+
+    const handleSelectDate = (d: Date) => {
+        setSelectedDate(d)
+        if (d.getMonth() !== viewDate.getMonth() || d.getFullYear() !== viewDate.getFullYear()) {
+            setViewDate(new Date(d.getFullYear(), d.getMonth(), 1))
+        }
+    }
 
     // Mapa de historial por cliente (celular normalizado)
     const historialPorCliente = useMemo(() => {
@@ -638,7 +644,7 @@ export default function AgendaCalendar({
                 handleNextMonth={handleNextMonth}
                 handleGoToday={handleGoToday}
                 selectedDate={selectedDate}
-                setSelectedDate={setSelectedDate}
+                setSelectedDate={handleSelectDate}
                 reservas={reservasList}
                 jornadasEspeciales={config?.jornadas_especiales || []}
                 mesesVisiblesCliente={mesesCliente}

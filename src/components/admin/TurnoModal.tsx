@@ -20,7 +20,8 @@ import {
     Save,
     RefreshCw,
     History,
-    Gift
+    Gift,
+    Lock
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
@@ -31,7 +32,8 @@ import {
     EstadoReserva,
     ESTADO_CONFIG,
     getHoyUTC3,
-    checkCumple
+    checkCumple,
+    validarTransicionEstado
 } from './agendaTypes'
 import {
     generarHorariosDisponibles,
@@ -526,6 +528,33 @@ export default function TurnoModal({
     }
 
     const actualizarEstado = async (nuevoEstado: EstadoReserva) => {
+        if (!modalData) return
+
+        // 1. Validar si la transición entre estados es legal
+        const validacion = validarTransicionEstado(modalData.estado, nuevoEstado)
+        if (!validacion.permitida) {
+            toast.error(validacion.motivo || 'Transición de estado no permitida.')
+            return
+        }
+
+        // 2. Confirmaciones preventivas según el tipo de estado
+        if (nuevoEstado === 'cancelado') {
+            const ok = confirm(
+                '¿Confirmás cancelar este turno? El horario quedará liberado en la agenda para otra clienta.'
+            )
+            if (!ok) return
+        } else if (nuevoEstado === 'ausente') {
+            const ok = confirm(
+                '¿Confirmás registrar la inasistencia (Ausente) de la clienta?'
+            )
+            if (!ok) return
+        } else if (modalData.estado === 'completado' && nuevoEstado === 'confirmado') {
+            const ok = confirm(
+                'Este turno ya figuraba como Completado. ¿Seguro que deseás rectificarlo y volver a marcarlo como Confirmado?'
+            )
+            if (!ok) return
+        }
+
         const payload: Record<string, unknown> = { estado: nuevoEstado }
         if (nuevoEstado === 'reprogramar') {
             payload.motivo_reprogramacion =
@@ -725,6 +754,11 @@ export default function TurnoModal({
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
                             <a
                                 href={getWppLink('confirmacion')}
+                                onClick={() => {
+                                    if (modalData.estado === 'pendiente') {
+                                        actualizarEstado('confirmado')
+                                    }
+                                }}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20b857] text-white font-bold py-2.5 px-3.5 rounded-xl text-xs shadow-sm transition"
@@ -1404,9 +1438,60 @@ export default function TurnoModal({
 
                     {/* TARJETA 5: ESTADO DEL TURNO Y ELIMINACIÓN */}
                     <div className="bg-white border border-stone-200/90 rounded-3xl p-5 sm:p-6 shadow-sm">
-                        <p className="text-xs font-black text-stone-800 uppercase tracking-wider mb-3">
-                            5. Cambiar Estado del Turno
-                        </p>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 pb-2.5 border-b border-stone-100">
+                            <div>
+                                <p className="text-xs font-black text-stone-800 uppercase tracking-wider">
+                                    5. Cambiar Estado del Turno
+                                </p>
+                                <p className="text-[11px] text-stone-500">
+                                    Gestión secuencial del ciclo de atención. No es posible retroceder a estados previos ya superados.
+                                </p>
+                            </div>
+                            <span
+                                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border shrink-0 ${estadoCfg.bg} ${estadoCfg.color} ${estadoCfg.border}`}
+                            >
+                                <span className="w-2 h-2 rounded-full bg-current" />
+                                Estado: {estadoCfg.label}
+                            </span>
+                        </div>
+
+                        {/* Flujo Guía de Estados */}
+                        <div className="flex items-center gap-1.5 text-[10px] font-bold text-stone-500 bg-stone-50 p-2.5 rounded-xl border border-stone-200/80 mb-3.5 overflow-x-auto">
+                            <span className="text-stone-400">Flujo habitual:</span>
+                            <span
+                                className={`px-2 py-0.5 rounded-md transition-all ${
+                                    modalData.estado === 'pendiente'
+                                        ? 'bg-amber-100 text-amber-800 font-black ring-1 ring-amber-300'
+                                        : 'text-stone-500'
+                                }`}
+                            >
+                                1. Pendiente
+                            </span>
+                            <span>➔</span>
+                            <span
+                                className={`px-2 py-0.5 rounded-md transition-all ${
+                                    modalData.estado === 'confirmado'
+                                        ? 'bg-emerald-100 text-emerald-800 font-black ring-1 ring-emerald-300'
+                                        : 'text-stone-500'
+                                }`}
+                            >
+                                2. Confirmado
+                            </span>
+                            <span>➔</span>
+                            <span
+                                className={`px-2 py-0.5 rounded-md transition-all ${
+                                    modalData.estado === 'completado'
+                                        ? 'bg-rose-100 text-rose-800 font-black ring-1 ring-rose-300'
+                                        : 'text-stone-500'
+                                }`}
+                            >
+                                3. Completado
+                            </span>
+                            <span className="ml-auto text-stone-400 text-[9px] hidden sm:inline">
+                                (Opciones: Reprogramar / Ausente / Cancelar)
+                            </span>
+                        </div>
+
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-5">
                             {(
                                 [
@@ -1420,22 +1505,44 @@ export default function TurnoModal({
                             ).map(e => {
                                 const cfg = ESTADO_CONFIG[e]
                                 const isCurrent = modalData.estado === e
+                                const validacion = validarTransicionEstado(modalData.estado, e)
+                                const isAllowed = isCurrent || validacion.permitida
 
                                 return (
                                     <button
                                         key={e}
                                         type="button"
-                                        onClick={() => !isCurrent && actualizarEstado(e)}
-                                        disabled={isCurrent}
-                                        className={`py-2.5 px-2 rounded-xl text-xs font-bold border transition cursor-pointer ${
+                                        onClick={() => {
+                                            if (isCurrent) return
+                                            if (!isAllowed) {
+                                                toast.error(
+                                                    validacion.motivo ||
+                                                        'Transición de estado no permitida'
+                                                )
+                                                return
+                                            }
+                                            actualizarEstado(e)
+                                        }}
+                                        title={
                                             isCurrent
-                                                ? `${cfg.bg} ${cfg.color} ${cfg.border} cursor-default shadow-sm`
-                                                : `bg-stone-50 text-stone-600 border-stone-200 ${cfg.hoverCls}`
+                                                ? 'Estado actual'
+                                                : isAllowed
+                                                  ? `Cambiar a ${cfg.label}`
+                                                  : validacion.motivo
+                                        }
+                                        className={`py-2.5 px-2 rounded-xl text-xs font-bold border transition ${
+                                            isCurrent
+                                                ? `${cfg.bg} ${cfg.color} ${cfg.border} cursor-default shadow-sm ring-2 ring-current/20`
+                                                : isAllowed
+                                                  ? `bg-stone-50 text-stone-700 border-stone-200 cursor-pointer ${cfg.hoverCls}`
+                                                  : 'bg-stone-100/70 text-stone-400 border-stone-200/60 cursor-not-allowed opacity-40 hover:bg-stone-100'
                                         }`}
                                     >
-                                        {isCurrent && (
-                                            <CheckCircle2 className="w-3 h-3 inline mr-1" />
-                                        )}
+                                        {isCurrent ? (
+                                            <CheckCircle2 className="w-3 h-3 inline mr-1 text-current" />
+                                        ) : !isAllowed ? (
+                                            <Lock className="w-3 h-3 inline mr-1 text-stone-400" />
+                                        ) : null}
                                         {cfg.label}
                                     </button>
                                 )

@@ -3,7 +3,10 @@ import {
     parseReservaMeta,
     getHoyArgentina,
     getAhoraArgentina,
-    HistorialEvento
+    HistorialEvento,
+    TRANSICIONES_ESTADO,
+    validarTransicionEstado,
+    ReglaTransicionEstado
 } from '@/lib/utils'
 
 export type EstadoReserva =
@@ -146,4 +149,10 @@ export const getHoyUTC3 = () => {
     return getHoyArgentina()
 }
 
-export { getEstadoEfectivo, parseReservaMeta }
+export {
+    getEstadoEfectivo,
+    parseReservaMeta,
+    TRANSICIONES_ESTADO,
+    validarTransicionEstado
+}
+export type { ReglaTransicionEstado }

@@ -222,6 +222,97 @@ export type SubEstadoReserva =
     | 'ausente'
     | 'rechazado'
 
+export interface ReglaTransicionEstado {
+    permitidos: SubEstadoReserva[]
+    motivoBloqueo: Record<string, string>
+}
+
+export const TRANSICIONES_ESTADO: Record<SubEstadoReserva, ReglaTransicionEstado> = {
+    pendiente: {
+        permitidos: ['confirmado', 'reprogramar', 'cancelado'],
+        motivoBloqueo: {
+            pendiente: 'El turno ya se encuentra en estado Pendiente.',
+            completado: 'Un turno pendiente debe ser confirmado y atendido antes de marcarse como completado.',
+            ausente: 'No se puede marcar ausente a un turno que aún no fue confirmado.'
+        }
+    },
+    confirmado: {
+        permitidos: ['completado', 'reprogramar', 'ausente', 'cancelado'],
+        motivoBloqueo: {
+            confirmado: 'El turno ya se encuentra Confirmado.',
+            pendiente: 'No se puede retroceder en los estados: Un turno confirmado ya fue acordado con la clienta y no puede volver a estar pendiente de confirmación.'
+        }
+    },
+    completado: {
+        permitidos: ['confirmado'],
+        motivoBloqueo: {
+            completado: 'El turno ya está Completado y cerrado.',
+            pendiente: 'No se puede retroceder a pendiente un turno que ya fue atendido y finalizado.',
+            reprogramar: 'El servicio ya fue realizado con éxito.',
+            ausente: 'El servicio ya fue realizado con éxito.',
+            cancelado: 'El servicio ya fue realizado con éxito.'
+        }
+    },
+    reprogramar: {
+        permitidos: ['confirmado', 'cancelado'],
+        motivoBloqueo: {
+            reprogramar: 'El turno ya se encuentra en espera de Reprogramación.',
+            pendiente: 'Un turno en reprogramación no puede retroceder a pendiente.',
+            completado: 'El turno debe tener día y horario asignado antes de completarse.',
+            ausente: 'El turno está pendiente de reasignación.'
+        }
+    },
+    ausente: {
+        permitidos: ['reprogramar', 'cancelado'],
+        motivoBloqueo: {
+            ausente: 'El turno ya está marcado como Ausente.',
+            pendiente: 'No se puede retroceder a pendiente una inasistencia.',
+            confirmado: 'Para reactivar una cita ausente, seleccione "A Reprogramar" para asignar nueva fecha.',
+            completado: 'No se puede completar un turno en el que la clienta no se presentó.'
+        }
+    },
+    cancelado: {
+        permitidos: ['reprogramar'],
+        motivoBloqueo: {
+            cancelado: 'El turno ya se encuentra Cancelado.',
+            pendiente: 'Un turno cancelado no puede retroceder a pendiente.',
+            confirmado: 'Para volver a agendar un turno cancelado, elija "A Reprogramar".',
+            completado: 'No se puede completar un turno cancelado.',
+            ausente: 'El turno fue cancelado.'
+        }
+    },
+    rechazado: {
+        permitidos: ['reprogramar'],
+        motivoBloqueo: {
+            rechazado: 'El turno ya se encuentra Rechazado.',
+            pendiente: 'Un turno rechazado no puede retroceder a pendiente.',
+            confirmado: 'Para volver a agendar un turno rechazado, elija "A Reprogramar".',
+            completado: 'No se puede completar un turno rechazado.',
+            ausente: 'El turno fue rechazado.'
+        }
+    }
+}
+
+export function validarTransicionEstado(
+    estadoActual: SubEstadoReserva,
+    nuevoEstado: SubEstadoReserva
+): { permitida: boolean; motivo?: string } {
+    if (estadoActual === nuevoEstado) {
+        return { permitida: false, motivo: `El turno ya está en estado ${estadoActual}.` }
+    }
+    const regla = TRANSICIONES_ESTADO[estadoActual]
+    if (!regla) {
+        return { permitida: true }
+    }
+    if (regla.permitidos.includes(nuevoEstado)) {
+        return { permitida: true }
+    }
+    const motivo =
+        regla.motivoBloqueo[nuevoEstado] ||
+        `No está permitido cambiar de estado ${estadoActual.toUpperCase()} a ${nuevoEstado.toUpperCase()}.`
+    return { permitida: false, motivo }
+}
+
 export interface HistorialEvento {
     fecha: string
     accion: string

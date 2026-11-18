@@ -9,7 +9,9 @@ import {
     serializeReservaMeta,
     SubEstadoReserva,
     esTurnoActivoEnGrilla,
-    normalizarCelular
+    normalizarCelular,
+    getEstadoEfectivo,
+    validarTransicionEstado
 } from '@/lib/utils'
 import { obtenerFichasCRM, guardarKvConfig } from '@/lib/reservas-server'
 
@@ -188,7 +190,19 @@ export async function PATCH(
         }
 
         if (d.estado !== undefined) {
+            const estadoActual = getEstadoEfectivo(actual)
             const nuevoEstado = d.estado as SubEstadoReserva
+
+            if (estadoActual !== nuevoEstado) {
+                const validacion = validarTransicionEstado(estadoActual, nuevoEstado)
+                if (!validacion.permitida) {
+                    return NextResponse.json(
+                        { error: validacion.motivo || 'Transición de estado no permitida.' },
+                        { status: 400 }
+                    )
+                }
+            }
+
             if (
                 nuevoEstado === 'pendiente' ||
                 nuevoEstado === 'confirmado' ||

@@ -45,6 +45,7 @@ interface RendimientoClientProps {
 }
 
 export type TipoFiltroPeriodo =
+    | 'hoy'
     | 'semana_actual'
     | 'semana_anterior'
     | 'quincena'
@@ -68,6 +69,15 @@ const NOMBRES_MESES = [
 ]
 
 const DIAS_CORTO = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+const DIAS_COMPLETO = [
+    'Domingo',
+    'Lunes',
+    'Martes',
+    'Miércoles',
+    'Jueves',
+    'Viernes',
+    'Sábado'
+]
 
 function formatYYYYMMDD(d: Date): string {
     const y = d.getFullYear()
@@ -89,28 +99,12 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
     const [filtroEstado, setFiltroEstado] = useState<
         'todos' | 'completado' | 'confirmado' | 'bajas'
     >('todos')
-    const [ultimaSincronizacion, setUltimaSincronizacion] = useState<string>('')
 
     // Sincronización en tiempo real ante cualquier cambio de estado en reservas
     useEffect(() => {
-        setUltimaSincronizacion(
-            new Date().toLocaleTimeString('es-AR', {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit'
-            })
-        )
-
         const unsub = suscribirCambiosRealtime(evento => {
             if (evento.tipo === 'reservas' || evento.tipo === 'all') {
                 router.refresh()
-                setUltimaSincronizacion(
-                    new Date().toLocaleTimeString('es-AR', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        second: '2-digit'
-                    })
-                )
             }
         })
         return () => unsub()
@@ -131,6 +125,14 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
         let labelPeriodo: string
 
         switch (filtro) {
+            case 'hoy': {
+                inicio = new Date(hoyArg)
+                fin = new Date(hoyArg)
+                const diaNombre = DIAS_COMPLETO[hoyArg.getDay()]
+                labelPeriodo = `Hoy: ${diaNombre} ${formatearDiaMes(hoyArg)}/${hoyArg.getFullYear()}`
+                break
+            }
+
             case 'semana_actual': {
                 inicio = new Date(
                     hoyArg.getFullYear(),
@@ -255,26 +257,49 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
             }
         >()
 
-        const diffDias = Math.round((fin.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24))
-        if (diffDias <= 60) {
-            const cursor = new Date(inicio)
-            while (cursor <= fin) {
-                const fStr = formatYYYYMMDD(cursor)
-                const diaNombre = DIAS_CORTO[cursor.getDay()]
-                const label =
-                    filtro === 'semana_actual' || filtro === 'semana_anterior'
-                        ? `${diaNombre} ${formatearDiaMes(cursor)}`
-                        : formatearDiaMes(cursor)
-
-                daysMap.set(fStr, {
+        if (filtro === 'hoy') {
+            const BLOQUES_HOY = [
+                '08:30',
+                '10:00',
+                '11:30',
+                '13:30',
+                '15:00',
+                '16:30',
+                '18:00',
+                '20:00'
+            ]
+            for (const b of BLOQUES_HOY) {
+                daysMap.set(b, {
                     cobrado: 0,
                     proyectado: 0,
                     turnosCompletados: 0,
                     turnosConfirmados: 0,
-                    label,
-                    fecha: fStr
+                    label: `${b} hs`,
+                    fecha: hoyISO
                 })
-                cursor.setDate(cursor.getDate() + 1)
+            }
+        } else {
+            const diffDias = Math.round((fin.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24))
+            if (diffDias <= 60) {
+                const cursor = new Date(inicio)
+                while (cursor <= fin) {
+                    const fStr = formatYYYYMMDD(cursor)
+                    const diaNombre = DIAS_CORTO[cursor.getDay()]
+                    const label =
+                        filtro === 'semana_actual' || filtro === 'semana_anterior'
+                            ? `${diaNombre} ${formatearDiaMes(cursor)}`
+                            : formatearDiaMes(cursor)
+
+                    daysMap.set(fStr, {
+                        cobrado: 0,
+                        proyectado: 0,
+                        turnosCompletados: 0,
+                        turnosConfirmados: 0,
+                        label,
+                        fecha: fStr
+                    })
+                    cursor.setDate(cursor.getDate() + 1)
+                }
             }
         }
 
@@ -346,7 +371,20 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
                     sActual.ingresos += desglose.totalFinal
                     serviciosCobradosMap.set(nombreLimpio, sActual)
 
-                    if (daysMap.has(r.fecha)) {
+                    if (filtro === 'hoy') {
+                        const h = (r.horario || '10:00').substring(0, 5)
+                        let slotKey = h
+                        if (!daysMap.has(slotKey)) {
+                            const keys = Array.from(daysMap.keys())
+                            const prox = keys.find(k => k >= h) || keys[keys.length - 1]
+                            slotKey = prox
+                        }
+                        if (daysMap.has(slotKey)) {
+                            const dEntry = daysMap.get(slotKey)!
+                            dEntry.cobrado += desglose.totalFinal
+                            dEntry.turnosCompletados += 1
+                        }
+                    } else if (daysMap.has(r.fecha)) {
                         const dEntry = daysMap.get(r.fecha)!
                         dEntry.cobrado += desglose.totalFinal
                         dEntry.turnosCompletados += 1
@@ -355,7 +393,20 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
                     turnosConfirmadosCount++
                     ingresosProyectados += desglose.totalFinal
 
-                    if (daysMap.has(r.fecha)) {
+                    if (filtro === 'hoy') {
+                        const h = (r.horario || '10:00').substring(0, 5)
+                        let slotKey = h
+                        if (!daysMap.has(slotKey)) {
+                            const keys = Array.from(daysMap.keys())
+                            const prox = keys.find(k => k >= h) || keys[keys.length - 1]
+                            slotKey = prox
+                        }
+                        if (daysMap.has(slotKey)) {
+                            const dEntry = daysMap.get(slotKey)!
+                            dEntry.proyectado += desglose.totalFinal
+                            dEntry.turnosConfirmados += 1
+                        }
+                    } else if (daysMap.has(r.fecha)) {
                         const dEntry = daysMap.get(r.fecha)!
                         dEntry.proyectado += desglose.totalFinal
                         dEntry.turnosConfirmados += 1
@@ -446,8 +497,12 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
             rankingServicios,
             turnosDetalle,
             labelPeriodo,
-            rangoTexto: `${formatearDiaMes(inicio)} al ${formatearDiaMes(fin)}`,
-            esSemanaActual: filtro === 'semana_actual'
+            rangoTexto:
+                filtro === 'hoy'
+                    ? formatearDiaMes(inicio)
+                    : `${formatearDiaMes(inicio)} al ${formatearDiaMes(fin)}`,
+            esSemanaActual: filtro === 'semana_actual',
+            esHoy: filtro === 'hoy'
         }
     }, [reservas, filtro])
 
@@ -478,97 +533,114 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
 
     return (
         <div className="w-full space-y-6 animate-in fade-in duration-300">
-            {/* Header del Panel de Rendimiento con Barra de Filtros Intacta */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-stone-200">
-                <div>
-                    <div className="flex items-center gap-2 text-rose-500 font-bold text-xs uppercase tracking-widest mb-1.5">
-                        <TrendingUp className="w-4 h-4" />
-                        <span>Inteligencia de Negocio & Control Ganancial</span>
-                        {ultimaSincronizacion && (
-                            <span className="inline-flex items-center gap-1 text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-200 ml-2 normal-case font-semibold">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                En vivo ({ultimaSincronizacion})
-                            </span>
-                        )}
-                    </div>
+            {/* Header del Panel de Rendimiento */}
+            <div className="flex flex-col gap-4 pb-4 border-b border-stone-200/80">
+                {/* Fila Superior: Título y Rango Activo */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <h2 className="text-2xl sm:text-3xl font-black text-stone-900 tracking-tight">
                         Panel de Rendimiento
                     </h2>
-                    <div className="mt-1 flex items-center gap-2">
-                        <span className="inline-flex items-center gap-1.5 bg-rose-50 border border-rose-200/90 text-rose-800 text-xs font-bold px-3 py-1 rounded-xl shadow-2xs">
-                            <CalendarDays className="w-3.5 h-3.5 text-rose-500" />
-                            {stats.labelPeriodo}
+
+                    {/* Badge con el rango de fechas activo */}
+                    <div className="flex items-center gap-2">
+                        <span className="inline-flex items-center gap-2 bg-rose-50/90 border border-rose-200/90 text-rose-800 text-xs sm:text-sm font-bold px-3.5 py-1.5 rounded-2xl shadow-2xs">
+                            <CalendarDays className="w-4 h-4 text-rose-500 shrink-0" />
+                            <span>{stats.labelPeriodo}</span>
                         </span>
                     </div>
                 </div>
 
-                {/* Filtros de Período Calendario (Se mantienen exactamente como los solicitó el usuario) */}
-                <div className="flex flex-wrap items-center gap-1.5 bg-stone-100 p-1.5 rounded-2xl border border-stone-200/80 shadow-inner">
+                {/* Barra de Filtros de Período (Orden cronológico de menor a mayor horizonte) */}
+                <div className="bg-stone-100/90 p-1.5 rounded-2xl border border-stone-200/80 shadow-2xs flex flex-wrap items-center gap-1 sm:gap-1.5">
+                    <button
+                        type="button"
+                        onClick={() => setFiltro('hoy')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                            filtro === 'hoy'
+                                ? 'bg-rose-500 text-white shadow-xs'
+                                : 'text-stone-600 hover:text-stone-900 hover:bg-stone-200/70'
+                        }`}
+                    >
+                        <span>⚡</span>
+                        <span>Hoy</span>
+                    </button>
+
                     <button
                         type="button"
                         onClick={() => setFiltro('semana_actual')}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
                             filtro === 'semana_actual'
-                                ? 'bg-rose-500 text-white shadow-sm'
+                                ? 'bg-rose-500 text-white shadow-xs'
                                 : 'text-stone-600 hover:text-stone-900 hover:bg-stone-200/70'
                         }`}
                     >
-                        📅 Esta Semana
+                        <span>📅</span>
+                        <span>Esta Semana</span>
                     </button>
+
                     <button
                         type="button"
                         onClick={() => setFiltro('semana_anterior')}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
                             filtro === 'semana_anterior'
-                                ? 'bg-rose-500 text-white shadow-sm'
+                                ? 'bg-rose-500 text-white shadow-xs'
                                 : 'text-stone-600 hover:text-stone-900 hover:bg-stone-200/70'
                         }`}
                     >
-                        ⏮️ Semana Anterior
+                        <span>⏮️</span>
+                        <span>Semana Anterior</span>
                     </button>
+
                     <button
                         type="button"
                         onClick={() => setFiltro('quincena')}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
                             filtro === 'quincena'
-                                ? 'bg-rose-500 text-white shadow-sm'
+                                ? 'bg-rose-500 text-white shadow-xs'
                                 : 'text-stone-600 hover:text-stone-900 hover:bg-stone-200/70'
                         }`}
                     >
-                        🌓 Quincena
+                        <span>🌓</span>
+                        <span>Quincena</span>
                     </button>
+
                     <button
                         type="button"
                         onClick={() => setFiltro('mes_actual')}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
                             filtro === 'mes_actual'
-                                ? 'bg-rose-500 text-white shadow-sm'
+                                ? 'bg-rose-500 text-white shadow-xs'
                                 : 'text-stone-600 hover:text-stone-900 hover:bg-stone-200/70'
                         }`}
                     >
-                        📆 Mes en Curso
+                        <span>📆</span>
+                        <span>Mes en Curso</span>
                     </button>
+
                     <button
                         type="button"
                         onClick={() => setFiltro('mes_anterior')}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
                             filtro === 'mes_anterior'
-                                ? 'bg-rose-500 text-white shadow-sm'
+                                ? 'bg-rose-500 text-white shadow-xs'
                                 : 'text-stone-600 hover:text-stone-900 hover:bg-stone-200/70'
                         }`}
                     >
-                        Mes Anterior
+                        <span>🗓️</span>
+                        <span>Mes Anterior</span>
                     </button>
+
                     <button
                         type="button"
                         onClick={() => setFiltro('todos')}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
                             filtro === 'todos'
-                                ? 'bg-stone-900 text-white shadow-sm'
+                                ? 'bg-stone-900 text-white shadow-xs'
                                 : 'text-stone-600 hover:text-stone-900 hover:bg-stone-200/70'
                         }`}
                     >
-                        📚 Historial Completo
+                        <span>📚</span>
+                        <span>Historial Completo</span>
                     </button>
                 </div>
             </div>
@@ -953,10 +1025,14 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
                         <div>
                             <h3 className="text-sm font-bold text-stone-800 uppercase tracking-wider flex items-center gap-2">
                                 <TrendingUp className="w-4 h-4 text-emerald-500" />
-                                Curva de Recaudación ({stats.rangoTexto})
+                                {filtro === 'hoy'
+                                    ? 'Evolución de Ingresos de Hoy'
+                                    : `Curva de Recaudación (${stats.rangoTexto})`}
                             </h3>
                             <p className="text-xs text-stone-400 font-medium">
-                                Comparativa diaria entre lo Cobrado Efectivo y lo Proyectado en Agenda
+                                {filtro === 'hoy'
+                                    ? 'Comparativa por horario entre lo Cobrado y lo Agendado para hoy'
+                                    : 'Comparativa diaria entre lo Cobrado Efectivo y lo Proyectado en Agenda'}
                             </p>
                         </div>
 

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
@@ -20,7 +20,12 @@ import {
     X,
     FileText,
     Gift,
-    Award
+    Award,
+    Filter,
+    ChevronLeft,
+    ChevronRight,
+    ArrowUpDown,
+    Check
 } from 'lucide-react'
 import GiftCardModal from '../GiftCardModal'
 import { celularParaWhatsapp, getHoyArgentina } from '@/lib/utils'
@@ -33,12 +38,32 @@ import { crearTurnoManualAdmin } from '@/app/admin/actions'
 
 type FiltroClientes =
     | 'todas'
-    | 'cumple_semana'
-    | 'cumple_mes'
-    | 'service'
+    | 'nuevas'
     | 'frecuentes'
+    | 'con_turno_futuro'
+    | 'sin_turno_futuro'
+    | 'service'
+    | 'inactivas'
+    | 'cumple_hoy'
+    | 'cumple_mes'
     | 'fidelidad_12'
+    | 'con_ausencias'
     | 'sin_celular'
+
+type OrdenClientes = 'recientes' | 'inversion' | 'servicios' | 'nombre'
+
+function generarRangoPaginas(actual: number, total: number): (number | '...')[] {
+    if (total <= 7) {
+        return Array.from({ length: total }, (_, i) => i + 1)
+    }
+    if (actual <= 4) {
+        return [1, 2, 3, 4, 5, '...', total]
+    }
+    if (actual >= total - 3) {
+        return [1, '...', total - 4, total - 3, total - 2, total - 1, total]
+    }
+    return [1, '...', actual - 1, actual, actual + 1, '...', total]
+}
 
 const ETIQUETA_BADGE: Record<
     EtiquetaCliente,
@@ -76,6 +101,14 @@ export default function ClientesPanel({
     const router = useRouter()
     const [busqueda, setBusqueda] = useState('')
     const [filtro, setFiltro] = useState<FiltroClientes>('todas')
+    const [orden, setOrden] = useState<OrdenClientes>('recientes')
+    const [elementosPorPagina, setElementosPorPagina] = useState<number>(10)
+    const [paginaActual, setPaginaActual] = useState<number>(1)
+
+    // Resetear a página 1 cuando cambia filtro, búsqueda, orden o cantidad por página
+    useEffect(() => {
+        setPaginaActual(1)
+    }, [busqueda, filtro, orden, elementosPorPagina])
 
     // Modal de Historial de Turnos
     const [clienteHistorial, setClienteHistorial] = useState<ResumenCliente | null>(
@@ -104,27 +137,34 @@ export default function ClientesPanel({
     const [guardandoTurno, setGuardandoTurno] = useState(false)
     const [giftCardClient, setGiftCardClient] = useState<ResumenCliente | null>(null)
 
-    // Métricas superiores de cartera
+    // Métricas superiores de cartera ampliadas
     const kpis = useMemo(() => {
         return {
             total: clientes.length,
+            nuevas: clientes.filter(c => c.completados === 1).length,
             frecuentes: clientes.filter(
                 c => c.etiqueta === 'vip' || c.etiqueta === 'frecuente' || c.completados >= 2
             ).length,
+            conTurnoFuturo: clientes.filter(c => !!c.proximoTurno).length,
+            sinTurnoFuturo: clientes.filter(c => !c.proximoTurno).length,
+            paraService: clientes.filter(c => c.necesitaService).length,
+            inactivas: clientes.filter(
+                c => (c.diasDesdeUltimoTurno ?? 0) >= 45 && !c.proximoTurno
+            ).length,
+            cumpleHoy: clientes.filter(c => c.esCumpleHoy).length,
             cumpleSemana: clientes.filter(c => c.esCumpleSemana).length,
             cumpleMes: clientes.filter(c => c.esCumpleMes).length,
-            paraService: clientes.filter(c => c.necesitaService).length,
             fidelidad12: clientes.filter(c => c.completados >= 11).length,
+            conAusencias: clientes.filter(c => c.ausencias > 0).length,
             sinCelular: clientes.filter(c => !c.celularDisplay).length
         }
     }, [clientes])
 
-    const filtrados = useMemo(() => {
+    // Filtrado y Ordenamiento
+    const filtradosYOrdenados = useMemo(() => {
         const q = busqueda.toLowerCase().trim()
-        return clientes.filter(c => {
-            if (filtro === 'cumple_semana' && !c.esCumpleSemana) return false
-            if (filtro === 'cumple_mes' && !c.esCumpleMes) return false
-            if (filtro === 'service' && !c.necesitaService) return false
+        const filtradas = clientes.filter(c => {
+            if (filtro === 'nuevas' && c.completados !== 1) return false
             if (
                 filtro === 'frecuentes' &&
                 c.etiqueta !== 'vip' &&
@@ -133,7 +173,19 @@ export default function ClientesPanel({
             ) {
                 return false
             }
+            if (filtro === 'con_turno_futuro' && !c.proximoTurno) return false
+            if (filtro === 'sin_turno_futuro' && !!c.proximoTurno) return false
+            if (filtro === 'service' && !c.necesitaService) return false
+            if (
+                filtro === 'inactivas' &&
+                ((c.diasDesdeUltimoTurno ?? 0) < 45 || !!c.proximoTurno)
+            ) {
+                return false
+            }
+            if (filtro === 'cumple_hoy' && !c.esCumpleHoy) return false
+            if (filtro === 'cumple_mes' && !c.esCumpleMes) return false
             if (filtro === 'fidelidad_12' && c.completados < 11) return false
+            if (filtro === 'con_ausencias' && c.ausencias <= 0) return false
             if (filtro === 'sin_celular' && !!c.celularDisplay) return false
 
             if (!q) return true
@@ -144,7 +196,43 @@ export default function ClientesPanel({
                 (c.notas_tecnicas && c.notas_tecnicas.toLowerCase().includes(q))
             )
         })
-    }, [clientes, busqueda, filtro])
+
+        return filtradas.sort((a, b) => {
+            if (orden === 'inversion') {
+                return b.totalInvertido - a.totalInvertido
+            }
+            if (orden === 'servicios') {
+                return b.completados - a.completados
+            }
+            if (orden === 'nombre') {
+                return a.nombre.localeCompare(b.nombre)
+            }
+            // 'recientes': los más recientes primero (días desde último turno menor)
+            const diasA = a.diasDesdeUltimoTurno ?? 9999
+            const diasB = b.diasDesdeUltimoTurno ?? 9999
+            if (diasA !== diasB) return diasA - diasB
+            return b.completados - a.completados
+        })
+    }, [clientes, busqueda, filtro, orden])
+
+    // Paginación
+    const totalElementos = filtradosYOrdenados.length
+    const totalPaginas = Math.max(1, Math.ceil(totalElementos / elementosPorPagina))
+    const paginaSegura = Math.min(Math.max(1, paginaActual), totalPaginas)
+    const indiceInicio = (paginaSegura - 1) * elementosPorPagina
+    const indiceFin = Math.min(indiceInicio + elementosPorPagina, totalElementos)
+
+    const clientasPaginadas = useMemo(() => {
+        return filtradosYOrdenados.slice(indiceInicio, indiceFin)
+    }, [filtradosYOrdenados, indiceInicio, indiceFin])
+
+    const cambiarPagina = (nuevaPagina: number) => {
+        setPaginaActual(nuevaPagina)
+        const el = document.getElementById('seccion-clientas-grilla')
+        if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }
+    }
 
     const abrirNuevaClienta = () => {
         setEditandoKey(undefined)
@@ -322,11 +410,11 @@ export default function ClientesPanel({
                     type="button"
                     onClick={() =>
                         setFiltro(
-                            filtro === 'cumple_semana' ? 'cumple_mes' : 'cumple_semana'
+                            filtro === 'cumple_hoy' ? 'cumple_mes' : 'cumple_hoy'
                         )
                     }
                     className={`bg-white/95 rounded-2xl p-4 border text-left transition shadow-sm ${
-                        filtro === 'cumple_semana' || filtro === 'cumple_mes'
+                        filtro === 'cumple_hoy' || filtro === 'cumple_mes'
                             ? 'border-pink-400 ring-2 ring-pink-300/40'
                             : 'border-orange-200/60 hover:border-pink-300'
                     }`}
@@ -338,10 +426,21 @@ export default function ClientesPanel({
                         <Cake className="w-4 h-4 text-pink-500" />
                     </div>
                     <p className="text-2xl sm:text-3xl font-black text-stone-900">
-                        {kpis.cumpleSemana}{' '}
-                        <span className="text-xs font-bold text-pink-600">
-                            esta sem. ({kpis.cumpleMes} en el mes)
-                        </span>
+                        {kpis.cumpleHoy > 0 ? (
+                            <>
+                                {kpis.cumpleHoy}{' '}
+                                <span className="text-xs font-bold text-rose-600">
+                                    ¡HOY! ({kpis.cumpleMes} en el mes)
+                                </span>
+                            </>
+                        ) : (
+                            <>
+                                {kpis.cumpleSemana}{' '}
+                                <span className="text-xs font-bold text-pink-600">
+                                    esta sem. ({kpis.cumpleMes} en el mes)
+                                </span>
+                            </>
+                        )}
                     </p>
                     <p className="text-[11px] text-stone-500 mt-0.5">
                         Tocá para filtrar cumpleañeras
@@ -372,9 +471,10 @@ export default function ClientesPanel({
                 </button>
             </div>
 
-            {/* 2. Barra de Búsqueda, Filtros Rápidos y Botón + Registrar Clienta */}
-            <div className="bg-white/95 rounded-2xl p-4 sm:p-5 border border-orange-200/60 shadow-sm space-y-3">
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            {/* 2. Barra de Control: Búsqueda + Ordenamiento + Cantidad de Tarjetas + Botón Registrar */}
+            <div className="bg-white/95 rounded-2xl p-4 sm:p-5 border border-stone-200/90 shadow-2xs space-y-3">
+                <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+                    {/* Input de Búsqueda */}
                     <div className="relative flex-1">
                         <Search className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                         <input
@@ -382,88 +482,410 @@ export default function ClientesPanel({
                             value={busqueda}
                             onChange={e => setBusqueda(e.target.value)}
                             placeholder="Buscar por nombre, WhatsApp o notas técnicas..."
-                            className="w-full pl-10 pr-4 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-sm text-stone-800 focus:outline-none focus:border-pink-400"
+                            className="w-full pl-10 pr-9 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-sm text-stone-800 focus:outline-none focus:border-rose-400 transition"
                         />
+                        {busqueda && (
+                            <button
+                                type="button"
+                                onClick={() => setBusqueda('')}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        )}
                     </div>
-                    <button
-                        type="button"
-                        onClick={abrirNuevaClienta}
-                        className="bg-gradient-to-r from-rose-500 to-amber-500 hover:from-rose-600 hover:to-amber-600 text-white px-4 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm shrink-0"
-                    >
-                        <UserPlus className="w-4 h-4" />
-                        Registrar Clienta
-                    </button>
-                </div>
 
-                {/* Pastillas de filtro rápido */}
-                <div className="flex flex-wrap items-center gap-2 pt-1">
-                    {(
-                        [
-                            { id: 'todas', label: `Todas (${kpis.total})` },
-                            {
-                                id: 'cumple_semana',
-                                label: `🎂 Cumple esta semana (${kpis.cumpleSemana})`
-                            },
-                            {
-                                id: 'cumple_mes',
-                                label: `🎉 Cumple este mes (${kpis.cumpleMes})`
-                            },
-                            {
-                                id: 'service',
-                                label: `🔔 Para Service +18 días (${kpis.paraService})`
-                            },
-                            {
-                                id: 'frecuentes',
-                                label: `⭐ Frecuentes / VIP (${kpis.frecuentes})`
-                            },
-                            {
-                                id: 'fidelidad_12',
-                                label: `🏆 12° Servicio / 10% OFF (${kpis.fidelidad12})`
-                            },
-                            {
-                                id: 'sin_celular',
-                                label: `📱 Sin Celular (${kpis.sinCelular})`
-                            }
-                        ] as { id: FiltroClientes; label: string }[]
-                    ).map(tab => (
+                    <div className="flex flex-wrap items-center gap-2.5">
+                        {/* Selector de Ordenamiento */}
+                        <div className="flex items-center gap-1.5 bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-xs text-stone-700">
+                            <ArrowUpDown className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                            <span className="text-[11px] font-bold text-stone-400 uppercase">Orden:</span>
+                            <select
+                                value={orden}
+                                onChange={e => setOrden(e.target.value as OrdenClientes)}
+                                className="bg-transparent font-bold text-stone-800 text-xs focus:outline-none cursor-pointer"
+                            >
+                                <option value="recientes">Más Recientes</option>
+                                <option value="inversion">Mayor Inversión ($)</option>
+                                <option value="servicios">Más Servicios</option>
+                                <option value="nombre">Nombre (A - Z)</option>
+                            </select>
+                        </div>
+
+                        {/* Selector de Cantidad de Tarjetas Visibles (5, 10, 15, 20, 30, 50) */}
+                        <div className="flex items-center gap-1.5 bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-xs text-stone-700">
+                            <span className="text-[11px] font-bold text-stone-400 uppercase">Ver:</span>
+                            <select
+                                value={elementosPorPagina}
+                                onChange={e => {
+                                    setElementosPorPagina(Number(e.target.value))
+                                    setPaginaActual(1)
+                                }}
+                                className="bg-transparent font-bold text-stone-800 text-xs focus:outline-none cursor-pointer"
+                            >
+                                <option value={5}>5 por pág.</option>
+                                <option value={10}>10 por pág.</option>
+                                <option value={15}>15 por pág.</option>
+                                <option value={20}>20 por pág.</option>
+                                <option value={30}>30 por pág.</option>
+                                <option value={50}>50 por pág.</option>
+                            </select>
+                        </div>
+
+                        {/* Botón Registrar Clienta */}
                         <button
-                            key={tab.id}
                             type="button"
-                            onClick={() => setFiltro(tab.id)}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition ${
-                                filtro === tab.id
-                                    ? 'bg-stone-900 text-white border-stone-900 shadow-sm'
-                                    : 'bg-stone-50 text-stone-600 border-stone-200 hover:bg-stone-100'
-                            }`}
+                            onClick={abrirNuevaClienta}
+                            className="bg-gradient-to-r from-rose-500 to-amber-500 hover:from-rose-600 hover:to-amber-600 text-white px-4 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-xs shrink-0 transition"
                         >
-                            {tab.label}
+                            <UserPlus className="w-4 h-4" />
+                            <span>Registrar Clienta</span>
                         </button>
-                    ))}
+                    </div>
                 </div>
             </div>
 
-            {/* 3. Grilla de Tarjetas de Clientas */}
-            {filtrados.length === 0 ? (
-                <div className="bg-white/90 rounded-2xl p-10 text-center border border-stone-200">
-                    <p className="text-stone-600 font-bold text-base mb-1">
-                        No hay clientas que coincidan con este filtro
-                    </p>
-                    <p className="text-stone-400 text-xs mb-4">
-                        Probá cambiar el filtro superior o registrar una nueva clienta.
-                    </p>
+            {/* 3. Barra de Filtros Segmentada con Ubicación Propia */}
+            <div className="bg-white/95 rounded-2xl p-4 sm:p-5 border border-stone-200/90 shadow-2xs space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-100 pb-2.5">
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-stone-700 uppercase tracking-wider flex items-center gap-1.5">
+                            <Filter className="w-4 h-4 text-rose-500" />
+                            Filtros de Cartera
+                        </span>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                            {totalElementos} clientas
+                        </span>
+                    </div>
+
                     {filtro !== 'todas' && (
                         <button
                             type="button"
                             onClick={() => setFiltro('todas')}
-                            className="bg-rose-50 text-rose-700 border border-rose-200 font-bold text-xs px-4 py-2 rounded-xl"
+                            className="text-xs font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1 transition"
                         >
-                            Ver todas las clientas
+                            <X className="w-3.5 h-3.5" />
+                            Limpiar filtros (ver todas)
                         </button>
                     )}
                 </div>
-            ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {filtrados.map((c, idx) => {
+
+                {/* Pastillas de filtro estilizadas y categorizadas */}
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                    {/* Todas */}
+                    <button
+                        type="button"
+                        onClick={() => setFiltro('todas')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition flex items-center gap-1.5 ${
+                            filtro === 'todas'
+                                ? 'bg-stone-900 text-white border-stone-900 shadow-xs'
+                                : 'bg-stone-50 text-stone-600 border-stone-200 hover:bg-stone-100'
+                        }`}
+                    >
+                        <span>👥</span>
+                        <span>Todas</span>
+                        <span
+                            className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                                filtro === 'todas'
+                                    ? 'bg-white/20 text-white'
+                                    : 'bg-stone-200/70 text-stone-700'
+                            }`}
+                        >
+                            {kpis.total}
+                        </span>
+                    </button>
+
+                    {/* Nuevas */}
+                    <button
+                        type="button"
+                        onClick={() => setFiltro('nuevas')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition flex items-center gap-1.5 ${
+                            filtro === 'nuevas'
+                                ? 'bg-sky-600 text-white border-sky-600 shadow-xs'
+                                : 'bg-sky-50/70 text-sky-800 border-sky-200 hover:bg-sky-100'
+                        }`}
+                    >
+                        <span>🆕</span>
+                        <span>Nuevas (1 servicio)</span>
+                        <span
+                            className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                                filtro === 'nuevas'
+                                    ? 'bg-white/20 text-white'
+                                    : 'bg-sky-200/80 text-sky-900'
+                            }`}
+                        >
+                            {kpis.nuevas}
+                        </span>
+                    </button>
+
+                    {/* Frecuentes / VIP */}
+                    <button
+                        type="button"
+                        onClick={() => setFiltro('frecuentes')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition flex items-center gap-1.5 ${
+                            filtro === 'frecuentes'
+                                ? 'bg-amber-500 text-white border-amber-500 shadow-xs'
+                                : 'bg-amber-50/70 text-amber-900 border-amber-200 hover:bg-amber-100'
+                        }`}
+                    >
+                        <span>⭐</span>
+                        <span>Frecuentes / VIP</span>
+                        <span
+                            className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                                filtro === 'frecuentes'
+                                    ? 'bg-white/20 text-white'
+                                    : 'bg-amber-200/80 text-amber-900'
+                            }`}
+                        >
+                            {kpis.frecuentes}
+                        </span>
+                    </button>
+
+                    {/* Con Turno Futuro */}
+                    <button
+                        type="button"
+                        onClick={() => setFiltro('con_turno_futuro')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition flex items-center gap-1.5 ${
+                            filtro === 'con_turno_futuro'
+                                ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                                : 'bg-emerald-50/70 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+                        }`}
+                    >
+                        <span>📅</span>
+                        <span>Con Turno Futuro</span>
+                        <span
+                            className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                                filtro === 'con_turno_futuro'
+                                    ? 'bg-white/20 text-white'
+                                    : 'bg-emerald-200/80 text-emerald-900'
+                            }`}
+                        >
+                            {kpis.conTurnoFuturo}
+                        </span>
+                    </button>
+
+                    {/* Sin Próximo Turno */}
+                    <button
+                        type="button"
+                        onClick={() => setFiltro('sin_turno_futuro')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition flex items-center gap-1.5 ${
+                            filtro === 'sin_turno_futuro'
+                                ? 'bg-orange-500 text-white border-orange-500 shadow-xs'
+                                : 'bg-orange-50/70 text-orange-900 border-orange-200 hover:bg-orange-100'
+                        }`}
+                    >
+                        <span>⏳</span>
+                        <span>Sin Próximo Turno</span>
+                        <span
+                            className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                                filtro === 'sin_turno_futuro'
+                                    ? 'bg-white/20 text-white'
+                                    : 'bg-orange-200/80 text-orange-900'
+                            }`}
+                        >
+                            {kpis.sinTurnoFuturo}
+                        </span>
+                    </button>
+
+                    {/* Para Service +18d */}
+                    <button
+                        type="button"
+                        onClick={() => setFiltro('service')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition flex items-center gap-1.5 ${
+                            filtro === 'service'
+                                ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                                : 'bg-indigo-50/70 text-indigo-900 border-indigo-200 hover:bg-indigo-100'
+                        }`}
+                    >
+                        <span>🔔</span>
+                        <span>Para Service (+18 d)</span>
+                        <span
+                            className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                                filtro === 'service'
+                                    ? 'bg-white/20 text-white'
+                                    : 'bg-indigo-200/80 text-indigo-900'
+                            }`}
+                        >
+                            {kpis.paraService}
+                        </span>
+                    </button>
+
+                    {/* Inactivas +45d */}
+                    <button
+                        type="button"
+                        onClick={() => setFiltro('inactivas')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition flex items-center gap-1.5 ${
+                            filtro === 'inactivas'
+                                ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
+                                : 'bg-purple-50/70 text-purple-900 border-purple-200 hover:bg-purple-100'
+                        }`}
+                    >
+                        <span>💤</span>
+                        <span>Inactivas (+45 d)</span>
+                        <span
+                            className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                                filtro === 'inactivas'
+                                    ? 'bg-white/20 text-white'
+                                    : 'bg-purple-200/80 text-purple-900'
+                            }`}
+                        >
+                            {kpis.inactivas}
+                        </span>
+                    </button>
+
+                    {/* ¡Cumple Hoy! */}
+                    <button
+                        type="button"
+                        onClick={() => setFiltro('cumple_hoy')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition flex items-center gap-1.5 ${
+                            filtro === 'cumple_hoy'
+                                ? 'bg-rose-500 text-white border-rose-500 shadow-xs'
+                                : 'bg-rose-50/70 text-rose-900 border-rose-200 hover:bg-rose-100'
+                        }`}
+                    >
+                        <span>🎂</span>
+                        <span>¡Cumple Hoy!</span>
+                        <span
+                            className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                                filtro === 'cumple_hoy'
+                                    ? 'bg-white/20 text-white'
+                                    : 'bg-rose-200/80 text-rose-900'
+                            }`}
+                        >
+                            {kpis.cumpleHoy}
+                        </span>
+                    </button>
+
+                    {/* Cumple este Mes */}
+                    <button
+                        type="button"
+                        onClick={() => setFiltro('cumple_mes')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition flex items-center gap-1.5 ${
+                            filtro === 'cumple_mes'
+                                ? 'bg-pink-500 text-white border-pink-500 shadow-xs'
+                                : 'bg-pink-50/70 text-pink-900 border-pink-200 hover:bg-pink-100'
+                        }`}
+                    >
+                        <span>🎉</span>
+                        <span>Cumple este Mes</span>
+                        <span
+                            className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                                filtro === 'cumple_mes'
+                                    ? 'bg-white/20 text-white'
+                                    : 'bg-pink-200/80 text-pink-900'
+                            }`}
+                        >
+                            {kpis.cumpleMes}
+                        </span>
+                    </button>
+
+                    {/* 12° Servicio / 10% OFF */}
+                    <button
+                        type="button"
+                        onClick={() => setFiltro('fidelidad_12')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition flex items-center gap-1.5 ${
+                            filtro === 'fidelidad_12'
+                                ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
+                                : 'bg-amber-50/70 text-amber-900 border-amber-200 hover:bg-amber-100'
+                        }`}
+                    >
+                        <span>🏆</span>
+                        <span>12° Serv. / 10% OFF</span>
+                        <span
+                            className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                                filtro === 'fidelidad_12'
+                                    ? 'bg-white/20 text-white'
+                                    : 'bg-amber-200/80 text-amber-900'
+                            }`}
+                        >
+                            {kpis.fidelidad12}
+                        </span>
+                    </button>
+
+                    {/* Con Ausencias */}
+                    <button
+                        type="button"
+                        onClick={() => setFiltro('con_ausencias')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition flex items-center gap-1.5 ${
+                            filtro === 'con_ausencias'
+                                ? 'bg-red-600 text-white border-red-600 shadow-xs'
+                                : 'bg-red-50/70 text-red-900 border-red-200 hover:bg-red-100'
+                        }`}
+                    >
+                        <span>⚠️</span>
+                        <span>Con Ausencias</span>
+                        <span
+                            className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                                filtro === 'con_ausencias'
+                                    ? 'bg-white/20 text-white'
+                                    : 'bg-red-200/80 text-red-900'
+                            }`}
+                        >
+                            {kpis.conAusencias}
+                        </span>
+                    </button>
+
+                    {/* Sin Celular */}
+                    <button
+                        type="button"
+                        onClick={() => setFiltro('sin_celular')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition flex items-center gap-1.5 ${
+                            filtro === 'sin_celular'
+                                ? 'bg-stone-700 text-white border-stone-700 shadow-xs'
+                                : 'bg-stone-100 text-stone-700 border-stone-300 hover:bg-stone-200'
+                        }`}
+                    >
+                        <span>📱</span>
+                        <span>Sin Celular</span>
+                        <span
+                            className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                                filtro === 'sin_celular'
+                                    ? 'bg-white/20 text-white'
+                                    : 'bg-stone-200 text-stone-700'
+                            }`}
+                        >
+                            {kpis.sinCelular}
+                        </span>
+                    </button>
+                </div>
+            </div>
+
+            {/* 4. Grilla de Tarjetas de Clientas con Paginación */}
+            <div id="seccion-clientas-grilla" className="scroll-mt-4 space-y-4">
+                {totalElementos > 0 && (
+                    <div className="flex items-center justify-between text-xs text-stone-500 font-medium px-1">
+                        <p>
+                            Mostrando clientas <span className="font-bold text-stone-800">{indiceInicio + 1}</span> a{' '}
+                            <span className="font-bold text-stone-800">{indiceFin}</span> de{' '}
+                            <span className="font-bold text-stone-800">{totalElementos}</span>
+                        </p>
+                        <p className="text-[11px] text-stone-400">
+                            Página {paginaSegura} de {totalPaginas}
+                        </p>
+                    </div>
+                )}
+
+                {totalElementos === 0 ? (
+                    <div className="bg-white/90 rounded-2xl p-10 text-center border border-stone-200">
+                        <p className="text-stone-600 font-bold text-base mb-1">
+                            No hay clientas que coincidan con este filtro
+                        </p>
+                        <p className="text-stone-400 text-xs mb-4">
+                            Probá cambiar el filtro superior o registrar una nueva clienta.
+                        </p>
+                        {filtro !== 'todas' && (
+                            <button
+                                type="button"
+                                onClick={() => setFiltro('todas')}
+                                className="bg-rose-50 text-rose-700 border border-rose-200 font-bold text-xs px-4 py-2 rounded-xl"
+                            >
+                                Ver todas las clientas
+                            </button>
+                        )}
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {clientasPaginadas.map((c, idx) => {
                         const badgeEtiqueta =
                             ETIQUETA_BADGE[c.etiqueta || 'nueva'] || ETIQUETA_BADGE.nueva
 
@@ -651,7 +1073,7 @@ export default function ClientesPanel({
                                     {/* Botones de WhatsApp contextuales si tiene número */}
                                     {c.celularDisplay && (
                                         <div className="flex flex-wrap items-center gap-2">
-                                            {(c.esCumpleSemana || c.esCumpleMes) && (
+                                            {(c.esCumpleHoy || c.esCumpleSemana || c.esCumpleMes) && (
                                                 <a
                                                     href={linkSaludoCumple(c)}
                                                     target="_blank"
@@ -700,6 +1122,66 @@ export default function ClientesPanel({
                     })}
                 </div>
             )}
+
+            {/* Paginación Inferior */}
+            {totalPaginas > 1 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white/95 rounded-2xl p-4 border border-stone-200/80 shadow-2xs">
+                    <p className="text-xs text-stone-500 font-medium">
+                        Página <span className="font-bold text-stone-800">{paginaSegura}</span> de{' '}
+                        <span className="font-bold text-stone-800">{totalPaginas}</span> ({totalElementos} clientas)
+                    </p>
+
+                    <div className="flex items-center gap-1 sm:gap-1.5">
+                        <button
+                            type="button"
+                            onClick={() => cambiarPagina(paginaSegura - 1)}
+                            disabled={paginaSegura === 1}
+                            className="px-3 py-1.5 rounded-xl border border-stone-200 text-xs font-bold text-stone-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-stone-100 transition flex items-center gap-1"
+                        >
+                            <ChevronLeft className="w-4 h-4" />
+                            <span>Anterior</span>
+                        </button>
+
+                        <div className="flex items-center gap-1">
+                            {generarRangoPaginas(paginaSegura, totalPaginas).map((pag, pIdx) => {
+                                if (pag === '...') {
+                                    return (
+                                        <span key={`dots-${pIdx}`} className="px-2 text-xs text-stone-400 font-bold">
+                                            ...
+                                        </span>
+                                    )
+                                }
+                                const num = Number(pag)
+                                return (
+                                    <button
+                                        key={`page-${num}`}
+                                        type="button"
+                                        onClick={() => cambiarPagina(num)}
+                                        className={`w-8 h-8 rounded-xl text-xs font-bold transition flex items-center justify-center ${
+                                            paginaSegura === num
+                                                ? 'bg-rose-500 text-white shadow-xs'
+                                                : 'text-stone-700 hover:bg-stone-100 border border-stone-200/80'
+                                        }`}
+                                    >
+                                        {num}
+                                    </button>
+                                )
+                            })}
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={() => cambiarPagina(paginaSegura + 1)}
+                            disabled={paginaSegura === totalPaginas}
+                            className="px-3 py-1.5 rounded-xl border border-stone-200 text-xs font-bold text-stone-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-stone-100 transition flex items-center gap-1"
+                        >
+                            <span>Siguiente</span>
+                            <ChevronRight className="w-4 h-4" />
+                        </button>
+                    </div>
+                </div>
+            )}
+        </div>
 
             {/* =================================================================
                 MODAL 1: HISTORIAL COMPLETO DE TURNOS DE LA CLIENTA

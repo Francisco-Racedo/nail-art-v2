@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import {
     AreaChart,
     Area,
@@ -8,7 +9,8 @@ import {
     YAxis,
     CartesianGrid,
     Tooltip,
-    ResponsiveContainer
+    ResponsiveContainer,
+    Legend
 } from 'recharts'
 import {
     TrendingUp,
@@ -23,7 +25,12 @@ import {
     MessageCircle,
     ArrowRight,
     Layers,
-    Filter
+    Wallet,
+    CreditCard,
+    AlertTriangle,
+    Clock,
+    Ban,
+    RefreshCw
 } from 'lucide-react'
 import {
     calcularDesgloseReserva,
@@ -31,6 +38,7 @@ import {
     getEstadoEfectivo,
     obtenerLabelsAdicionales
 } from '@/lib/utils'
+import { suscribirCambiosRealtime } from '@/lib/realtime'
 
 interface RendimientoClientProps {
     reservas: any[]
@@ -75,9 +83,38 @@ function formatearDiaMes(d: Date): string {
 }
 
 export default function RendimientoClient({ reservas }: RendimientoClientProps) {
+    const router = useRouter()
     const [filtro, setFiltro] = useState<TipoFiltroPeriodo>('semana_actual')
     const [busqueda, setBusqueda] = useState('')
-    const [filtroEstado, setFiltroEstado] = useState<'todos' | 'confirmado' | 'completado' | 'cancelado'>('todos')
+    const [filtroEstado, setFiltroEstado] = useState<
+        'todos' | 'completado' | 'confirmado' | 'bajas'
+    >('todos')
+    const [ultimaSincronizacion, setUltimaSincronizacion] = useState<string>('')
+
+    // Sincronización en tiempo real ante cualquier cambio de estado en reservas
+    useEffect(() => {
+        setUltimaSincronizacion(
+            new Date().toLocaleTimeString('es-AR', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            })
+        )
+
+        const unsub = suscribirCambiosRealtime(evento => {
+            if (evento.tipo === 'reservas' || evento.tipo === 'all') {
+                router.refresh()
+                setUltimaSincronizacion(
+                    new Date().toLocaleTimeString('es-AR', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit'
+                    })
+                )
+            }
+        })
+        return () => unsub()
+    }, [router])
 
     const stats = useMemo(() => {
         // Componentes de fecha exactamente en el uso horario de Argentina (UTC-3)
@@ -181,7 +218,6 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
             }
 
             case 'todos': {
-                // Historial completo desde el primer registro hasta el último
                 const fechasOrdenadas = (reservas || [])
                     .map(r => r.fecha)
                     .filter(Boolean)
@@ -189,7 +225,9 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
 
                 if (fechasOrdenadas.length > 0) {
                     const [y1, m1, d1] = fechasOrdenadas[0].split('-').map(Number)
-                    const [y2, m2, d2] = fechasOrdenadas[fechasOrdenadas.length - 1].split('-').map(Number)
+                    const [y2, m2, d2] = fechasOrdenadas[fechasOrdenadas.length - 1]
+                        .split('-')
+                        .map(Number)
                     inicio = new Date(y1, m1 - 1, d1, 12, 0, 0)
                     fin = new Date(y2, m2 - 1, d2, 12, 0, 0)
                 } else {
@@ -204,25 +242,19 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
         const startISO = formatYYYYMMDD(inicio)
         const endISO = formatYYYYMMDD(fin)
 
-        // Turnos adicionales del mes actual que caen fuera de "Esta Semana"
-        // (por ejemplo si hay un turno el 28 de Noviembre mientras estamos en la semana del 16 al 22)
-        const inicioMesActualISO = `${p.year}-${String(p.month).padStart(2, '0')}-01`
-        const finMesActualISO = `${p.year}-${String(p.month).padStart(2, '0')}-${new Date(p.year, p.month, 0).getDate()}`
-        
-        const turnosMesFueraDeEstaSemana = (reservas || []).filter(r => {
-            if (filtro !== 'semana_actual') return false
-            const ef = getEstadoEfectivo(r)
-            if (ef !== 'confirmado' && ef !== 'completado') return false
-            return r.fecha >= inicioMesActualISO && r.fecha <= finMesActualISO && (r.fecha < startISO || r.fecha > endISO)
-        })
-
-        // Pre-cargar días para el gráfico
+        // Pre-cargar días para el gráfico (hasta 60 días individuales)
         const daysMap = new Map<
             string,
-            { ingresos: number; turnos: number; label: string; fecha: string }
+            {
+                cobrado: number
+                proyectado: number
+                turnosCompletados: number
+                turnosConfirmados: number
+                label: string
+                fecha: string
+            }
         >()
 
-        // Solo expandimos días individuales si el rango es de hasta 60 días
         const diffDias = Math.round((fin.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24))
         if (diffDias <= 60) {
             const cursor = new Date(inicio)
@@ -234,147 +266,192 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
                         ? `${diaNombre} ${formatearDiaMes(cursor)}`
                         : formatearDiaMes(cursor)
 
-                daysMap.set(fStr, { ingresos: 0, turnos: 0, label, fecha: fStr })
+                daysMap.set(fStr, {
+                    cobrado: 0,
+                    proyectado: 0,
+                    turnosCompletados: 0,
+                    turnosConfirmados: 0,
+                    label,
+                    fecha: fStr
+                })
                 cursor.setDate(cursor.getDate() + 1)
             }
         }
 
-        // Filtrar reservas que caigan estrictamente dentro del rango
-        const filtered = reservas.filter(
-            r => r.fecha >= startISO && r.fecha <= endISO
-        )
+        // Filtrar reservas dentro del período seleccionado
+        const filtered = reservas.filter(r => r.fecha >= startISO && r.fecha <= endISO)
 
-        let ingresos = 0
-        let ingresosCompletadosHastaHoy = 0
-        let ingresosProyectadosResto = 0
-        let totalBaseServicios = 0
-        let totalAdicionales = 0
-        let totalDescuentos = 0
-        let completadosConf = 0
-        let canceladosRech = 0
+        // Variables Contables Reales (Completados = Cobrado Real)
+        let ingresosCobrados = 0
+        let cobradoEfectivo = 0
+        let cobradoTransferencia = 0
+        let totalBaseCobrado = 0
+        let totalAdicionalesCobrado = 0
+        let totalDescuentosCobrado = 0
+        let turnosCompletadosCount = 0
+
+        // Variables Proyectadas (Confirmados = Pendientes de atención en agenda)
+        let ingresosProyectados = 0
+        let turnosConfirmadosCount = 0
+
+        // Variables de Inasistencias y Pérdidas
+        let ingresosPerdidos = 0
         let ausentesCount = 0
+        let canceladosCount = 0
 
-        const serviciosMap = new Map<string, { count: number; ingresos: number }>()
-        const clientesUnicos = new Set<string>()
+        const serviciosCobradosMap = new Map<string, { count: number; ingresos: number }>()
+        const clientasAtendidasSet = new Set<string>()
 
-        // Lista detallada de turnos con desglose financiero individual
-        const turnosDetalle = filtered.map(r => {
-            const estadoReal = getEstadoEfectivo(r)
-            const desglose = calcularDesgloseReserva(r)
-            const esActivoOCompletado =
-                estadoReal === 'confirmado' || estadoReal === 'completado'
+        // Lista enriquecida de turnos para la tabla
+        const turnosDetalle = filtered
+            .map(r => {
+                const estadoReal = getEstadoEfectivo(r)
+                const desglose = calcularDesgloseReserva(r)
 
-            if (estadoReal === 'cancelado' || estadoReal === 'rechazado') {
-                canceladosRech++
-            } else if (estadoReal === 'ausente') {
-                ausentesCount++
-            }
+                if (estadoReal === 'completado') {
+                    turnosCompletadosCount++
+                    ingresosCobrados += desglose.totalFinal
+                    totalBaseCobrado += desglose.precioBaseServicio
+                    totalAdicionalesCobrado += desglose.montoAdicionales
+                    totalDescuentosCobrado += desglose.montoDescuento
 
-            if (esActivoOCompletado) {
-                completadosConf++
-                ingresos += desglose.totalFinal
-                totalBaseServicios += desglose.precioBaseServicio
-                totalAdicionales += desglose.montoAdicionales
-                totalDescuentos += desglose.montoDescuento
+                    // Arqueo por medio de pago
+                    const mp = (r.metodo_pago || 'efectivo').toLowerCase()
+                    if (
+                        mp.includes('transf') ||
+                        mp.includes('mp') ||
+                        mp.includes('mercadopago') ||
+                        mp.includes('banco')
+                    ) {
+                        cobradoTransferencia += desglose.totalFinal
+                    } else {
+                        cobradoEfectivo += desglose.totalFinal
+                    }
 
-                if (r.fecha <= hoyISO) {
-                    ingresosCompletadosHastaHoy += desglose.totalFinal
-                } else {
-                    ingresosProyectadosResto += desglose.totalFinal
+                    // Clienta única efectivamente atendida
+                    const idClienta = r.celular ? r.celular.trim() : r.nombre?.trim() || ''
+                    if (idClienta) {
+                        clientasAtendidasSet.add(idClienta)
+                    }
+
+                    // Ranking de servicios realizados y cobrados
+                    const nombreLimpio = (r.servicio || 'Servicio General')
+                        .split('(')[0]
+                        .trim()
+                    const sActual = serviciosCobradosMap.get(nombreLimpio) || {
+                        count: 0,
+                        ingresos: 0
+                    }
+                    sActual.count++
+                    sActual.ingresos += desglose.totalFinal
+                    serviciosCobradosMap.set(nombreLimpio, sActual)
+
+                    if (daysMap.has(r.fecha)) {
+                        const dEntry = daysMap.get(r.fecha)!
+                        dEntry.cobrado += desglose.totalFinal
+                        dEntry.turnosCompletados += 1
+                    }
+                } else if (estadoReal === 'confirmado') {
+                    turnosConfirmadosCount++
+                    ingresosProyectados += desglose.totalFinal
+
+                    if (daysMap.has(r.fecha)) {
+                        const dEntry = daysMap.get(r.fecha)!
+                        dEntry.proyectado += desglose.totalFinal
+                        dEntry.turnosConfirmados += 1
+                    }
+                } else if (estadoReal === 'ausente') {
+                    ausentesCount++
+                    ingresosPerdidos += desglose.totalFinal
+                } else if (estadoReal === 'cancelado' || estadoReal === 'rechazado') {
+                    canceladosCount++
+                    ingresosPerdidos += desglose.totalFinal
                 }
 
-                if (r.celular) {
-                    clientesUnicos.add(r.celular.trim())
+                return {
+                    id: r.id,
+                    nombre: r.nombre || 'Clienta sin nombre',
+                    celular: r.celular || '',
+                    fecha: r.fecha,
+                    horario: (r.horario || '10:00').substring(0, 5),
+                    servicio: (r.servicio || 'Servicio').split('(')[0].trim(),
+                    adicionales: obtenerLabelsAdicionales(desglose.adicionalesIds),
+                    precioBase: desglose.precioBaseServicio,
+                    montoAdicionales: desglose.montoAdicionales,
+                    montoDescuento: desglose.montoDescuento,
+                    totalFinal: desglose.totalFinal,
+                    estado: estadoReal,
+                    metodoPago: (r.metodo_pago || 'efectivo').toLowerCase()
                 }
-
-                const nombreLimpio = (r.servicio || 'Servicio General')
-                    .split('(')[0]
-                    .trim()
-                const sActual = serviciosMap.get(nombreLimpio) || {
-                    count: 0,
-                    ingresos: 0
-                }
-                sActual.count++
-                sActual.ingresos += desglose.totalFinal
-                serviciosMap.set(nombreLimpio, sActual)
-
-                if (daysMap.has(r.fecha)) {
-                    const dEntry = daysMap.get(r.fecha)!
-                    dEntry.ingresos += desglose.totalFinal
-                    dEntry.turnos += 1
-                }
-            }
-
-            return {
-                id: r.id,
-                nombre: r.nombre || 'Clienta sin nombre',
-                celular: r.celular || '',
-                fecha: r.fecha,
-                horario: (r.horario || '10:00').substring(0, 5),
-                servicio: (r.servicio || 'Servicio').split('(')[0].trim(),
-                adicionales: obtenerLabelsAdicionales(desglose.adicionalesIds),
-                precioBase: desglose.precioBaseServicio,
-                montoAdicionales: desglose.montoAdicionales,
-                montoDescuento: desglose.montoDescuento,
-                totalFinal: desglose.totalFinal,
-                estado: estadoReal,
-                metodoPago: r.metodo_pago || 'efectivo'
-            }
-        }).sort((a, b) => {
-            if (a.fecha !== b.fecha) return a.fecha.localeCompare(b.fecha)
-            return a.horario.localeCompare(b.horario)
-        })
+            })
+            .sort((a, b) => {
+                if (a.fecha !== b.fecha) return a.fecha.localeCompare(b.fecha)
+                return a.horario.localeCompare(b.horario)
+            })
 
         const dataChart = Array.from(daysMap.values()).map(item => ({
             name: item.label,
             fecha: item.fecha,
-            ingresos: item.ingresos,
-            turnos: item.turnos
+            cobrado: item.cobrado,
+            proyectado: item.proyectado,
+            totalDia: item.cobrado + item.proyectado,
+            turnosCompletados: item.turnosCompletados,
+            turnosConfirmados: item.turnosConfirmados
         }))
 
-        const totalGestionados = completadosConf + canceladosRech + ausentesCount
-        const ocupacion =
-            totalGestionados === 0
-                ? 0
-                : Math.round((completadosConf / totalGestionados) * 100)
-        const ticketPromedio =
-            completadosConf > 0 ? Math.round(ingresos / completadosConf) : 0
+        // Indicadores analíticos
+        const totalConResultado = turnosCompletadosCount + ausentesCount + canceladosCount
+        const tasaCumplimiento =
+            totalConResultado > 0
+                ? Math.round((turnosCompletadosCount / totalConResultado) * 100)
+                : 100
 
-        const rankingServicios = Array.from(serviciosMap.entries())
+        const ticketPromedioCobrado =
+            turnosCompletadosCount > 0
+                ? Math.round(ingresosCobrados / turnosCompletadosCount)
+                : 0
+
+        const potencialTotal = ingresosCobrados + ingresosProyectados
+
+        const rankingServicios = Array.from(serviciosCobradosMap.entries())
             .map(([nombre, data]) => ({
                 nombre,
                 count: data.count,
                 ingresos: data.ingresos,
                 porcentaje:
-                    ingresos > 0 ? Math.round((data.ingresos / ingresos) * 100) : 0
+                    ingresosCobrados > 0
+                        ? Math.round((data.ingresos / ingresosCobrados) * 100)
+                        : 0
             }))
             .sort((a, b) => b.ingresos - a.ingresos)
 
         return {
-            ingresos,
-            ingresosCompletadosHastaHoy,
-            ingresosProyectadosResto,
-            totalBaseServicios,
-            totalAdicionales,
-            totalDescuentos,
-            completadosConf,
-            canceladosRech,
+            ingresosCobrados,
+            cobradoEfectivo,
+            cobradoTransferencia,
+            totalBaseCobrado,
+            totalAdicionalesCobrado,
+            totalDescuentosCobrado,
+            turnosCompletadosCount,
+            ingresosProyectados,
+            turnosConfirmadosCount,
+            potencialTotal,
+            ingresosPerdidos,
             ausentesCount,
-            totalGestionados,
-            ocupacion,
-            ticketPromedio,
-            clientesAtendidos: clientesUnicos.size,
+            canceladosCount,
+            tasaCumplimiento,
+            ticketPromedioCobrado,
+            clientasAtendidasReales: clientasAtendidasSet.size,
             dataChart,
             rankingServicios,
             turnosDetalle,
             labelPeriodo,
             rangoTexto: `${formatearDiaMes(inicio)} al ${formatearDiaMes(fin)}`,
-            esSemanaActual: filtro === 'semana_actual',
-            turnosMesFueraDeEstaSemana
+            esSemanaActual: filtro === 'semana_actual'
         }
     }, [reservas, filtro])
 
-    // Filtrar la lista de turnos según el buscador y estado
+    // Filtrar la lista de turnos según el buscador y el selector de estado
     const turnosFiltrados = useMemo(() => {
         return stats.turnosDetalle.filter(t => {
             const matchesBusqueda =
@@ -383,8 +460,17 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
                 t.servicio.toLowerCase().includes(busqueda.toLowerCase()) ||
                 t.fecha.includes(busqueda)
 
-            const matchesEstado =
-                filtroEstado === 'todos' || t.estado === filtroEstado
+            let matchesEstado = true
+            if (filtroEstado === 'completado') {
+                matchesEstado = t.estado === 'completado'
+            } else if (filtroEstado === 'confirmado') {
+                matchesEstado = t.estado === 'confirmado'
+            } else if (filtroEstado === 'bajas') {
+                matchesEstado =
+                    t.estado === 'ausente' ||
+                    t.estado === 'cancelado' ||
+                    t.estado === 'rechazado'
+            }
 
             return matchesBusqueda && matchesEstado
         })
@@ -392,12 +478,18 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
 
     return (
         <div className="w-full space-y-6 animate-in fade-in duration-300">
-            {/* Header del Panel */}
+            {/* Header del Panel de Rendimiento con Barra de Filtros Intacta */}
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-stone-200">
                 <div>
                     <div className="flex items-center gap-2 text-rose-500 font-bold text-xs uppercase tracking-widest mb-1.5">
                         <TrendingUp className="w-4 h-4" />
-                        <span>Inteligencia de Negocio</span>
+                        <span>Inteligencia de Negocio & Control Ganancial</span>
+                        {ultimaSincronizacion && (
+                            <span className="inline-flex items-center gap-1 text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-200 ml-2 normal-case font-semibold">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                En vivo ({ultimaSincronizacion})
+                            </span>
+                        )}
                     </div>
                     <h2 className="text-2xl sm:text-3xl font-black text-stone-900 tracking-tight">
                         Panel de Rendimiento
@@ -410,7 +502,7 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
                     </div>
                 </div>
 
-                {/* Filtros de Período Calendario */}
+                {/* Filtros de Período Calendario (Se mantienen exactamente como los solicitó el usuario) */}
                 <div className="flex flex-wrap items-center gap-1.5 bg-stone-100 p-1.5 rounded-2xl border border-stone-200/80 shadow-inner">
                     <button
                         type="button"
@@ -481,145 +573,163 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
                 </div>
             </div>
 
-            {/* Aviso inteligente cuando hay turnos en el mes fuera de esta semana */}
-            {stats.turnosMesFueraDeEstaSemana.length > 0 && (
-                <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+            {/* Tarjetas Principales de KPIs Financieros y Gananciales */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* 1. FACTURACIÓN REAL COBRADA (SOLO COMPLETADOS) */}
+                <div className="bg-white/95 backdrop-blur-sm border-2 border-emerald-300/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-50 rounded-bl-full pointer-events-none -z-0" />
+                    <div className="flex items-center justify-between mb-3 relative z-10">
+                        <span className="text-xs font-black text-emerald-800 uppercase tracking-wider flex items-center gap-1.5">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                            Facturación Real Cobrada
+                        </span>
+                        <div className="p-2 bg-emerald-100 text-emerald-700 rounded-xl">
+                            <DollarSign className="w-4 h-4" />
+                        </div>
+                    </div>
+                    <p className="text-2xl sm:text-3xl font-black text-emerald-950 leading-none relative z-10">
+                        ${stats.ingresosCobrados.toLocaleString('es-AR')}
+                    </p>
+                    <div className="mt-3 flex flex-col gap-1 text-[11px] font-semibold text-stone-600 border-t border-emerald-100 pt-2.5 relative z-10">
+                        <div className="flex justify-between items-center">
+                            <span className="text-emerald-700">✓ Turnos atendidos y cobrados:</span>
+                            <span className="font-bold text-stone-900">
+                                {stats.turnosCompletadosCount}
+                            </span>
+                        </div>
+                        <div className="flex justify-between items-center text-[10px] text-stone-500">
+                            <span>Base: ${stats.totalBaseCobrado.toLocaleString('es-AR')}</span>
+                            {stats.totalAdicionalesCobrado > 0 && (
+                                <span className="text-emerald-700 font-bold">
+                                    +${stats.totalAdicionalesCobrado.toLocaleString('es-AR')} deco
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* 2. ARQUEO DE CAJA / MEDIOS DE PAGO (EFECTIVO VS TRANSFERENCIA) */}
+                <div className="bg-white/95 backdrop-blur-sm border border-stone-200/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
+                    <div className="flex items-center justify-between mb-3">
+                        <span className="text-xs font-bold text-stone-500 uppercase tracking-wider flex items-center gap-1.5">
+                            <Wallet className="w-3.5 h-3.5 text-indigo-500" />
+                            Arqueo de Cobros
+                        </span>
+                        <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl border border-indigo-100">
+                            <CreditCard className="w-4 h-4" />
+                        </div>
+                    </div>
+                    <div className="space-y-2 mt-1">
+                        <div className="flex items-center justify-between bg-stone-50 p-2 rounded-xl border border-stone-100">
+                            <span className="text-xs font-bold text-stone-700 flex items-center gap-1.5">
+                                💵 Efectivo en Mano:
+                            </span>
+                            <span className="font-black text-xs text-stone-900">
+                                ${stats.cobradoEfectivo.toLocaleString('es-AR')}
+                            </span>
+                        </div>
+                        <div className="flex items-center justify-between bg-stone-50 p-2 rounded-xl border border-stone-100">
+                            <span className="text-xs font-bold text-stone-700 flex items-center gap-1.5">
+                                💳 Banco / Transf.:
+                            </span>
+                            <span className="font-black text-xs text-stone-900">
+                                ${stats.cobradoTransferencia.toLocaleString('es-AR')}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* 3. EN AGENDA / FACTURACIÓN PROYECTADA (CONFIRMADOS POR ATENDER) */}
+                <div className="bg-white/95 backdrop-blur-sm border border-stone-200/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
+                    <div className="flex items-center justify-between mb-3">
+                        <span className="text-xs font-bold text-stone-500 uppercase tracking-wider flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5 text-sky-500" />
+                            En Agenda (Por Atender)
+                        </span>
+                        <div className="p-2 bg-sky-50 text-sky-600 rounded-xl border border-sky-100">
+                            <CalendarDays className="w-4 h-4" />
+                        </div>
+                    </div>
+                    <p className="text-2xl sm:text-3xl font-black text-sky-900 leading-none">
+                        ${stats.ingresosProyectados.toLocaleString('es-AR')}
+                    </p>
+                    <div className="mt-3 flex flex-col gap-1 text-[11px] font-semibold text-stone-600 border-t border-stone-100 pt-2.5">
+                        <div className="flex justify-between items-center">
+                            <span className="text-sky-700">⏳ Turnos confirmados:</span>
+                            <span className="font-bold text-stone-900">
+                                {stats.turnosConfirmadosCount}
+                            </span>
+                        </div>
+                        <div className="flex justify-between items-center text-[10px] text-stone-500">
+                            <span>Potencial Total del Período:</span>
+                            <span className="font-bold text-stone-800">
+                                ${stats.potencialTotal.toLocaleString('es-AR')}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* 4. CLIENTAS ATENDIDAS & TICKET PROMEDIO REAL */}
+                <div className="bg-white/95 backdrop-blur-sm border border-stone-200/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
+                    <div className="flex items-center justify-between mb-3">
+                        <span className="text-xs font-bold text-stone-500 uppercase tracking-wider flex items-center gap-1.5">
+                            <Users className="w-3.5 h-3.5 text-purple-500" />
+                            Clientas Atendidas Reales
+                        </span>
+                        <div className="p-2 bg-purple-50 text-purple-600 rounded-xl border border-purple-100">
+                            <Receipt className="w-4 h-4" />
+                        </div>
+                    </div>
+                    <div className="flex items-baseline justify-between">
+                        <p className="text-2xl sm:text-3xl font-black text-stone-900 leading-none">
+                            {stats.clientasAtendidasReales}
+                        </p>
+                        <div className="text-right">
+                            <span className="text-[10px] text-stone-400 block font-bold uppercase">
+                                Ticket Promedio
+                            </span>
+                            <span className="text-sm font-black text-purple-700">
+                                ${stats.ticketPromedioCobrado.toLocaleString('es-AR')}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="mt-3 pt-2.5 border-t border-stone-100 flex items-center justify-between text-[11px] font-semibold">
+                        <span className="text-stone-500">Efectividad de turnos:</span>
+                        <span
+                            className={`font-bold ${
+                                stats.tasaCumplimiento >= 85 ? 'text-emerald-600' : 'text-amber-600'
+                            }`}
+                        >
+                            {stats.tasaCumplimiento}%
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            {/* Aviso de Ingresos No Percibidos por Inasistencias (Si los hubiere) */}
+            {stats.ingresosPerdidos > 0 && (
+                <div className="bg-rose-50/80 border border-rose-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
                     <div className="flex items-center gap-2.5">
-                        <span className="text-xl">💡</span>
-                        <div className="text-xs text-amber-900">
+                        <div className="w-8 h-8 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                            <AlertTriangle className="w-4 h-4" />
+                        </div>
+                        <div className="text-xs text-rose-900">
                             <span className="font-bold">
-                                Tenés {stats.turnosMesFueraDeEstaSemana.length} turno(s) más agendado(s) más adelante en este mes
+                                Ingresos no percibidos por turnos caídos:
                             </span>{' '}
-                            (ej: {stats.turnosMesFueraDeEstaSemana.map(t => `${t.fecha.split('-').reverse().slice(0, 2).join('/')} • ${t.nombre}`).join(', ')}).
+                            Se perdieron <strong>${stats.ingresosPerdidos.toLocaleString('es-AR')}</strong> en este período ({stats.ausentesCount} clientas ausentes y {stats.canceladosCount} cancelaciones).
                         </div>
                     </div>
                     <button
                         type="button"
-                        onClick={() => setFiltro('mes_actual')}
-                        className="self-start sm:self-auto px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs rounded-xl transition shadow-xs flex items-center gap-1.5 shrink-0"
+                        onClick={() => setFiltroEstado('bajas')}
+                        className="self-start sm:self-auto px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl transition shadow-xs shrink-0"
                     >
-                        <span>Ver Mes en Curso</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
+                        Ver Turnos Caídos
                     </button>
                 </div>
             )}
-
-            {/* Tarjetas Principales de KPIs */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* 1. Facturación del Período */}
-                <div className="bg-white/95 backdrop-blur-sm border border-stone-200/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
-                    <div className="flex items-center justify-between mb-3">
-                        <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">
-                            Facturación Total
-                        </span>
-                        <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100">
-                            <DollarSign className="w-4 h-4" />
-                        </div>
-                    </div>
-                    <p className="text-2xl sm:text-3xl font-black text-stone-900 leading-none">
-                        ${stats.ingresos.toLocaleString('es-AR')}
-                    </p>
-
-                    {stats.esSemanaActual ? (
-                        <div className="mt-2.5 flex flex-col gap-1 text-[11px] font-semibold text-stone-500 border-t border-stone-100 pt-2">
-                            <div className="flex justify-between">
-                                <span className="text-emerald-700">✓ Atendido hasta hoy:</span>
-                                <span className="font-bold text-stone-800">
-                                    ${stats.ingresosCompletadosHastaHoy.toLocaleString('es-AR')}
-                                </span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span className="text-sky-700">⏳ Por atender (resto semana):</span>
-                                <span className="font-bold text-stone-800">
-                                    ${stats.ingresosProyectadosResto.toLocaleString('es-AR')}
-                                </span>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-stone-500">
-                            <span>Base: ${stats.totalBaseServicios.toLocaleString('es-AR')}</span>
-                            {stats.totalAdicionales > 0 && (
-                                <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded font-bold">
-                                    +${stats.totalAdicionales.toLocaleString('es-AR')} deco
-                                </span>
-                            )}
-                            {stats.totalDescuentos > 0 && (
-                                <span className="text-rose-600 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded font-bold">
-                                    -${stats.totalDescuentos.toLocaleString('es-AR')} desc
-                                </span>
-                            )}
-                        </div>
-                    )}
-                </div>
-
-                {/* 2. Ticket Promedio */}
-                <div className="bg-white/95 backdrop-blur-sm border border-stone-200/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
-                    <div className="flex items-center justify-between mb-3">
-                        <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">
-                            Ticket Promedio
-                        </span>
-                        <div className="p-2 bg-sky-50 text-sky-600 rounded-xl border border-sky-100">
-                            <Receipt className="w-4 h-4" />
-                        </div>
-                    </div>
-                    <p className="text-2xl sm:text-3xl font-black text-stone-900 leading-none">
-                        ${stats.ticketPromedio.toLocaleString('es-AR')}
-                    </p>
-                    <p className="mt-2 text-xs font-medium text-stone-500">
-                        Promedio generado por cada turno realizado en este período.
-                    </p>
-                </div>
-
-                {/* 3. Tasa de Efectividad y Ocupación */}
-                <div className="bg-white/95 backdrop-blur-sm border border-stone-200/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
-                    <div className="flex items-center justify-between mb-3">
-                        <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">
-                            Efectividad de Turnos
-                        </span>
-                        <div className="p-2 bg-amber-50 text-amber-600 rounded-xl border border-amber-100">
-                            <CheckCircle2 className="w-4 h-4" />
-                        </div>
-                    </div>
-                    <div className="flex items-baseline gap-2">
-                        <p className="text-2xl sm:text-3xl font-black text-stone-900 leading-none">
-                            {stats.ocupacion}%
-                        </p>
-                        <span className="text-xs font-bold text-emerald-600">
-                            ({stats.completadosConf} confirmados)
-                        </span>
-                    </div>
-                    <div className="mt-2.5 flex items-center gap-2 text-[11px] font-semibold text-stone-500">
-                        {stats.canceladosRech > 0 && (
-                            <span className="text-rose-600">
-                                {stats.canceladosRech} cancelados
-                            </span>
-                        )}
-                        {stats.ausentesCount > 0 && (
-                            <span className="text-amber-600">
-                                {stats.ausentesCount} ausentes
-                            </span>
-                        )}
-                    </div>
-                </div>
-
-                {/* 4. Clientas Atendidas */}
-                <div className="bg-white/95 backdrop-blur-sm border border-stone-200/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
-                    <div className="flex items-center justify-between mb-3">
-                        <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">
-                            Clientas Atendidas
-                        </span>
-                        <div className="p-2 bg-purple-50 text-purple-600 rounded-xl border border-purple-100">
-                            <Users className="w-4 h-4" />
-                        </div>
-                    </div>
-                    <p className="text-2xl sm:text-3xl font-black text-stone-900 leading-none">
-                        {stats.clientesAtendidos}
-                    </p>
-                    <p className="mt-2 text-xs font-medium text-stone-500">
-                        Personas únicas que reservaron en este intervalo.
-                    </p>
-                </div>
-            </div>
 
             {/* TABLA DETALLADA DE TURNOS Y COBROS DEL PERÍODO */}
             <div className="bg-white/95 backdrop-blur-sm border border-stone-200/80 rounded-2xl p-5 shadow-sm">
@@ -627,15 +737,64 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
                     <div>
                         <h3 className="text-sm font-bold text-stone-900 uppercase tracking-wider flex items-center gap-2">
                             <Layers className="w-4 h-4 text-rose-500" />
-                            Detalle de Turnos y Cobros del Período ({turnosFiltrados.length})
+                            Detalle de Turnos y Cobros ({turnosFiltrados.length})
                         </h3>
                         <p className="text-xs text-stone-500 font-medium">
-                            Registro nominal de clientas, servicios realizados, adicionales y montos cobrados
+                            Visualizá qué turnos fueron efectivamente cobrados y cuáles continúan agendados o sufrieron bajas.
                         </p>
                     </div>
 
-                    {/* Filtros locales de la tabla */}
+                    {/* Filtros Rápidos de la Tabla */}
                     <div className="flex flex-wrap items-center gap-2">
+                        {/* Selector de Estado */}
+                        <div className="flex flex-wrap items-center gap-1 bg-stone-100 p-1 rounded-xl border border-stone-200/70 text-xs font-bold">
+                            <button
+                                type="button"
+                                onClick={() => setFiltroEstado('todos')}
+                                className={`px-2.5 py-1 rounded-lg transition ${
+                                    filtroEstado === 'todos'
+                                        ? 'bg-white text-stone-900 shadow-2xs'
+                                        : 'text-stone-600 hover:text-stone-900'
+                                }`}
+                            >
+                                Todos ({stats.turnosDetalle.length})
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setFiltroEstado('completado')}
+                                className={`px-2.5 py-1 rounded-lg transition ${
+                                    filtroEstado === 'completado'
+                                        ? 'bg-emerald-500 text-white shadow-2xs'
+                                        : 'text-stone-600 hover:text-emerald-700'
+                                }`}
+                            >
+                                ✓ Cobrados ({stats.turnosCompletadosCount})
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setFiltroEstado('confirmado')}
+                                className={`px-2.5 py-1 rounded-lg transition ${
+                                    filtroEstado === 'confirmado'
+                                        ? 'bg-sky-500 text-white shadow-2xs'
+                                        : 'text-stone-600 hover:text-sky-700'
+                                }`}
+                            >
+                                ⏳ En Agenda ({stats.turnosConfirmadosCount})
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setFiltroEstado('bajas')}
+                                className={`px-2.5 py-1 rounded-lg transition ${
+                                    filtroEstado === 'bajas'
+                                        ? 'bg-rose-500 text-white shadow-2xs'
+                                        : 'text-stone-600 hover:text-rose-700'
+                                }`}
+                            >
+                                ✕ Bajas ({stats.ausentesCount + stats.canceladosCount})
+                            </button>
+                        </div>
+
+                        {/* Buscador de Clientas */}
                         <div className="relative">
                             <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
                             <input
@@ -643,36 +802,17 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
                                 placeholder="Buscar clienta o servicio..."
                                 value={busqueda}
                                 onChange={e => setBusqueda(e.target.value)}
-                                className="pl-8 pr-3 py-1.5 text-xs bg-stone-50 border border-stone-200 rounded-xl text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-rose-400 w-48 sm:w-56"
+                                className="pl-8 pr-3 py-1.5 text-xs bg-stone-50 border border-stone-200 rounded-xl text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-rose-400 w-44 sm:w-52"
                             />
                         </div>
-                        <select
-                            value={filtroEstado}
-                            onChange={e => setFiltroEstado(e.target.value as any)}
-                            className="text-xs bg-stone-50 border border-stone-200 rounded-xl px-2.5 py-1.5 text-stone-700 font-semibold focus:outline-none focus:ring-2 focus:ring-rose-400 cursor-pointer"
-                        >
-                            <option value="todos">Todos los estados</option>
-                            <option value="confirmado">Solo Confirmados</option>
-                            <option value="completado">Solo Completados</option>
-                            <option value="cancelado">Solo Cancelados</option>
-                        </select>
                     </div>
                 </div>
 
                 {turnosFiltrados.length === 0 ? (
                     <div className="py-12 text-center">
                         <p className="text-stone-400 text-sm font-medium">
-                            No se encontraron turnos en este período con los filtros aplicados.
+                            No se encontraron turnos en este período con el filtro aplicado.
                         </p>
-                        {filtro !== 'mes_actual' && (
-                            <button
-                                type="button"
-                                onClick={() => setFiltro('mes_actual')}
-                                className="mt-3 text-xs font-bold text-rose-600 hover:text-rose-700 underline"
-                            >
-                                Cambiar a "Mes en Curso" para ver todos los turnos del mes
-                            </button>
-                        )}
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
@@ -682,20 +822,16 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
                                     <th className="py-2.5 px-3">Fecha y Hora</th>
                                     <th className="py-2.5 px-3">Clienta</th>
                                     <th className="py-2.5 px-3">Servicio Principal & Deco</th>
-                                    <th className="py-2.5 px-3">Estado</th>
-                                    <th className="py-2.5 px-3 text-right">Cobro Total</th>
+                                    <th className="py-2.5 px-3">Estado Operativo</th>
+                                    <th className="py-2.5 px-3 text-right">Monto</th>
                                     <th className="py-2.5 px-3 text-center">Contacto</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-stone-100 text-xs">
                                 {turnosFiltrados.map(t => {
                                     const fechaLatam = t.fecha.split('-').reverse().join('/')
-                                    const badgeClasses: Record<string, string> = {
-                                        confirmado: 'bg-emerald-50 text-emerald-800 border-emerald-200',
-                                        completado: 'bg-blue-50 text-blue-800 border-blue-200',
-                                        pendiente: 'bg-amber-50 text-amber-800 border-amber-200',
-                                        cancelado: 'bg-rose-50 text-rose-800 border-rose-200 line-through'
-                                    }
+                                    const esCompletado = t.estado === 'completado'
+                                    const esConfirmado = t.estado === 'confirmado'
 
                                     return (
                                         <tr
@@ -737,21 +873,49 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
                                             </td>
 
                                             <td className="py-3 px-3 whitespace-nowrap">
-                                                <span
-                                                    className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
-                                                        badgeClasses[t.estado] || 'bg-stone-100 text-stone-600 border-stone-200'
-                                                    }`}
-                                                >
-                                                    {t.estado}
-                                                </span>
+                                                {esCompletado ? (
+                                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                                        Cobrado
+                                                    </span>
+                                                ) : esConfirmado ? (
+                                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-sky-100 text-sky-800 border border-sky-300">
+                                                        <Clock className="w-3 h-3 text-sky-600" />
+                                                        Por Atender
+                                                    </span>
+                                                ) : t.estado === 'ausente' ? (
+                                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300">
+                                                        <AlertTriangle className="w-3 h-3 text-amber-600" />
+                                                        Ausente
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-100 text-rose-800 border border-rose-300 line-through">
+                                                        <Ban className="w-3 h-3 text-rose-600" />
+                                                        Cancelado
+                                                    </span>
+                                                )}
                                             </td>
 
                                             <td className="py-3 px-3 text-right whitespace-nowrap">
-                                                <div className="font-black text-stone-900 text-sm">
+                                                <div
+                                                    className={`font-black text-sm ${
+                                                        esCompletado
+                                                            ? 'text-emerald-700'
+                                                            : esConfirmado
+                                                              ? 'text-sky-800'
+                                                              : 'text-stone-400 line-through'
+                                                    }`}
+                                                >
                                                     ${t.totalFinal.toLocaleString('es-AR')}
                                                 </div>
                                                 <div className="text-[10px] text-stone-400">
-                                                    Base: ${t.precioBase.toLocaleString('es-AR')}
+                                                    {esCompletado
+                                                        ? t.metodoPago.includes('transf')
+                                                            ? '💳 Transferencia'
+                                                            : '💵 Efectivo'
+                                                        : esConfirmado
+                                                          ? '⏳ En agenda'
+                                                          : 'Perdido'}
                                                 </div>
                                             </td>
 
@@ -781,19 +945,31 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
                 )}
             </div>
 
-            {/* Gráfico y Composición */}
+            {/* Gráfico y Composición de Ingresos */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Gráfico de Área (2 columnas) */}
+                {/* Gráfico de Área Recharts: Cobrado Real vs Proyectado en Agenda */}
                 <div className="lg:col-span-2 bg-white/95 backdrop-blur-sm border border-stone-200/80 rounded-2xl p-5 shadow-sm">
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
                         <div>
                             <h3 className="text-sm font-bold text-stone-800 uppercase tracking-wider flex items-center gap-2">
                                 <TrendingUp className="w-4 h-4 text-emerald-500" />
-                                Curva de Facturación ({stats.rangoTexto})
+                                Curva de Recaudación ({stats.rangoTexto})
                             </h3>
                             <p className="text-xs text-stone-400 font-medium">
-                                Recaudación diaria en el ciclo evaluado
+                                Comparativa diaria entre lo Cobrado Efectivo y lo Proyectado en Agenda
                             </p>
+                        </div>
+
+                        {/* Leyenda visual */}
+                        <div className="flex items-center gap-3 text-xs font-bold">
+                            <span className="flex items-center gap-1 text-emerald-700">
+                                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                                Cobrado Real
+                            </span>
+                            <span className="flex items-center gap-1 text-sky-700">
+                                <span className="w-2.5 h-2.5 rounded-full bg-sky-500" />
+                                Por Atender
+                            </span>
                         </div>
                     </div>
 
@@ -804,15 +980,13 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
                                 margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
                             >
                                 <defs>
-                                    <linearGradient
-                                        id="rendimientoGradient"
-                                        x1="0"
-                                        y1="0"
-                                        x2="0"
-                                        y2="1"
-                                    >
-                                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.25} />
+                                    <linearGradient id="cobradoGrad" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.35} />
                                         <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
+                                    </linearGradient>
+                                    <linearGradient id="proyectadoGrad" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.25} />
+                                        <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0.0} />
                                     </linearGradient>
                                 </defs>
                                 <CartesianGrid
@@ -843,49 +1017,64 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
                                         padding: '10px 14px',
                                         boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
                                     }}
-                                    formatter={(value: any) => [
+                                    formatter={(value: any, name: any) => [
                                         `$${Number(value).toLocaleString('es-AR')}`,
-                                        'Facturación'
+                                        name === 'cobrado' ? 'Cobrado Real' : 'Por Atender'
                                     ]}
-                                    labelFormatter={(label: any) => `Día: ${label}`}
+                                    labelFormatter={(label: any) => `Fecha: ${label}`}
                                 />
                                 <Area
                                     type="monotone"
-                                    dataKey="ingresos"
+                                    dataKey="cobrado"
                                     stroke="#10b981"
                                     strokeWidth={3}
                                     fillOpacity={1}
-                                    fill="url(#rendimientoGradient)"
+                                    fill="url(#cobradoGrad)"
+                                />
+                                <Area
+                                    type="monotone"
+                                    dataKey="proyectado"
+                                    stroke="#0ea5e9"
+                                    strokeWidth={2}
+                                    strokeDasharray="4 4"
+                                    fillOpacity={1}
+                                    fill="url(#proyectadoGrad)"
                                 />
                             </AreaChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
 
-                {/* Desglose de Servicios y Adicionales (1 columna) */}
+                {/* Composición de Ganancia Real Cobrada */}
                 <div className="bg-white/95 backdrop-blur-sm border border-stone-200/80 rounded-2xl p-5 shadow-sm flex flex-col justify-between">
                     <div>
                         <h3 className="text-sm font-bold text-stone-800 uppercase tracking-wider flex items-center gap-2 mb-1">
                             <Sparkles className="w-4 h-4 text-amber-500" />
-                            Composición de Ingresos
+                            Composición de Caja Real
                         </h3>
                         <p className="text-xs text-stone-400 font-medium mb-4">
-                            Detalle de base, nail art y descuentos
+                            Desglose de tratamientos y adicionales efectivamente cobrados
                         </p>
 
                         <div className="space-y-3.5">
                             <div>
                                 <div className="flex justify-between text-xs font-semibold text-stone-600 mb-1">
                                     <span>Servicios Principales:</span>
-                                    <span className="font-bold text-stone-800">
-                                        ${stats.totalBaseServicios.toLocaleString('es-AR')}
+                                    <span className="font-bold text-stone-900">
+                                        ${stats.totalBaseCobrado.toLocaleString('es-AR')}
                                     </span>
                                 </div>
                                 <div className="w-full bg-stone-100 rounded-full h-2 overflow-hidden">
                                     <div
                                         className="bg-stone-800 h-2 rounded-full"
                                         style={{
-                                            width: `${stats.ingresos > 0 ? (stats.totalBaseServicios / stats.ingresos) * 100 : 0}%`
+                                            width: `${
+                                                stats.ingresosCobrados > 0
+                                                    ? (stats.totalBaseCobrado /
+                                                          stats.ingresosCobrados) *
+                                                      100
+                                                    : 0
+                                            }%`
                                         }}
                                     />
                                 </div>
@@ -894,35 +1083,47 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
                             <div>
                                 <div className="flex justify-between text-xs font-semibold text-stone-600 mb-1">
                                     <span className="flex items-center gap-1 text-emerald-700">
-                                        ✨ Adicionales / Deco:
+                                        ✨ Nail Art / Adicionales:
                                     </span>
                                     <span className="font-bold text-emerald-700">
-                                        +${stats.totalAdicionales.toLocaleString('es-AR')}
+                                        +${stats.totalAdicionalesCobrado.toLocaleString('es-AR')}
                                     </span>
                                 </div>
                                 <div className="w-full bg-stone-100 rounded-full h-2 overflow-hidden">
                                     <div
                                         className="bg-emerald-500 h-2 rounded-full"
                                         style={{
-                                            width: `${stats.ingresos > 0 ? (stats.totalAdicionales / stats.ingresos) * 100 : 0}%`
+                                            width: `${
+                                                stats.ingresosCobrados > 0
+                                                    ? (stats.totalAdicionalesCobrado /
+                                                          stats.ingresosCobrados) *
+                                                      100
+                                                    : 0
+                                            }%`
                                         }}
                                     />
                                 </div>
                             </div>
 
-                            {stats.totalDescuentos > 0 && (
+                            {stats.totalDescuentosCobrado > 0 && (
                                 <div>
                                     <div className="flex justify-between text-xs font-semibold text-rose-600 mb-1">
-                                        <span>Descuentos Aplicados:</span>
+                                        <span>Descuentos Otorgados:</span>
                                         <span className="font-bold">
-                                            -${stats.totalDescuentos.toLocaleString('es-AR')}
+                                            -${stats.totalDescuentosCobrado.toLocaleString('es-AR')}
                                         </span>
                                     </div>
                                     <div className="w-full bg-stone-100 rounded-full h-2 overflow-hidden">
                                         <div
                                             className="bg-rose-500 h-2 rounded-full"
                                             style={{
-                                                width: `${stats.ingresos > 0 ? (stats.totalDescuentos / stats.ingresos) * 100 : 0}%`
+                                                width: `${
+                                                    stats.ingresosCobrados > 0
+                                                        ? (stats.totalDescuentosCobrado /
+                                                              stats.ingresosCobrados) *
+                                                          100
+                                                        : 0
+                                                }%`
                                             }}
                                         />
                                     </div>
@@ -934,33 +1135,33 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
                     <div className="mt-6 pt-4 border-t border-stone-100 bg-stone-50/80 -mx-5 -mb-5 p-5 rounded-b-2xl">
                         <div className="flex items-center justify-between">
                             <span className="text-xs font-bold text-stone-700 uppercase tracking-wider">
-                                Total Neto:
+                                Total Cobrado en Mano:
                             </span>
-                            <span className="text-xl font-black text-rose-600">
-                                ${stats.ingresos.toLocaleString('es-AR')}
+                            <span className="text-xl font-black text-emerald-600">
+                                ${stats.ingresosCobrados.toLocaleString('es-AR')}
                             </span>
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* Ranking de Servicios */}
+            {/* Ranking de Servicios Más Rentables Efectivos */}
             <div className="bg-white/95 backdrop-blur-sm border border-stone-200/80 rounded-2xl p-5 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
                     <div>
                         <h3 className="text-sm font-bold text-stone-800 uppercase tracking-wider flex items-center gap-2">
                             <Flame className="w-4 h-4 text-orange-500" />
-                            Servicios Más Demandados y Rentables
+                            Servicios Más Rentables (Cobrados)
                         </h3>
                         <p className="text-xs text-stone-400 font-medium">
-                            Distribución de preferencias y recaudación por cada categoría de servicio en este período
+                            Distribución de ingresos generados exclusivamente por tratamientos atendidos y cobrados en este período
                         </p>
                     </div>
                 </div>
 
                 {stats.rankingServicios.length === 0 ? (
                     <p className="text-xs text-stone-400 py-6 text-center italic">
-                        No hay turnos registrados en este período.
+                        Aún no hay turnos completados y cobrados en este período.
                     </p>
                 ) : (
                     <div className="space-y-3">
@@ -978,7 +1179,7 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
                                             {s.nombre}
                                         </h4>
                                         <p className="text-xs text-stone-500 font-medium mt-0.5">
-                                            {s.count} {s.count === 1 ? 'turno' : 'turnos'} confirmados
+                                            {s.count} {s.count === 1 ? 'servicio cobrado' : 'servicios cobrados'}
                                         </p>
                                     </div>
                                 </div>
@@ -989,12 +1190,12 @@ export default function RendimientoClient({ reservas }: RendimientoClientProps) 
                                             ${s.ingresos.toLocaleString('es-AR')}
                                         </p>
                                         <p className="text-[11px] font-bold text-emerald-600">
-                                            {s.porcentaje}% del total
+                                            {s.porcentaje}% del total cobrado
                                         </p>
                                     </div>
                                     <div className="w-20 hidden sm:block bg-stone-200 rounded-full h-2 overflow-hidden">
                                         <div
-                                            className="bg-gradient-to-r from-rose-500 to-amber-500 h-2 rounded-full"
+                                            className="bg-gradient-to-r from-emerald-500 to-teal-500 h-2 rounded-full"
                                             style={{ width: `${s.porcentaje}%` }}
                                         />
                                     </div>

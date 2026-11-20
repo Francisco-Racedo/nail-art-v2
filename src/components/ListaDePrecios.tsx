@@ -251,7 +251,7 @@ export default function ListaDePrecios() {
                                                         eye, francesas, diseños complejos y piedrería:
                                                     </p>
 
-                                                    <div className="space-y-2">
+                                                    <div className="space-y-2.5">
                                                         {adicionales.map((s: Servicio) => {
                                                             const esRangoDibujo =
                                                                 s.nombre
@@ -261,26 +261,33 @@ export default function ListaDePrecios() {
                                                             return (
                                                                 <div
                                                                     key={s.id}
-                                                                    className="flex justify-between items-center py-3 px-3.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition-colors"
+                                                                    className="flex justify-between items-start sm:items-center gap-3 py-3.5 px-3.5 sm:px-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition-colors"
                                                                 >
-                                                                    <div className="flex items-center gap-3 min-w-0 pr-2">
-                                                                        <span className="text-lg bg-white/10 rounded-full w-9 h-9 flex items-center justify-center shrink-0">
+                                                                    <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
+                                                                        <span className="text-lg bg-white/10 rounded-full w-9 h-9 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
                                                                             {s.icono || '✨'}
                                                                         </span>
-                                                                        <div className="min-w-0">
-                                                                            <span className="font-semibold text-white text-sm sm:text-base block truncate">
+                                                                        <div className="min-w-0 flex-1">
+                                                                            <span className="font-semibold text-white text-sm sm:text-base block leading-snug break-words">
                                                                                 {s.nombre}
                                                                             </span>
-                                                                            {(s.subtitulo ||
-                                                                                s.descripcion) && (
-                                                                                <span className="text-[11px] text-stone-300 line-clamp-1">
-                                                                                    {s.subtitulo ||
-                                                                                        s.descripcion}
+                                                                            {s.subtitulo && (
+                                                                                <span className="text-xs text-stone-200/95 block leading-relaxed mt-0.5 break-words">
+                                                                                    {s.subtitulo}
                                                                                 </span>
                                                                             )}
+                                                                            {s.descripcion &&
+                                                                                s.descripcion !==
+                                                                                    s.subtitulo && (
+                                                                                    <span className="text-[11px] text-stone-300/85 block leading-relaxed mt-0.5 break-words">
+                                                                                        {
+                                                                                            s.descripcion
+                                                                                        }
+                                                                                    </span>
+                                                                                )}
                                                                         </div>
                                                                     </div>
-                                                                    <span className="font-editorial font-bold text-amber-300 text-xl sm:text-2xl shrink-0 ml-2">
+                                                                    <span className="font-editorial font-bold text-amber-300 text-lg sm:text-2xl shrink-0 whitespace-nowrap bg-white/5 border border-amber-300/20 px-2.5 py-0.5 rounded-xl self-center">
                                                                         {esRangoDibujo
                                                                             ? '$2.000 - $3.000'
                                                                             : `$${Number(
@@ -296,31 +303,31 @@ export default function ListaDePrecios() {
 
                                                     {/* Desglose oficial de Retirado de otro profesional */}
                                                     <div className="mt-5 p-4 rounded-2xl bg-white/10 border border-white/15 text-xs text-stone-100">
-                                                        <div className="flex items-center gap-2 mb-2 text-amber-300 font-bold uppercase tracking-wider text-[11px]">
+                                                        <div className="flex items-center gap-2 mb-2.5 text-amber-300 font-bold uppercase tracking-wider text-[11px]">
                                                             <span>✨</span> Retiro de Trabajo de Otro Profesional
                                                         </div>
-                                                        <div className="space-y-1.5 text-stone-200 text-[11px] sm:text-xs">
-                                                            <div className="flex justify-between items-center py-1 border-b border-white/10">
-                                                                <span>• Retiro Semipermanente:</span>
-                                                                <span className="font-bold text-white">
+                                                        <div className="space-y-2 text-stone-200 text-xs">
+                                                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-0.5 py-1.5 border-b border-white/10">
+                                                                <span className="font-medium text-stone-100">• Retiro Semipermanente:</span>
+                                                                <span className="font-bold text-amber-300 sm:text-white pl-3 sm:pl-0">
                                                                     $4.000{' '}
                                                                     <span className="text-stone-300 font-normal">
                                                                         ($3.000 con nuevo esmaltado)
                                                                     </span>
                                                                 </span>
                                                             </div>
-                                                            <div className="flex justify-between items-center py-1 border-b border-white/10">
-                                                                <span>• Retiro Capping Gel:</span>
-                                                                <span className="font-bold text-white">
+                                                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-0.5 py-1.5 border-b border-white/10">
+                                                                <span className="font-medium text-stone-100">• Retiro Capping Gel:</span>
+                                                                <span className="font-bold text-amber-300 sm:text-white pl-3 sm:pl-0">
                                                                     $5.000{' '}
                                                                     <span className="text-stone-300 font-normal">
                                                                         ($4.000 con nuevo esmaltado)
                                                                     </span>
                                                                 </span>
                                                             </div>
-                                                            <div className="flex justify-between items-center py-1">
-                                                                <span>• Retiro Soft Gel:</span>
-                                                                <span className="font-bold text-white">
+                                                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-0.5 py-1">
+                                                                <span className="font-medium text-stone-100">• Retiro Soft Gel:</span>
+                                                                <span className="font-bold text-amber-300 sm:text-white pl-3 sm:pl-0">
                                                                     $6.000{' '}
                                                                     <span className="text-stone-300 font-normal">
                                                                         ($4.500 con nuevo servicio)
@@ -328,7 +335,7 @@ export default function ListaDePrecios() {
                                                                 </span>
                                                             </div>
                                                         </div>
-                                                        <p className="mt-2.5 pt-2 border-t border-white/10 text-[10px] text-stone-300 font-light">
+                                                        <p className="mt-2.5 pt-2 border-t border-white/10 text-[11px] text-stone-300 font-light">
                                                             💵 Medios de pago en el salón: Efectivo y Transferencia bancaria.
                                                         </p>
                                                     </div>

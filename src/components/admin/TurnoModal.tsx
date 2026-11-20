@@ -769,12 +769,33 @@ export default function TurnoModal({
                             </a>
                             <a
                                 href={getWppLink('recordatorio_24h')}
+                                onClick={() => {
+                                    if (!modalData.notificacion_enviada) {
+                                        patchTurno(
+                                            { notificacion_enviada: true },
+                                            'Recordatorio de turno marcado como enviado ✓'
+                                        )
+                                            .then(() => {
+                                                setModalData(prev =>
+                                                    prev
+                                                        ? {
+                                                              ...prev,
+                                                              notificacion_enviada: true
+                                                          }
+                                                        : null
+                                                )
+                                            })
+                                            .catch(() => {})
+                                    }
+                                }}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-3.5 rounded-xl text-xs shadow-sm transition"
                             >
                                 <Clock className="w-3.5 h-3.5" />
-                                Recordatorio de Turno
+                                {modalData.notificacion_enviada
+                                    ? 'Recordatorio Enviado ✓'
+                                    : 'Recordatorio de Turno'}
                             </a>
                             <a
                                 href={getWppLink('reprogramar')}

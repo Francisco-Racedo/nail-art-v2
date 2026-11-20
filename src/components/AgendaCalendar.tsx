@@ -19,6 +19,7 @@ import {
 import WeekNavigator from './admin/WeekNavigator'
 import EventGrid from './admin/EventGrid'
 import TurnoModal from './admin/TurnoModal'
+import RecordatoriosMananaPanel from './admin/RecordatoriosMananaPanel'
 import BottomSheetModal from './ui/BottomSheetModal'
 import {
     Reserva,
@@ -118,10 +119,40 @@ export default function AgendaCalendar({
 
     const [mounted, setMounted] = useState(false)
     const [modalData, setModalData] = useState<ModalData | null>(null)
-    const [vistaActiva, setVistaActiva] = useState<'calendario' | 'detalle_turno'>('calendario')
+    const [vistaActiva, setVistaActiva] = useState<
+        'calendario' | 'recordatorios_manana' | 'detalle_turno'
+    >('calendario')
     const [mesesCliente, setMesesCliente] = useState<number>(
         Number(config?.meses_visibles_cliente) || 3
     )
+
+    // Cálculo de la fecha de mañana en zona horaria Argentina (UTC-3) y turnos del día siguiente
+    const mananaStr = useMemo(() => {
+        const now = getAhoraArgentina()
+        const tomorrow = new Date(
+            now.getFullYear(),
+            now.getMonth(),
+            now.getDate() + 1,
+            12,
+            0,
+            0
+        )
+        return formatDateStr(tomorrow)
+    }, [])
+
+    const resumenManana = useMemo(() => {
+        const activos = reservasList.filter(r => {
+            if (r.fecha !== mananaStr) return false
+            const ef = getEstadoEfectivo(r)
+            return ef === 'pendiente' || ef === 'confirmado' || ef === 'completado'
+        })
+        const sinAvisar = activos.filter(r => !r.notificacion_enviada).length
+        return {
+            total: activos.length,
+            sinAvisar,
+            avisados: activos.length - sinAvisar
+        }
+    }, [reservasList, mananaStr])
 
     useEffect(() => {
         setReservasList(initialReservas)
@@ -623,12 +654,44 @@ export default function AgendaCalendar({
                         type="button"
                         onClick={() => setVistaActiva('calendario')}
                         className={`px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-black transition flex items-center gap-2 cursor-pointer ${
-                            vistaActiva === 'calendario' || !modalData
+                            vistaActiva === 'calendario' ||
+                            (vistaActiva === 'detalle_turno' && !modalData)
                                 ? 'bg-stone-900 text-white shadow-sm'
                                 : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
                         }`}
                     >
                         <span>📅 Calendario y Grilla del Día</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setVistaActiva('recordatorios_manana')}
+                        className={`px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-black transition flex items-center gap-2 cursor-pointer ${
+                            vistaActiva === 'recordatorios_manana'
+                                ? 'bg-stone-900 text-white shadow-sm'
+                                : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
+                        }`}
+                    >
+                        <span>🔔 Turnos de Mañana</span>
+                        {resumenManana.total === 0 ? (
+                            <span
+                                className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
+                                    vistaActiva === 'recordatorios_manana'
+                                        ? 'bg-stone-700 text-stone-200'
+                                        : 'bg-stone-200 text-stone-600'
+                                }`}
+                            >
+                                0
+                            </span>
+                        ) : resumenManana.sinAvisar > 0 ? (
+                            <span className="text-[10px] px-2 py-0.5 rounded-full font-black bg-amber-400 text-stone-950 shadow-2xs">
+                                {resumenManana.sinAvisar} por avisar
+                            </span>
+                        ) : (
+                            <span className="text-[10px] px-2 py-0.5 rounded-full font-black bg-emerald-500 text-white shadow-2xs">
+                                ✓ {resumenManana.total}/{resumenManana.total} avisadas
+                            </span>
+                        )}
                     </button>
 
                     {modalData && (
@@ -667,7 +730,27 @@ export default function AgendaCalendar({
                     )}
                 </div>
 
-                {modalData && vistaActiva === 'detalle_turno' ? (
+                {vistaActiva === 'recordatorios_manana' ? (
+                    <RecordatoriosMananaPanel
+                        mananaStr={mananaStr}
+                        reservas={reservasList}
+                        config={config}
+                        historialPorCliente={historialPorCliente}
+                        onOpenTurno={r => handleEventClick(r)}
+                        onIrAGrillaFecha={fechaStr => {
+                            const [y, m, d] = (fechaStr || '').split('-').map(Number)
+                            if (y && m && d) {
+                                handleSelectDate(new Date(y, m - 1, d, 12, 0, 0))
+                            }
+                            setVistaActiva('calendario')
+                        }}
+                        onUpdateReservaLocal={(id, changes) => {
+                            setReservasList(prev =>
+                                prev.map(r => (r.id === id ? { ...r, ...changes } : r))
+                            )
+                        }}
+                    />
+                ) : modalData && vistaActiva === 'detalle_turno' ? (
                     <TurnoModal
                         modalData={modalData}
                         setModalData={val => {
@@ -698,6 +781,12 @@ export default function AgendaCalendar({
                                                       : {}),
                                                   ...(partial.estado !== undefined
                                                       ? { estado: partial.estado }
+                                                      : {}),
+                                                  ...(partial.notificacion_enviada !== undefined
+                                                      ? {
+                                                            notificacion_enviada:
+                                                                partial.notificacion_enviada
+                                                        }
                                                       : {}),
                                                   ...(partial.descuento_aplicado !== undefined
                                                       ? {

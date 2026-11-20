@@ -21,6 +21,7 @@ import { useRouter } from 'next/navigation'
 import { createClient as createBrowserClient } from '@/lib/supabase/client'
 import { processVideoForUpload } from '@/lib/video-processor'
 import { emitirCambioRealtime } from '@/lib/realtime'
+import BottomSheetModal, { ConfirmBottomSheetModal } from './ui/BottomSheetModal'
 
 export interface MediaItem {
     name: string
@@ -46,6 +47,8 @@ export default function CMSGalleryClient({
     const [previewMedia, setPreviewMedia] = useState<MediaItem | null>(null)
     const [previewPlaying, setPreviewPlaying] = useState(true)
     const [previewMuted, setPreviewMuted] = useState(false)
+    const [fileToDelete, setFileToDelete] = useState<string | null>(null)
+    const [deletingFile, setDeletingFile] = useState(false)
 
     const supabase = createBrowserClient()
 
@@ -149,9 +152,14 @@ export default function CMSGalleryClient({
         }
     }
 
-    const handleDelete = async (fileName: string) => {
-        if (!confirm('¿Estás segura de eliminar este archivo de la galería/reels?')) return
+    const handleDelete = (fileName: string) => {
+        setFileToDelete(fileName)
+    }
 
+    const executeDelete = async () => {
+        if (!fileToDelete) return
+        const fileName = fileToDelete
+        setDeletingFile(true)
         const toastId = toast.loading('Eliminando archivo...')
         try {
             const { error } = await supabase.storage
@@ -170,6 +178,9 @@ export default function CMSGalleryClient({
             toast.error('No se pudo borrar: ' + (err.message || 'Error desconocido'), {
                 id: toastId
             })
+        } finally {
+            setDeletingFile(false)
+            setFileToDelete(null)
         }
     }
 
@@ -364,79 +375,105 @@ export default function CMSGalleryClient({
                 </div>
             )}
 
-            {/* Modal de Vista Previa / Reproductor de Reel */}
-            {previewMedia && (
-                <div
-                    className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200"
-                    onClick={() => setPreviewMedia(null)}
-                >
-                    <div
-                        className="relative bg-stone-950 rounded-[2.5rem] overflow-hidden max-w-md w-full border border-white/20 shadow-2xl flex flex-col"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        {/* Cabecera del modal */}
-                        <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
-                            {previewMedia.isVideo && (
-                                <button
-                                    type="button"
-                                    onClick={() => setPreviewMuted(!previewMuted)}
-                                    className="w-10 h-10 rounded-full bg-black/60 backdrop-blur-md text-white flex items-center justify-center hover:bg-black/90 transition shadow-lg border border-white/20"
-                                    title={previewMuted ? 'Activar sonido' : 'Silenciar'}
-                                >
-                                    {previewMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-                                </button>
-                            )}
+            {/* Modal Slide-Up de Vista Previa / Reproductor de Reel */}
+            <BottomSheetModal
+                isOpen={!!previewMedia}
+                onClose={() => setPreviewMedia(null)}
+                maxWidthClass="max-w-md"
+                headerClassName="bg-gradient-to-r from-rose-50/70 via-purple-50/40 to-white"
+                bodyClassName="p-0 bg-stone-950"
+                icon={
+                    <div className="w-10 h-10 rounded-2xl bg-rose-100 text-rose-600 border border-rose-200 flex items-center justify-center">
+                        {previewMedia?.isVideo ? (
+                            <Film className="w-5 h-5" />
+                        ) : (
+                            <ImageIcon className="w-5 h-5" />
+                        )}
+                    </div>
+                }
+                badge={
+                    <span className="text-rose-500">
+                        {previewMedia?.isVideo ? '🎬 Reel en Movimiento' : '📸 Foto de Galería'}
+                    </span>
+                }
+                title={
+                    <span className="block truncate max-w-[230px]">
+                        {previewMedia?.name || 'Vista Previa'}
+                    </span>
+                }
+                footer={
+                    <div className="flex items-center justify-between gap-2.5 w-full">
+                        {previewMedia?.isVideo && (
                             <button
                                 type="button"
-                                onClick={() => setPreviewMedia(null)}
-                                className="w-10 h-10 rounded-full bg-black/60 backdrop-blur-md text-white flex items-center justify-center hover:bg-black/90 transition shadow-lg border border-white/20"
+                                onClick={() => setPreviewMuted(!previewMuted)}
+                                className="px-4 py-3 rounded-xl border border-stone-300 bg-white hover:bg-stone-100 text-stone-700 text-xs sm:text-sm font-bold flex items-center gap-2 transition cursor-pointer"
                             >
-                                <X className="w-5 h-5" />
+                                {previewMuted ? (
+                                    <>
+                                        <VolumeX className="w-4 h-4 text-stone-500" /> Activar Sonido
+                                    </>
+                                ) : (
+                                    <>
+                                        <Volume2 className="w-4 h-4 text-rose-500" /> Silenciar
+                                    </>
+                                )}
                             </button>
-                        </div>
-
-                        {/* Contenido Visual */}
-                        <div className="w-full flex items-center justify-center bg-black min-h-[420px] max-h-[75vh]">
-                            {previewMedia.isVideo ? (
-                                <video
-                                    src={previewMedia.url}
-                                    className="w-full h-full max-h-[75vh] object-contain"
-                                    controls
-                                    autoPlay
-                                    playsInline
-                                    loop
-                                    muted={previewMuted}
-                                />
-                            ) : (
-                                <img
-                                    src={previewMedia.url}
-                                    alt="Vista Previa"
-                                    className="w-full h-full max-h-[75vh] object-contain"
-                                />
-                            )}
-                        </div>
-
-                        {/* Pie del modal */}
-                        <div className="p-5 bg-gradient-to-t from-stone-950 via-stone-900 to-stone-900/90 text-white flex items-center justify-between border-t border-white/10">
-                            <div>
-                                <p className="text-xs uppercase tracking-wider text-rose-400 font-bold">
-                                    {previewMedia.isVideo ? '🎬 Reel en Movimiento' : '📸 Foto de Galería'}
-                                </p>
-                                <p className="text-sm font-semibold truncate max-w-[220px] text-stone-200">
-                                    {previewMedia.name}
-                                </p>
-                            </div>
+                        )}
+                        <button
+                            type="button"
+                            onClick={() => setPreviewMedia(null)}
+                            className="flex-1 py-3 px-4 rounded-xl border border-stone-300 bg-white hover:bg-stone-100 text-stone-700 text-xs sm:text-sm font-bold transition cursor-pointer"
+                        >
+                            Cerrar
+                        </button>
+                        {previewMedia && (
                             <button
                                 type="button"
                                 onClick={() => handleDelete(previewMedia.name)}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-600/80 hover:bg-red-600 text-white text-xs font-bold transition shadow-sm"
+                                className="inline-flex items-center justify-center gap-1.5 px-4 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs sm:text-sm font-bold transition shadow-md shadow-red-200 cursor-pointer"
                             >
-                                <Trash2 className="w-3.5 h-3.5" /> Eliminar
+                                <Trash2 className="w-4 h-4" /> Eliminar
                             </button>
-                        </div>
+                        )}
                     </div>
-                </div>
-            )}
+                }
+            >
+                {previewMedia && (
+                    <div className="w-full flex items-center justify-center bg-black min-h-[340px] max-h-[65dvh]">
+                        {previewMedia.isVideo ? (
+                            <video
+                                src={previewMedia.url}
+                                className="w-full h-full max-h-[65dvh] object-contain"
+                                controls
+                                autoPlay
+                                playsInline
+                                loop
+                                muted={previewMuted}
+                            />
+                        ) : (
+                            <img
+                                src={previewMedia.url}
+                                alt="Vista Previa"
+                                className="w-full h-full max-h-[65dvh] object-contain"
+                            />
+                        )}
+                    </div>
+                )}
+            </BottomSheetModal>
+
+            {/* Modal Slide-Up de confirmación para eliminar foto o reel */}
+            <ConfirmBottomSheetModal
+                isOpen={!!fileToDelete}
+                onClose={() => !deletingFile && setFileToDelete(null)}
+                onConfirm={executeDelete}
+                loading={deletingFile}
+                title="¿Eliminar este archivo de la galería?"
+                description="Esta foto o video estilo Reel se quitará de forma permanente de la página pública del salón."
+                confirmLabel="Sí, Eliminar Archivo"
+                cancelLabel="Cancelar"
+                variant="danger"
+            />
         </div>
     )
 }

@@ -31,6 +31,7 @@ import TabNegocio from '@/components/admin/ajustes/TabNegocio'
 import TabServicios, { Servicio } from '@/components/admin/ajustes/TabServicios'
 import TabCMSVisual from '@/components/admin/ajustes/TabCMSVisual'
 import TabSeccionesCustom from '@/components/admin/ajustes/TabSeccionesCustom'
+import { ConfirmBottomSheetModal } from '@/components/ui/BottomSheetModal'
 
 interface Config {
     intervalo_minutos: number
@@ -94,6 +95,7 @@ export default function AjustesClient({
     )
     const [guardandoCMS, setGuardandoCMS] = useState(false)
     const [subiendoArchivo, setSubiendoArchivo] = useState(false)
+    const [seccionIdAEliminar, setSeccionIdAEliminar] = useState<string | null>(null)
 
     useEffect(() => {
         setNombreNegocio(config?.nombre_negocio || 'Pintaditas Nails')
@@ -287,7 +289,6 @@ export default function AjustesClient({
     }
 
     const handleDeleteService = async (id: number) => {
-        if (!confirm('¿Seguro que deseás eliminar este servicio del catálogo?')) return
         const toastId = toast.loading('Eliminando servicio...')
         try {
             await deleteServicio(id)
@@ -345,7 +346,13 @@ export default function AjustesClient({
     }
 
     const eliminarSeccionPersonalizada = (id: string) => {
-        if (!confirm('¿Seguro que deseás eliminar esta sección de la web?')) return
+        setSeccionIdAEliminar(id)
+    }
+
+    const confirmarEliminarSeccion = () => {
+        if (!seccionIdAEliminar) return
+        const id = seccionIdAEliminar
+        setSeccionIdAEliminar(null)
         const nuevoCms = {
             ...cms,
             secciones_personalizadas: cms.secciones_personalizadas.filter(s => s.id !== id)
@@ -484,6 +491,17 @@ export default function AjustesClient({
                     eliminarSeccionPersonalizada={eliminarSeccionPersonalizada}
                 />
             )}
+
+            <ConfirmBottomSheetModal
+                isOpen={!!seccionIdAEliminar}
+                onClose={() => setSeccionIdAEliminar(null)}
+                onConfirm={confirmarEliminarSeccion}
+                title="¿Eliminar esta sección de la web?"
+                description="La sección personalizada se quitará inmediatamente de la página pública del salón."
+                confirmLabel="Sí, Eliminar Sección"
+                cancelLabel="Cancelar"
+                variant="danger"
+            />
         </div>
     )
 }

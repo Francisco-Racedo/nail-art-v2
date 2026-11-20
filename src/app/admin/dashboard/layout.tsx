@@ -28,7 +28,7 @@ export default async function AdminDashboardLayout({
             <AdminNav />
 
             {/* Main Content Area */}
-            <main className="flex-1 w-full h-full overflow-y-auto overflow-x-hidden px-3 sm:px-6 md:px-10 pt-5 sm:pt-8 pb-28 md:pb-8 relative z-10">
+            <main className="flex-1 w-full h-full overflow-y-auto overflow-x-hidden px-3 sm:px-6 md:px-10 pt-5 sm:pt-8 pb-28 md:pb-8 relative">
                 <div className="max-w-6xl mx-auto w-full">{children}</div>
             </main>
         </div>

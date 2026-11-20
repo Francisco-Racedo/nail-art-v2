@@ -27,6 +27,7 @@ import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { notificarCambioEnTiempoReal } from '@/app/providers'
 import GiftCardModal from '../GiftCardModal'
+import { ConfirmBottomSheetModal } from '../ui/BottomSheetModal'
 import {
     ModalData,
     EstadoReserva,
@@ -98,6 +99,7 @@ export default function TurnoModal({
 }: TurnoModalProps) {
     const router = useRouter()
     const [confirmDelete, setConfirmDelete] = useState(false)
+    const [estadoPorConfirmar, setEstadoPorConfirmar] = useState<EstadoReserva | null>(null)
 
     // 1. Estado de Servicio, Adicionales, Descuento y Pago
     const [servicioElegido, setServicioElegido] = useState<string>(modalData.servicio)
@@ -527,33 +529,9 @@ export default function TurnoModal({
         }
     }
 
-    const actualizarEstado = async (nuevoEstado: EstadoReserva) => {
+    const ejecutarCambioEstado = async (nuevoEstado: EstadoReserva) => {
         if (!modalData) return
-
-        // 1. Validar si la transición entre estados es legal
-        const validacion = validarTransicionEstado(modalData.estado, nuevoEstado)
-        if (!validacion.permitida) {
-            toast.error(validacion.motivo || 'Transición de estado no permitida.')
-            return
-        }
-
-        // 2. Confirmaciones preventivas según el tipo de estado
-        if (nuevoEstado === 'cancelado') {
-            const ok = confirm(
-                '¿Confirmás cancelar este turno? El horario quedará liberado en la agenda para otra clienta.'
-            )
-            if (!ok) return
-        } else if (nuevoEstado === 'ausente') {
-            const ok = confirm(
-                '¿Confirmás registrar la inasistencia (Ausente) de la clienta?'
-            )
-            if (!ok) return
-        } else if (modalData.estado === 'completado' && nuevoEstado === 'confirmado') {
-            const ok = confirm(
-                'Este turno ya figuraba como Completado. ¿Seguro que deseás rectificarlo y volver a marcarlo como Confirmado?'
-            )
-            if (!ok) return
-        }
+        setEstadoPorConfirmar(null)
 
         const payload: Record<string, unknown> = { estado: nuevoEstado }
         if (nuevoEstado === 'reprogramar') {
@@ -588,6 +566,29 @@ export default function TurnoModal({
                 id: toastId
             })
         }
+    }
+
+    const actualizarEstado = async (nuevoEstado: EstadoReserva) => {
+        if (!modalData) return
+
+        // 1. Validar si la transición entre estados es legal
+        const validacion = validarTransicionEstado(modalData.estado, nuevoEstado)
+        if (!validacion.permitida) {
+            toast.error(validacion.motivo || 'Transición de estado no permitida.')
+            return
+        }
+
+        // 2. Confirmaciones preventivas en modal slide-up según el tipo de estado
+        if (
+            nuevoEstado === 'cancelado' ||
+            nuevoEstado === 'ausente' ||
+            (modalData.estado === 'completado' && nuevoEstado === 'confirmado')
+        ) {
+            setEstadoPorConfirmar(nuevoEstado)
+            return
+        }
+
+        await ejecutarCambioEstado(nuevoEstado)
     }
 
     const liberarTurno = async () => {
@@ -1577,44 +1578,63 @@ export default function TurnoModal({
 
                         {/* Eliminar registro y liberar horario */}
                         <div className="pt-3 border-t border-stone-100">
-                            {!confirmDelete ? (
-                                <button
-                                    type="button"
-                                    onClick={() => setConfirmDelete(true)}
-                                    className="w-full flex items-center justify-center gap-2 bg-white text-stone-400 border border-stone-200 hover:bg-red-50 hover:text-red-700 hover:border-red-300 font-bold py-2.5 rounded-xl transition text-xs cursor-pointer"
-                                >
-                                    <Trash2 className="w-4 h-4" /> Eliminar turno y liberar horario
-                                </button>
-                            ) : (
-                                <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-                                    <div className="flex items-center gap-2 text-red-600 font-bold mb-2 text-xs">
-                                        <AlertTriangle className="w-4 h-4" />
-                                        <span>
-                                            ¿Confirmar eliminación permanente de este turno?
-                                        </span>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => setConfirmDelete(false)}
-                                            className="flex-1 bg-white border border-stone-200 text-stone-600 font-bold py-2 rounded-lg text-xs cursor-pointer"
-                                        >
-                                            Cancelar
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={liberarTurno}
-                                            className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded-lg text-xs cursor-pointer"
-                                        >
-                                            Sí, eliminar
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
+                            <button
+                                type="button"
+                                onClick={() => setConfirmDelete(true)}
+                                className="w-full flex items-center justify-center gap-2 bg-white text-stone-500 border border-stone-200 hover:bg-red-50 hover:text-red-700 hover:border-red-300 font-bold py-2.5 rounded-xl transition text-xs cursor-pointer"
+                            >
+                                <Trash2 className="w-4 h-4" /> Eliminar turno y liberar horario
+                            </button>
                         </div>
                     </div>
                 </div>
             </div>
+
+            {/* Modal Slide-Up de confirmación para cambio de estado delicado */}
+            <ConfirmBottomSheetModal
+                isOpen={!!estadoPorConfirmar}
+                onClose={() => setEstadoPorConfirmar(null)}
+                onConfirm={() => {
+                    if (estadoPorConfirmar) {
+                        ejecutarCambioEstado(estadoPorConfirmar)
+                    }
+                }}
+                title={
+                    estadoPorConfirmar === 'cancelado'
+                        ? '¿Cancelar este turno?'
+                        : estadoPorConfirmar === 'ausente'
+                          ? '¿Registrar inasistencia (Ausente)?'
+                          : '¿Rectificar estado a Confirmado?'
+                }
+                description={
+                    estadoPorConfirmar === 'cancelado'
+                        ? 'El turno pasará a estado Cancelado y el horario quedará liberado en la agenda para otra clienta.'
+                        : estadoPorConfirmar === 'ausente'
+                          ? 'Se registrará que la clienta no asistió a su turno en su ficha de historial.'
+                          : 'Este turno ya figuraba como Completado. ¿Seguro que deseás rectificarlo y volver a marcarlo como Confirmado?'
+                }
+                confirmLabel={
+                    estadoPorConfirmar === 'cancelado'
+                        ? 'Sí, Cancelar Turno'
+                        : estadoPorConfirmar === 'ausente'
+                          ? 'Sí, Marcar Ausente'
+                          : 'Sí, Rectificar'
+                }
+                cancelLabel="Volver"
+                variant={estadoPorConfirmar === 'cancelado' ? 'danger' : 'warning'}
+            />
+
+            {/* Modal Slide-Up de confirmación para eliminar turno */}
+            <ConfirmBottomSheetModal
+                isOpen={confirmDelete}
+                onClose={() => setConfirmDelete(false)}
+                onConfirm={liberarTurno}
+                title="¿Eliminar turno permanentemente?"
+                description="Esta acción borrará el registro del turno de la base de datos y dejará el bloque horario libre en la agenda."
+                confirmLabel="Sí, Eliminar Turno"
+                cancelLabel="Cancelar"
+                variant="danger"
+            />
 
             {/* Modal de Emisión de Gift Card digital */}
             <GiftCardModal

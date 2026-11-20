@@ -54,7 +54,7 @@ export default function AdminNav() {
             </aside>
 
             {/* Mobile Bottom Navigation */}
-            <nav className="md:hidden fixed bottom-0 w-full bg-stone-900 border-t border-stone-800 pb-safe z-50 shadow-[0_-10px_40px_rgba(0,0,0,0.15)]">
+            <nav className="md:hidden fixed bottom-0 w-full bg-stone-900 border-t border-stone-800 pb-safe z-40 shadow-[0_-10px_40px_rgba(0,0,0,0.15)]">
                 <div className="flex justify-around items-center px-1.5 py-2.5 pb-3">
                     {navItems.map((item) => {
                         const isActive = pathname === item.href

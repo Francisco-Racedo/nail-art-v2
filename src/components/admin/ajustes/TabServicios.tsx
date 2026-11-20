@@ -10,9 +10,9 @@ import {
     ChevronDown,
     X,
     Eye,
-    Tag,
     DollarSign
 } from 'lucide-react'
+import BottomSheetModal, { ConfirmBottomSheetModal } from '@/components/ui/BottomSheetModal'
 
 export interface Servicio {
     id: number
@@ -55,6 +55,8 @@ export default function TabServicios({
 }: TabServiciosProps) {
     const [categoriaActiva, setCategoriaActiva] = useState('Todas')
     const [busqueda, setBusqueda] = useState('')
+    const [serviceToDelete, setServiceToDelete] = useState<Servicio | null>(null)
+    const [deleting, setDeleting] = useState(false)
 
     // Estado temporal para el Live Preview dentro del Modal
     const [previewNombre, setPreviewNombre] = useState('')
@@ -73,7 +75,9 @@ export default function TabServicios({
         setPreviewSubtitulo('Refuerzo de uña natural con deco delicada')
         setPreviewPrecio('24000')
         setPreviewCategoria('Con 2 Decos Simples')
-        setPreviewDescripcion('Incluye nivelación de uña natural, esmaltado semipermanente y francesitas en 2 uñas.')
+        setPreviewDescripcion(
+            'Incluye nivelación de uña natural, esmaltado semipermanente y francesitas en 2 uñas.'
+        )
         setPreviewDestacado(true)
         setPreviewIcono('💅')
         setIsModalOpen(true)
@@ -101,6 +105,17 @@ export default function TabServicios({
             return matchesCat && matchesSearch
         })
     }, [servicios, categoriaActiva, busqueda])
+
+    const handleConfirmDelete = async () => {
+        if (!serviceToDelete) return
+        setDeleting(true)
+        try {
+            await onDeleteService(serviceToDelete.id)
+        } finally {
+            setDeleting(false)
+            setServiceToDelete(null)
+        }
+    }
 
     return (
         <div className="space-y-6 animate-in fade-in">
@@ -243,15 +258,15 @@ export default function TabServicios({
                                         <button
                                             type="button"
                                             onClick={() => openEditModal(s)}
-                                            className="p-2 text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded-xl transition"
+                                            className="p-2 text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded-xl transition cursor-pointer"
                                             title="Editar Servicio"
                                         >
                                             <Edit2 className="w-4 h-4" />
                                         </button>
                                         <button
                                             type="button"
-                                            onClick={() => onDeleteService(s.id)}
-                                            className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-xl transition"
+                                            onClick={() => setServiceToDelete(s)}
+                                            className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-xl transition cursor-pointer"
                                             title="Eliminar Servicio"
                                         >
                                             <Trash2 className="w-4 h-4" />
@@ -264,259 +279,257 @@ export default function TabServicios({
                 )}
             </div>
 
-            {/* Modal Luxury para Añadir / Editar Servicio con LIVE CARD PREVIEW */}
-            {isModalOpen && (
-                <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-sm animate-in fade-in">
-                    <div
-                        className="absolute inset-0"
-                        onClick={() => {
-                            setIsModalOpen(false)
-                            setEditingService(null)
-                        }}
-                    />
-
-                    <div className="relative bg-white border border-stone-200 rounded-3xl w-full max-w-2xl max-h-[92vh] overflow-y-auto shadow-2xl p-6 sm:p-8 space-y-6">
-                        {/* Header del Modal */}
-                        <div className="flex items-center justify-between pb-4 border-b border-stone-100">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600">
-                                    {editingService ? (
-                                        <Edit2 className="w-5 h-5" />
-                                    ) : (
-                                        <Plus className="w-5 h-5" />
-                                    )}
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-black text-stone-900">
-                                        {editingService ? 'Editar Servicio' : 'Nuevo Servicio'}
-                                    </h3>
-                                    <p className="text-xs text-stone-500">
-                                        Completá los detalles y observá el aspecto final en la vista previa.
-                                    </p>
-                                </div>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setIsModalOpen(false)
-                                    setEditingService(null)
-                                }}
-                                className="p-2 rounded-xl text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition"
-                            >
-                                <X className="w-5 h-5" />
-                            </button>
+            {/* Modal Slide-Up Luxury para Añadir / Editar Servicio con LIVE CARD PREVIEW */}
+            <BottomSheetModal
+                isOpen={isModalOpen}
+                onClose={() => {
+                    setIsModalOpen(false)
+                    setEditingService(null)
+                }}
+                maxWidthClass="max-w-2xl"
+                headerClassName="bg-gradient-to-r from-rose-50/70 via-pink-50/40 to-white"
+                icon={
+                    <div className="w-10 h-10 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600">
+                        {editingService ? (
+                            <Edit2 className="w-5 h-5" />
+                        ) : (
+                            <Plus className="w-5 h-5" />
+                        )}
+                    </div>
+                }
+                title={editingService ? 'Editar Servicio' : 'Nuevo Servicio'}
+                subtitle="Completá los detalles y observá el aspecto final en la vista previa."
+                footer={
+                    <div className="flex items-center justify-end gap-2.5 w-full">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setIsModalOpen(false)
+                                setEditingService(null)
+                            }}
+                            className="flex-1 sm:flex-initial px-5 py-3 rounded-xl text-xs sm:text-sm font-bold text-stone-700 bg-white hover:bg-stone-100 border border-stone-300 transition cursor-pointer"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            type="submit"
+                            form="form-servicio-catalogo"
+                            className="flex-1 sm:flex-initial px-6 py-3 rounded-xl text-xs sm:text-sm font-black uppercase tracking-wider text-white bg-gradient-to-r from-rose-500 via-pink-500 to-amber-500 hover:from-rose-600 hover:to-amber-600 shadow-md shadow-rose-500/20 transition cursor-pointer"
+                        >
+                            {editingService ? 'Guardar Cambios' : 'Añadir al Catálogo'}
+                        </button>
+                    </div>
+                }
+            >
+                <div className="space-y-5">
+                    {/* LIVE CARD PREVIEW — Aspecto real tal como lo verá el cliente */}
+                    <div className="p-4 sm:p-5 rounded-2xl bg-[#FAF6F2] border border-rose-200/80 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                            <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-rose-700">
+                                <Eye className="w-3.5 h-3.5 shrink-0" />
+                                Vista Previa en Vivo (Lista de Precios del Cliente)
+                            </span>
+                            <span className="text-[10px] text-stone-500 font-medium text-right">
+                                Toca la tarjeta para probar el acordeón
+                            </span>
                         </div>
 
-                        {/* LIVE CARD PREVIEW — Aspecto real tal como lo verá el cliente */}
-                        <div className="p-4 sm:p-5 rounded-2xl bg-[#FAF6F2] border border-rose-200/80 space-y-2">
-                            <div className="flex items-center justify-between">
-                                <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-rose-700">
-                                    <Eye className="w-3.5 h-3.5" />
-                                    Vista Previa en Vivo (Lista de Precios del Cliente)
-                                </span>
-                                <span className="text-[10px] text-stone-500 font-medium">
-                                    Toca la tarjeta para probar el acordeón
-                                </span>
-                            </div>
-
-                            {/* Tarjeta idéntica a ListaDePrecios */}
-                            <div
-                                onClick={() => setPreviewExpanded(v => !v)}
-                                className="bg-white/90 backdrop-blur-md rounded-2xl border border-rose-200/80 cursor-pointer flex overflow-hidden shadow-sm hover:border-rose-300 transition-all"
-                            >
-                                <div className="w-1.5 bg-gradient-to-b from-rose-400 via-pink-400 to-amber-300 shrink-0" />
-                                <div className="p-4 sm:p-5 flex-1">
-                                    <div className="flex justify-between items-start gap-3">
-                                        <div>
-                                            <div className="flex flex-wrap items-center gap-2">
-                                                <span className="text-lg mr-1">{previewIcono || '💅'}</span>
-                                                <p className="font-editorial font-bold text-[#231C19] text-xl sm:text-2xl tracking-tight">
-                                                    {previewNombre || 'Nombre del Servicio'}
-                                                </p>
-                                                {previewDestacado && (
-                                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-gradient-to-r from-rose-500 to-amber-500 text-white text-[10px] font-bold uppercase tracking-widest shadow-xs">
-                                                        <Sparkles className="w-2.5 h-2.5" /> Favorito
-                                                    </span>
-                                                )}
-                                            </div>
-                                            {previewSubtitulo && (
-                                                <p className="text-stone-500 font-medium text-xs mt-1 tracking-wide">
-                                                    {previewSubtitulo}
-                                                </p>
-                                            )}
-                                        </div>
-
-                                        <div className="flex items-center gap-2 shrink-0">
-                                            <span className="font-editorial font-bold text-rose-700 text-xl sm:text-2xl tracking-tight bg-rose-50/90 border border-rose-200/70 px-3 py-1 rounded-xl">
-                                                ${Number(previewPrecio || 0).toLocaleString('es-AR')}
+                        {/* Tarjeta idéntica a ListaDePrecios */}
+                        <div
+                            onClick={() => setPreviewExpanded(v => !v)}
+                            className="bg-white/95 rounded-2xl border border-rose-200/80 cursor-pointer flex overflow-hidden shadow-sm hover:border-rose-300 transition-all"
+                        >
+                            <div className="w-1.5 bg-gradient-to-b from-rose-400 via-pink-400 to-amber-300 shrink-0" />
+                            <div className="p-4 sm:p-5 flex-1">
+                                <div className="flex justify-between items-start gap-3">
+                                    <div>
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <span className="text-lg mr-1">
+                                                {previewIcono || '💅'}
                                             </span>
-                                            {previewDescripcion && (
-                                                <ChevronDown
-                                                    className={`w-4 h-4 text-stone-400 transition-transform ${
-                                                        previewExpanded ? 'rotate-180 text-rose-500' : ''
-                                                    }`}
-                                                />
+                                            <p className="font-editorial font-bold text-[#231C19] text-lg sm:text-2xl tracking-tight">
+                                                {previewNombre || 'Nombre del Servicio'}
+                                            </p>
+                                            {previewDestacado && (
+                                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-gradient-to-r from-rose-500 to-amber-500 text-white text-[10px] font-bold uppercase tracking-widest shadow-xs">
+                                                    <Sparkles className="w-2.5 h-2.5" /> Favorito
+                                                </span>
                                             )}
                                         </div>
+                                        {previewSubtitulo && (
+                                            <p className="text-stone-500 font-medium text-xs mt-1 tracking-wide">
+                                                {previewSubtitulo}
+                                            </p>
+                                        )}
                                     </div>
 
-                                    {previewDescripcion && previewExpanded && (
-                                        <p className="mt-3 pt-2.5 border-t border-rose-200/50 text-xs text-stone-600 leading-relaxed">
-                                            {previewDescripcion}
-                                        </p>
-                                    )}
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        <span className="font-editorial font-bold text-rose-700 text-lg sm:text-2xl tracking-tight bg-rose-50/90 border border-rose-200/70 px-3 py-1 rounded-xl">
+                                            ${Number(previewPrecio || 0).toLocaleString('es-AR')}
+                                        </span>
+                                        {previewDescripcion && (
+                                            <ChevronDown
+                                                className={`w-4 h-4 text-stone-400 transition-transform ${
+                                                    previewExpanded
+                                                        ? 'rotate-180 text-rose-500'
+                                                        : ''
+                                                }`}
+                                            />
+                                        )}
+                                    </div>
                                 </div>
+
+                                {previewDescripcion && previewExpanded && (
+                                    <p className="mt-3 pt-2.5 border-t border-rose-200/50 text-xs text-stone-600 leading-relaxed">
+                                        {previewDescripcion}
+                                    </p>
+                                )}
                             </div>
                         </div>
+                    </div>
 
-                        {/* Formulario de Alta / Modificación */}
-                        <form
-                            ref={formRef}
-                            onSubmit={onSaveService}
-                            className="space-y-4"
-                        >
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1.5">
-                                        Categoría *
-                                    </label>
-                                    <select
-                                        name="categoria"
-                                        value={previewCategoria}
-                                        onChange={e => setPreviewCategoria(e.target.value)}
-                                        className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs font-medium text-stone-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
-                                    >
-                                        <option value="Servicios Base (Lisas)">
-                                            Servicios Base (Lisas)
-                                        </option>
-                                        <option value="Con 2 Decos Simples">
-                                            Con 2 Decos Simples
-                                        </option>
-                                        <option value="Adicionales & Nail Art">
-                                            Adicionales &amp; Nail Art
-                                        </option>
-                                    </select>
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1.5">
-                                        Emoji / Icono
-                                    </label>
-                                    <input
-                                        type="text"
-                                        name="icono"
-                                        value={previewIcono}
-                                        onChange={e => setPreviewIcono(e.target.value)}
-                                        placeholder="💅"
-                                        className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs font-medium text-stone-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
-                                    />
-                                </div>
+                    {/* Formulario de Alta / Modificación */}
+                    <form
+                        id="form-servicio-catalogo"
+                        ref={formRef}
+                        onSubmit={onSaveService}
+                        className="space-y-4"
+                    >
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1.5">
+                                    Categoría *
+                                </label>
+                                <select
+                                    name="categoria"
+                                    value={previewCategoria}
+                                    onChange={e => setPreviewCategoria(e.target.value)}
+                                    className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs font-medium text-stone-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+                                >
+                                    <option value="Servicios Base (Lisas)">
+                                        Servicios Base (Lisas)
+                                    </option>
+                                    <option value="Con 2 Decos Simples">
+                                        Con 2 Decos Simples
+                                    </option>
+                                    <option value="Adicionales & Nail Art">
+                                        Adicionales &amp; Nail Art
+                                    </option>
+                                </select>
                             </div>
 
                             <div>
                                 <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1.5">
-                                    Nombre del Servicio *
+                                    Emoji / Icono
                                 </label>
                                 <input
                                     type="text"
-                                    name="nombre"
-                                    value={previewNombre}
-                                    onChange={e => setPreviewNombre(e.target.value)}
-                                    placeholder="Ej: Kapping Gel con 2 Decos Simples"
-                                    required
+                                    name="icono"
+                                    value={previewIcono}
+                                    onChange={e => setPreviewIcono(e.target.value)}
+                                    placeholder="💅"
+                                    className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs font-medium text-stone-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1.5">
+                                Nombre del Servicio *
+                            </label>
+                            <input
+                                type="text"
+                                name="nombre"
+                                value={previewNombre}
+                                onChange={e => setPreviewNombre(e.target.value)}
+                                placeholder="Ej: Kapping Gel con 2 Decos Simples"
+                                required
+                                className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs font-medium text-stone-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1.5">
+                                    Subtítulo Corto
+                                </label>
+                                <input
+                                    type="text"
+                                    name="subtitulo"
+                                    value={previewSubtitulo}
+                                    onChange={e => setPreviewSubtitulo(e.target.value)}
+                                    placeholder="Ej: Incluye nivelación y francesitas"
                                     className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs font-medium text-stone-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
                                 />
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1.5">
-                                        Subtítulo Corto
-                                    </label>
-                                    <input
-                                        type="text"
-                                        name="subtitulo"
-                                        value={previewSubtitulo}
-                                        onChange={e => setPreviewSubtitulo(e.target.value)}
-                                        placeholder="Ej: Incluye nivelación y francesitas"
-                                        className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs font-medium text-stone-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1.5">
-                                        Precio (ARS sin $) *
-                                    </label>
-                                    <div className="relative">
-                                        <DollarSign className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
-                                        <input
-                                            type="number"
-                                            name="precio"
-                                            value={previewPrecio}
-                                            onChange={e => setPreviewPrecio(e.target.value)}
-                                            placeholder="24000"
-                                            required
-                                            min="0"
-                                            className="w-full pl-9 pr-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs font-bold text-stone-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
                             <div>
                                 <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1.5">
-                                    Descripción Detallada (desplegable para clientas)
+                                    Precio (ARS sin $) *
                                 </label>
-                                <textarea
-                                    name="descripcion"
-                                    value={previewDescripcion}
-                                    onChange={e => setPreviewDescripcion(e.target.value)}
-                                    rows={2}
-                                    placeholder="Explicá qué incluye, tipo de técnica, esmaltado o recomendaciones..."
-                                    className="w-full bg-stone-50 border border-stone-200 rounded-xl p-3 text-xs font-medium text-stone-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
-                                />
-                            </div>
-
-                            <label className="flex items-center gap-3 p-3 rounded-xl bg-amber-50/70 border border-amber-200/70 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    name="destacado"
-                                    checked={previewDestacado}
-                                    onChange={e => setPreviewDestacado(e.target.checked)}
-                                    className="w-4 h-4 accent-amber-500 rounded"
-                                />
-                                <div>
-                                    <span className="block text-xs font-bold text-stone-900">
-                                        Destacar como &ldquo;Favorito&rdquo;
-                                    </span>
-                                    <span className="block text-[11px] text-stone-500">
-                                        Agrega una insignia dorada y resalta el tratamiento en la lista de precios.
-                                    </span>
+                                <div className="relative">
+                                    <DollarSign className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+                                    <input
+                                        type="number"
+                                        name="precio"
+                                        value={previewPrecio}
+                                        onChange={e => setPreviewPrecio(e.target.value)}
+                                        placeholder="24000"
+                                        required
+                                        min="0"
+                                        className="w-full pl-9 pr-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-xs font-bold text-stone-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+                                    />
                                 </div>
-                            </label>
-
-                            <div className="flex items-center justify-end gap-3 pt-3 border-t border-stone-100">
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setIsModalOpen(false)
-                                        setEditingService(null)
-                                    }}
-                                    className="px-5 py-2.5 rounded-xl text-xs font-bold text-stone-600 hover:bg-stone-100 border border-stone-200 transition"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider text-white bg-gradient-to-r from-rose-500 via-pink-500 to-amber-500 hover:from-rose-600 hover:to-amber-600 shadow-md shadow-rose-500/20 transition hover:scale-[1.02] active:scale-[0.98]"
-                                >
-                                    {editingService ? 'Guardar Cambios' : 'Añadir al Catálogo'}
-                                </button>
                             </div>
-                        </form>
-                    </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1.5">
+                                Descripción Detallada (desplegable para clientas)
+                            </label>
+                            <textarea
+                                name="descripcion"
+                                value={previewDescripcion}
+                                onChange={e => setPreviewDescripcion(e.target.value)}
+                                rows={2}
+                                placeholder="Explicá qué incluye, tipo de técnica, esmaltado o recomendaciones..."
+                                className="w-full bg-stone-50 border border-stone-200 rounded-xl p-3 text-xs font-medium text-stone-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+                            />
+                        </div>
+
+                        <label className="flex items-center gap-3 p-3 rounded-xl bg-amber-50/70 border border-amber-200/70 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                name="destacado"
+                                checked={previewDestacado}
+                                onChange={e => setPreviewDestacado(e.target.checked)}
+                                className="w-4 h-4 accent-amber-500 rounded"
+                            />
+                            <div>
+                                <span className="block text-xs font-bold text-stone-900">
+                                    Destacar como &ldquo;Favorito&rdquo;
+                                </span>
+                                <span className="block text-[11px] text-stone-500">
+                                    Agrega una insignia dorada y resalta el tratamiento en la lista de precios.
+                                </span>
+                            </div>
+                        </label>
+                    </form>
                 </div>
-            )}
+            </BottomSheetModal>
+
+            {/* Modal Slide-Up de Confirmación para Eliminar Servicio (Reemplaza al confirm nativo del navegador) */}
+            <ConfirmBottomSheetModal
+                isOpen={!!serviceToDelete}
+                onClose={() => !deleting && setServiceToDelete(null)}
+                onConfirm={handleConfirmDelete}
+                loading={deleting}
+                title={`¿Eliminar "${serviceToDelete?.nombre || 'este servicio'}"?`}
+                description="Este tratamiento se quitará de la lista de precios pública y del formulario de reservas. ¿Confirmás eliminarlo del catálogo?"
+                confirmLabel="Sí, Eliminar Servicio"
+                cancelLabel="Cancelar"
+                variant="danger"
+            />
         </div>
     )
 }

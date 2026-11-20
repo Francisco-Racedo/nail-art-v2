@@ -30,6 +30,7 @@ import {
     CalendarCheck
 } from 'lucide-react'
 import GiftCardModal from '../GiftCardModal'
+import BottomSheetModal, { ConfirmBottomSheetModal } from '../ui/BottomSheetModal'
 import { celularParaWhatsapp, getHoyArgentina } from '@/lib/utils'
 import type { ResumenCliente, EtiquetaCliente } from '@/lib/reservas-server'
 import {
@@ -169,6 +170,7 @@ export default function ClientesPanel({
     const [formNotas, setFormNotas] = useState('')
     const [formEtiqueta, setFormEtiqueta] = useState<EtiquetaCliente>('frecuente')
     const [guardandoFicha, setGuardandoFicha] = useState(false)
+    const [confirmOcultarOpen, setConfirmOcultarOpen] = useState(false)
 
     // Modal de Agendar Nuevo Turno directo para una clienta
     const [clienteAgendar, setClienteAgendar] = useState<ResumenCliente | null>(
@@ -1204,323 +1206,365 @@ export default function ClientesPanel({
             </div>
 
             {/* =================================================================
-                MODAL 1: HISTORIAL COMPLETO DE TURNOS DE LA CLIENTA
+                MODAL 1: HISTORIAL COMPLETO DE TURNOS DE LA CLIENTA (SLIDE-UP)
                ================================================================= */}
-            {clienteHistorial && (
-                <div className="fixed inset-0 bg-stone-900/50 backdrop-blur-sm z-[100] flex items-end md:items-center justify-center p-0 md:p-6 animate-in fade-in">
-                    <div
-                        className="absolute inset-0"
-                        onClick={() => setClienteHistorial(null)}
-                    />
-                    <div className="bg-white rounded-t-3xl md:rounded-3xl w-full max-w-lg max-h-[85dvh] overflow-y-auto p-6 relative z-10 shadow-2xl border border-stone-200">
-                        <div className="flex items-start justify-between gap-2 mb-4 pb-3 border-b border-stone-100">
-                            <div>
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-rose-500">
-                                    Historial de Servicios
-                                </p>
-                                <h3 className="text-xl font-black text-stone-900">
-                                    {clienteHistorial.nombre}
-                                </h3>
-                                <p className="text-xs text-stone-500">
-                                    {clienteHistorial.completados} servicios realizados • Total
-                                    invertido: $
-                                    {clienteHistorial.totalInvertido.toLocaleString('es-AR')}
-                                </p>
-                            </div>
+            <BottomSheetModal
+                isOpen={!!clienteHistorial}
+                onClose={() => setClienteHistorial(null)}
+                maxWidthClass="max-w-lg"
+                headerClassName="bg-gradient-to-r from-rose-50/70 via-pink-50/40 to-white"
+                icon={
+                    <div className="w-10 h-10 rounded-2xl bg-rose-100 text-rose-600 border border-rose-200 flex items-center justify-center shadow-2xs">
+                        <ClipboardList className="w-5 h-5" />
+                    </div>
+                }
+                badge={<span className="text-rose-500">Historial de Servicios</span>}
+                title={clienteHistorial?.nombre || ''}
+                subtitle={
+                    clienteHistorial
+                        ? `${clienteHistorial.completados} servicios realizados • Total invertido: $${clienteHistorial.totalInvertido.toLocaleString('es-AR')}`
+                        : ''
+                }
+                footer={
+                    <div className="flex items-center gap-2.5 w-full">
+                        <button
+                            type="button"
+                            onClick={() => setClienteHistorial(null)}
+                            className="flex-1 py-3 px-4 rounded-xl border border-stone-300 bg-white hover:bg-stone-100 text-stone-700 font-bold text-xs sm:text-sm transition cursor-pointer"
+                        >
+                            Cerrar
+                        </button>
+                        {clienteHistorial && (
                             <button
                                 type="button"
-                                onClick={() => setClienteHistorial(null)}
-                                className="p-2 rounded-full text-stone-400 hover:text-stone-700 hover:bg-stone-100"
+                                onClick={() => {
+                                    const c = clienteHistorial
+                                    setClienteHistorial(null)
+                                    setClienteAgendar(c)
+                                    setTurnoFecha(getHoyArgentina())
+                                    setTurnoHorario(horariosBase[0] || '10:00')
+                                    setTurnoServicio(
+                                        servicios[0]
+                                            ? `${servicios[0].nombre} ($${Number(servicios[0].precio).toLocaleString('es-AR')})`
+                                            : 'Esmaltado Semipermanente'
+                                    )
+                                }}
+                                className="flex-1 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm shadow-md shadow-emerald-200 flex items-center justify-center gap-1.5 transition cursor-pointer"
                             >
-                                <X className="w-5 h-5" />
+                                <CalendarPlus className="w-4 h-4" />
+                                Dar Turno
                             </button>
-                        </div>
-
-                        {clienteHistorial.turnos.length === 0 ? (
-                            <p className="text-sm text-stone-500 py-8 text-center">
-                                Esta clienta aún no registra turnos en el historial.
-                            </p>
-                        ) : (
-                            <div className="space-y-2.5">
-                                {clienteHistorial.turnos.map(t => (
-                                    <div
-                                        key={t.id}
-                                        className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200/80 flex items-center justify-between gap-3"
-                                    >
-                                        <div>
-                                            <p className="text-xs font-bold text-stone-900">
-                                                📅 {t.fecha.split('-').reverse().join('/')} •{' '}
-                                                {t.horario} hs
-                                            </p>
-                                            <p className="text-xs text-stone-600 font-medium mt-0.5">
-                                                {t.servicio.split('(')[0].trim()}
-                                            </p>
-                                            {t.descuento_aplicado > 0 && (
-                                                <span className="inline-block text-[10px] font-bold text-rose-600 mt-0.5">
-                                                    🎁 Descuento aplicado: -{t.descuento_aplicado}%
-                                                </span>
-                                            )}
-                                        </div>
-                                        <div className="text-right shrink-0">
-                                            <span className="block text-sm font-black text-stone-900">
-                                                ${t.precioFinal.toLocaleString('es-AR')}
-                                            </span>
-                                            <span className="inline-block text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-white border border-stone-200 text-stone-600 mt-1">
-                                                {t.estado}
-                                            </span>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
                         )}
                     </div>
-                </div>
-            )}
+                }
+            >
+                {!clienteHistorial || clienteHistorial.turnos.length === 0 ? (
+                    <p className="text-sm text-stone-500 py-8 text-center">
+                        Esta clienta aún no registra turnos en el historial.
+                    </p>
+                ) : (
+                    <div className="space-y-2.5">
+                        {clienteHistorial.turnos.map(t => (
+                            <div
+                                key={t.id}
+                                className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200/80 flex items-center justify-between gap-3"
+                            >
+                                <div>
+                                    <p className="text-xs font-bold text-stone-900">
+                                        📅 {t.fecha.split('-').reverse().join('/')} • {t.horario} hs
+                                    </p>
+                                    <p className="text-xs text-stone-600 font-medium mt-0.5">
+                                        {t.servicio.split('(')[0].trim()}
+                                    </p>
+                                    {t.descuento_aplicado > 0 && (
+                                        <span className="inline-block text-[10px] font-bold text-rose-600 mt-0.5">
+                                            🎁 Descuento aplicado: -{t.descuento_aplicado}%
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="text-right shrink-0">
+                                    <span className="block text-sm font-black text-stone-900">
+                                        ${t.precioFinal.toLocaleString('es-AR')}
+                                    </span>
+                                    <span className="inline-block text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-white border border-stone-200 text-stone-600 mt-1">
+                                        {t.estado}
+                                    </span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </BottomSheetModal>
 
             {/* =================================================================
-                MODAL 2: CREAR / EDITAR FICHA TÉCNICA DE LA CLIENTA
+                MODAL 2: CREAR / EDITAR FICHA TÉCNICA DE LA CLIENTA (SLIDE-UP)
                ================================================================= */}
-            {modalFichaOpen && (
-                <div className="fixed inset-0 bg-stone-900/50 backdrop-blur-sm z-[100] flex items-end md:items-center justify-center p-0 md:p-6 animate-in fade-in">
-                    <div
-                        className="absolute inset-0"
-                        onClick={() => setModalFichaOpen(false)}
-                    />
-                    <div className="bg-white rounded-t-3xl md:rounded-3xl w-full max-w-lg max-h-[88dvh] overflow-y-auto p-6 relative z-10 shadow-2xl border border-stone-200">
-                        <div className="flex items-center justify-between mb-4 pb-3 border-b border-stone-100">
-                            <h3 className="text-xl font-black text-stone-900">
-                                {editandoKey
-                                    ? 'Editar Ficha y Notas Técnicas'
-                                    : 'Registrar Nueva Clienta'}
-                            </h3>
+            <BottomSheetModal
+                isOpen={modalFichaOpen}
+                onClose={() => setModalFichaOpen(false)}
+                maxWidthClass="max-w-lg"
+                headerClassName="bg-gradient-to-r from-rose-50/70 via-amber-50/40 to-white"
+                icon={
+                    <div className="w-10 h-10 rounded-2xl bg-rose-100 text-rose-600 border border-rose-200 flex items-center justify-center shadow-2xs">
+                        {editandoKey ? (
+                            <Edit3 className="w-5 h-5" />
+                        ) : (
+                            <UserPlus className="w-5 h-5" />
+                        )}
+                    </div>
+                }
+                badge={
+                    <span className="text-rose-500">
+                        {editandoKey ? 'Ficha Técnica CRM' : 'Alta en Cartera'}
+                    </span>
+                }
+                title={
+                    editandoKey
+                        ? 'Editar Ficha y Notas Técnicas'
+                        : 'Registrar Nueva Clienta'
+                }
+                footer={
+                    <div className="flex flex-wrap items-center gap-2 w-full">
+                        <button
+                            type="button"
+                            onClick={() => setModalFichaOpen(false)}
+                            className="px-4 py-3 rounded-xl border border-stone-300 bg-white hover:bg-stone-100 text-stone-700 font-bold text-xs sm:text-sm transition cursor-pointer"
+                        >
+                            Cancelar
+                        </button>
+                        {editandoKey && (
                             <button
                                 type="button"
-                                onClick={() => setModalFichaOpen(false)}
-                                className="p-2 rounded-full text-stone-400 hover:text-stone-700"
+                                onClick={() => setConfirmOcultarOpen(true)}
+                                className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold py-3 px-3.5 rounded-xl text-xs sm:text-sm flex items-center gap-1.5 transition cursor-pointer"
                             >
-                                <X className="w-5 h-5" />
+                                <Trash2 className="w-4 h-4" /> Ocultar Ficha
                             </button>
+                        )}
+                        <button
+                            type="submit"
+                            form="form-ficha-clienta"
+                            disabled={guardandoFicha}
+                            className="flex-1 bg-gradient-to-r from-rose-500 to-amber-500 hover:from-rose-600 hover:to-amber-600 text-white font-black py-3 px-5 rounded-xl text-xs sm:text-sm shadow-md shadow-rose-200 disabled:opacity-50 transition cursor-pointer"
+                        >
+                            {guardandoFicha ? 'Guardando...' : 'Guardar Ficha'}
+                        </button>
+                    </div>
+                }
+            >
+                <form id="form-ficha-clienta" onSubmit={handleGuardarFicha} className="space-y-3.5">
+                    <div>
+                        <label className="block text-xs font-bold text-stone-600 uppercase mb-1">
+                            Nombre y Apellido *
+                        </label>
+                        <input
+                            type="text"
+                            required
+                            value={formNombre}
+                            onChange={e => setFormNombre(e.target.value)}
+                            placeholder="Ej: Liliana Martínez"
+                            className="w-full p-3 rounded-xl border border-stone-200 text-sm text-stone-900"
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label className="block text-xs font-bold text-stone-600 uppercase mb-1">
+                                WhatsApp (sin 0 ni 15)
+                            </label>
+                            <input
+                                type="tel"
+                                value={formCelular}
+                                onChange={e =>
+                                    setFormCelular(e.target.value.replace(/\D/g, ''))
+                                }
+                                placeholder="Ej: 3814556677"
+                                className="w-full p-3 rounded-xl border border-stone-200 text-sm text-stone-900"
+                            />
                         </div>
+                        <div>
+                            <label className="block text-xs font-bold text-stone-600 uppercase mb-1">
+                                Fecha de Cumpleaños / Nac.
+                            </label>
+                            <input
+                                type="date"
+                                value={formFechaNac}
+                                onChange={e => setFormFechaNac(e.target.value)}
+                                className="w-full p-3 rounded-xl border border-stone-200 text-sm text-stone-900"
+                            />
+                        </div>
+                    </div>
 
-                        <form onSubmit={handleGuardarFicha} className="space-y-3.5">
-                            <div>
-                                <label className="block text-xs font-bold text-stone-600 uppercase mb-1">
-                                    Nombre y Apellido *
-                                </label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={formNombre}
-                                    onChange={e => setFormNombre(e.target.value)}
-                                    placeholder="Ej: Liliana Martínez"
-                                    className="w-full p-3 rounded-xl border border-stone-200 text-sm text-stone-900"
-                                />
-                            </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label className="block text-xs font-bold text-stone-600 uppercase mb-1">
+                                Categoría de Clienta
+                            </label>
+                            <select
+                                value={formEtiqueta}
+                                onChange={e =>
+                                    setFormEtiqueta(e.target.value as EtiquetaCliente)
+                                }
+                                className="w-full p-3 rounded-xl border border-stone-200 text-sm text-stone-900 bg-white"
+                            >
+                                <option value="vip">👑 Clienta VIP</option>
+                                <option value="frecuente">💖 Clienta Frecuente</option>
+                                <option value="nueva">🆕 Clienta Nueva</option>
+                                <option value="atencion">⚠️ Revisar por ausencias</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-stone-600 uppercase mb-1">
+                                Email (opcional)
+                            </label>
+                            <input
+                                type="email"
+                                value={formEmail}
+                                onChange={e => setFormEmail(e.target.value)}
+                                placeholder="correo@ejemplo.com"
+                                className="w-full p-3 rounded-xl border border-stone-200 text-sm text-stone-900"
+                            />
+                        </div>
+                    </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <div>
-                                    <label className="block text-xs font-bold text-stone-600 uppercase mb-1">
-                                        WhatsApp (sin 0 ni 15)
-                                    </label>
-                                    <input
-                                        type="tel"
-                                        value={formCelular}
-                                        onChange={e =>
-                                            setFormCelular(e.target.value.replace(/\D/g, ''))
-                                        }
-                                        placeholder="Ej: 3814556677"
-                                        className="w-full p-3 rounded-xl border border-stone-200 text-sm text-stone-900"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-stone-600 uppercase mb-1">
-                                        Fecha de Cumpleaños / Nac.
-                                    </label>
-                                    <input
-                                        type="date"
-                                        value={formFechaNac}
-                                        onChange={e => setFormFechaNac(e.target.value)}
-                                        className="w-full p-3 rounded-xl border border-stone-200 text-sm text-stone-900"
-                                    />
-                                </div>
-                            </div>
+                    <div>
+                        <label className="block text-xs font-bold text-stone-600 uppercase mb-1">
+                            💅 Ficha Técnica y Notas Privadas de Manicuría
+                        </label>
+                        <textarea
+                            rows={3}
+                            value={formNotas}
+                            onChange={e => setFormNotas(e.target.value)}
+                            placeholder="Ej: Prefiere Soft Gel almendrado largo #2, uña natural sensible, tonos vía láctea y french..."
+                            className="w-full p-3 rounded-xl border border-stone-200 text-sm text-stone-900"
+                        />
+                    </div>
+                </form>
+            </BottomSheetModal>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <div>
-                                    <label className="block text-xs font-bold text-stone-600 uppercase mb-1">
-                                        Categoría de Clienta
-                                    </label>
-                                    <select
-                                        value={formEtiqueta}
-                                        onChange={e =>
-                                            setFormEtiqueta(e.target.value as EtiquetaCliente)
-                                        }
-                                        className="w-full p-3 rounded-xl border border-stone-200 text-sm text-stone-900 bg-white"
-                                    >
-                                        <option value="vip">👑 Clienta VIP</option>
-                                        <option value="frecuente">💖 Clienta Frecuente</option>
-                                        <option value="nueva">🆕 Clienta Nueva</option>
-                                        <option value="atencion">⚠️ Revisar por ausencias</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-stone-600 uppercase mb-1">
-                                        Email (opcional)
-                                    </label>
-                                    <input
-                                        type="email"
-                                        value={formEmail}
-                                        onChange={e => setFormEmail(e.target.value)}
-                                        placeholder="correo@ejemplo.com"
-                                        className="w-full p-3 rounded-xl border border-stone-200 text-sm text-stone-900"
-                                    />
-                                </div>
-                            </div>
+            {/* Confirmación emergente para ocultar ficha de clienta */}
+            <ConfirmBottomSheetModal
+                isOpen={confirmOcultarOpen}
+                onClose={() => setConfirmOcultarOpen(false)}
+                onConfirm={() => {
+                    setConfirmOcultarOpen(false)
+                    if (editandoKey) {
+                        handleEliminarFicha(
+                            {
+                                key: editandoKey,
+                                reservaIds: editandoReservaIds
+                            } as ResumenCliente,
+                            false
+                        )
+                    }
+                }}
+                title={`¿Ocultar la ficha de ${formNombre || 'esta clienta'}?`}
+                description="La ficha se ocultará del listado de clientas activas sin borrar su historial contable de turnos."
+                confirmLabel="Sí, Ocultar Ficha"
+                cancelLabel="Cancelar"
+                variant="danger"
+            />
 
-                            <div>
-                                <label className="block text-xs font-bold text-stone-600 uppercase mb-1">
-                                    💅 Ficha Técnica y Notas Privadas de Manicuría
-                                </label>
-                                <textarea
-                                    rows={3}
-                                    value={formNotas}
-                                    onChange={e => setFormNotas(e.target.value)}
-                                    placeholder="Ej: Prefiere Soft Gel almendrado largo #2, uña natural sensible, tonos vía láctea y french..."
-                                    className="w-full p-3 rounded-xl border border-stone-200 text-sm text-stone-900"
-                                />
-                            </div>
+            {/* =================================================================
+                MODAL 3: AGENDAR TURNO DIRECTO PARA ESTA CLIENTA (SLIDE-UP)
+               ================================================================= */}
+            <BottomSheetModal
+                isOpen={!!clienteAgendar}
+                onClose={() => setClienteAgendar(null)}
+                maxWidthClass="max-w-md"
+                headerClassName="bg-gradient-to-r from-emerald-50/80 via-teal-50/40 to-white"
+                icon={
+                    <div className="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center justify-center shadow-2xs">
+                        <CalendarPlus className="w-5 h-5" />
+                    </div>
+                }
+                badge={<span className="text-emerald-600">Asignación Rápida</span>}
+                title={`Dar turno a ${clienteAgendar?.nombre || ''}`}
+                footer={
+                    <div className="flex items-center gap-2.5 w-full">
+                        <button
+                            type="button"
+                            onClick={() => setClienteAgendar(null)}
+                            className="px-4 py-3.5 rounded-xl border border-stone-300 bg-white hover:bg-stone-100 text-stone-700 font-bold text-xs sm:text-sm transition cursor-pointer"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            type="submit"
+                            form="form-agendar-directo"
+                            disabled={guardandoTurno}
+                            className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-5 rounded-xl text-xs sm:text-sm shadow-md shadow-emerald-200 disabled:opacity-50 transition cursor-pointer"
+                        >
+                            {guardandoTurno
+                                ? 'Asignando turno...'
+                                : 'Confirmar y Agendar Turno'}
+                        </button>
+                    </div>
+                }
+            >
+                <form
+                    id="form-agendar-directo"
+                    onSubmit={handleAgendarDirecto}
+                    className="space-y-3.5"
+                >
+                    <div>
+                        <label className="block text-xs font-bold text-stone-600 uppercase mb-1">
+                            Fecha del Turno
+                        </label>
+                        <input
+                            type="date"
+                            required
+                            min={getHoyArgentina()}
+                            value={turnoFecha}
+                            onChange={e => setTurnoFecha(e.target.value)}
+                            className="w-full p-3 rounded-xl border border-stone-200 text-sm font-bold text-stone-900"
+                        />
+                    </div>
 
-                            <div className="flex items-center gap-2 pt-2">
+                    <div>
+                        <label className="block text-xs font-bold text-stone-600 uppercase mb-1">
+                            Bloque Horario (1h 30m)
+                        </label>
+                        <div className="grid grid-cols-3 gap-2">
+                            {horariosBase.map(h => (
                                 <button
-                                    type="submit"
-                                    disabled={guardandoFicha}
-                                    className="flex-1 bg-gradient-to-r from-rose-500 to-amber-500 text-white font-bold py-3 rounded-xl text-sm shadow-md disabled:opacity-50"
+                                    key={h}
+                                    type="button"
+                                    onClick={() => setTurnoHorario(h)}
+                                    className={`py-2.5 rounded-xl text-xs font-bold border transition ${
+                                        turnoHorario === h
+                                            ? 'bg-emerald-600 text-white border-emerald-700 shadow-sm'
+                                            : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-emerald-50'
+                                    }`}
                                 >
-                                    {guardandoFicha ? 'Guardando...' : 'Guardar Ficha'}
+                                    {h} hs
                                 </button>
-                                {editandoKey && (
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            handleEliminarFicha(
-                                                {
-                                                    key: editandoKey,
-                                                    reservaIds: editandoReservaIds
-                                                } as ResumenCliente,
-                                                false
-                                            )
-                                        }
-                                        className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold py-3 px-4 rounded-xl text-xs flex items-center gap-1"
-                                    >
-                                        <Trash2 className="w-4 h-4" /> Ocultar Ficha
-                                    </button>
-                                )}
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* =================================================================
-                MODAL 3: AGENDAR TURNO DIRECTO PARA ESTA CLIENTA
-               ================================================================= */}
-            {clienteAgendar && (
-                <div className="fixed inset-0 bg-stone-900/50 backdrop-blur-sm z-[100] flex items-end md:items-center justify-center p-0 md:p-6 animate-in fade-in">
-                    <div
-                        className="absolute inset-0"
-                        onClick={() => setClienteAgendar(null)}
-                    />
-                    <div className="bg-white rounded-t-3xl md:rounded-3xl w-full max-w-md p-6 relative z-10 shadow-2xl border border-stone-200">
-                        <div className="flex items-center justify-between mb-4 pb-3 border-b border-stone-100">
-                            <div>
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">
-                                    Asignación Rápida
-                                </p>
-                                <h3 className="text-lg font-black text-stone-900">
-                                    Dar turno a {clienteAgendar.nombre}
-                                </h3>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => setClienteAgendar(null)}
-                                className="p-2 rounded-full text-stone-400 hover:text-stone-700"
-                            >
-                                <X className="w-5 h-5" />
-                            </button>
+                            ))}
                         </div>
-
-                        <form onSubmit={handleAgendarDirecto} className="space-y-3.5">
-                            <div>
-                                <label className="block text-xs font-bold text-stone-600 uppercase mb-1">
-                                    Fecha del Turno
-                                </label>
-                                <input
-                                    type="date"
-                                    required
-                                    min={getHoyArgentina()}
-                                    value={turnoFecha}
-                                    onChange={e => setTurnoFecha(e.target.value)}
-                                    className="w-full p-3 rounded-xl border border-stone-200 text-sm font-bold text-stone-900"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-bold text-stone-600 uppercase mb-1">
-                                    Bloque Horario (1h 30m)
-                                </label>
-                                <div className="grid grid-cols-3 gap-2">
-                                    {horariosBase.map(h => (
-                                        <button
-                                            key={h}
-                                            type="button"
-                                            onClick={() => setTurnoHorario(h)}
-                                            className={`py-2.5 rounded-xl text-xs font-bold border transition ${
-                                                turnoHorario === h
-                                                    ? 'bg-emerald-600 text-white border-emerald-700 shadow-sm'
-                                                    : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-emerald-50'
-                                            }`}
-                                        >
-                                            {h} hs
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-bold text-stone-600 uppercase mb-1">
-                                    Servicio a Realizar
-                                </label>
-                                <select
-                                    required
-                                    value={turnoServicio}
-                                    onChange={e => setTurnoServicio(e.target.value)}
-                                    className="w-full p-3 rounded-xl border border-stone-200 text-sm font-semibold text-stone-900 bg-white"
-                                >
-                                    {servicios.map(s => (
-                                        <option
-                                            key={s.id}
-                                            value={`${s.nombre} ($${Number(s.precio).toLocaleString('es-AR')})`}
-                                        >
-                                            {s.nombre} (${Number(s.precio).toLocaleString('es-AR')}
-                                            )
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <button
-                                type="submit"
-                                disabled={guardandoTurno}
-                                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-xl text-sm shadow-md disabled:opacity-50"
-                            >
-                                {guardandoTurno
-                                    ? 'Asignando turno...'
-                                    : 'Confirmar y Agendar Turno'}
-                            </button>
-                        </form>
                     </div>
-                </div>
-            )}
+
+                    <div>
+                        <label className="block text-xs font-bold text-stone-600 uppercase mb-1">
+                            Servicio a Realizar
+                        </label>
+                        <select
+                            required
+                            value={turnoServicio}
+                            onChange={e => setTurnoServicio(e.target.value)}
+                            className="w-full p-3 rounded-xl border border-stone-200 text-sm font-semibold text-stone-900 bg-white"
+                        >
+                            {servicios.map(s => (
+                                <option
+                                    key={s.id}
+                                    value={`${s.nombre} ($${Number(s.precio).toLocaleString('es-AR')})`}
+                                >
+                                    {s.nombre} (${Number(s.precio).toLocaleString('es-AR')})
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                </form>
+            </BottomSheetModal>
 
             {/* Modal de emisión de Gift Card para la clienta seleccionada */}
             <GiftCardModal

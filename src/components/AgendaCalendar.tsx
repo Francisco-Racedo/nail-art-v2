@@ -19,6 +19,7 @@ import {
 import WeekNavigator from './admin/WeekNavigator'
 import EventGrid from './admin/EventGrid'
 import TurnoModal from './admin/TurnoModal'
+import BottomSheetModal from './ui/BottomSheetModal'
 import {
     Reserva,
     ModalData,
@@ -897,30 +898,52 @@ export default function AgendaCalendar({
                 </div>
             </div>
 
-            {/* Panel de Configuración de Horarios del Día */}
-            {showConfigHorarios && (
-                <div className="mb-6 bg-white border-2 border-rose-300/80 rounded-3xl p-5 sm:p-6 shadow-md animate-in fade-in">
-                    <div className="flex items-start justify-between gap-4 mb-4 pb-4 border-b border-stone-100">
-                        <div>
-                            <h4 className="text-base font-black text-stone-900 flex items-center gap-2">
-                                <Clock className="w-5 h-5 text-rose-500" />
-                                Configuración de Horarios: {selectedDateLabel}
-                            </h4>
-                            <p className="text-xs text-stone-500 mt-0.5">
-                                Seleccioná con 1 toque qué turnos estarán habilitados para reserva y atención en esta fecha, o cerrá el día completo.
-                            </p>
-                        </div>
+            {/* Modal Slide-Up 1: Configuración de Horarios del Día */}
+            <BottomSheetModal
+                isOpen={showConfigHorarios}
+                onClose={() => setShowConfigHorarios(false)}
+                maxWidthClass="max-w-2xl"
+                headerClassName="bg-gradient-to-r from-rose-50/70 via-pink-50/40 to-white"
+                icon={
+                    <div className="w-10 h-10 rounded-2xl bg-rose-100 text-rose-600 border border-rose-200 flex items-center justify-center shadow-2xs">
+                        <Clock className="w-5 h-5" />
+                    </div>
+                }
+                badge={<span className="text-rose-500">Jornada & Atención</span>}
+                title={`Configuración de Horarios: ${selectedDateLabel}`}
+                subtitle="Seleccioná con 1 toque qué turnos estarán habilitados para reserva y atención en esta fecha, o cerrá el día completo."
+                footer={
+                    <div className="flex flex-wrap items-center gap-2 w-full">
                         <button
                             type="button"
                             onClick={() => setShowConfigHorarios(false)}
-                            className="text-stone-400 hover:text-stone-700 p-1 rounded-lg"
+                            className="px-4 py-3 rounded-xl border border-stone-300 bg-white hover:bg-stone-100 text-stone-700 text-xs sm:text-sm font-bold transition cursor-pointer"
                         >
-                            <X className="w-5 h-5" />
+                            Cancelar
+                        </button>
+                        {jornadaEspecialDelDia && (
+                            <button
+                                type="button"
+                                onClick={restaurarDiaNormal}
+                                className="bg-amber-50 border border-amber-200 hover:bg-amber-100 text-amber-900 text-xs sm:text-sm font-bold px-4 py-3 rounded-xl transition cursor-pointer"
+                            >
+                                Restaurar Habitual
+                            </button>
+                        )}
+                        <button
+                            type="button"
+                            disabled={guardandoConfigDia}
+                            onClick={guardarHorariosDia}
+                            className="flex-1 bg-stone-900 hover:bg-stone-800 text-white text-xs sm:text-sm font-black px-5 py-3 rounded-xl shadow-md disabled:opacity-50 flex items-center justify-center gap-2 transition cursor-pointer"
+                        >
+                            {guardandoConfigDia ? 'Guardando...' : 'Aplicar y Guardar Horarios'}
                         </button>
                     </div>
-
+                }
+            >
+                <div className="space-y-4">
                     {/* Plantillas rápidas */}
-                    <div className="mb-5 bg-stone-50 border border-stone-200/90 rounded-2xl p-3.5 sm:p-4">
+                    <div className="bg-stone-50 border border-stone-200/90 rounded-2xl p-3.5 sm:p-4">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-3">
                             <span className="text-[11px] font-black uppercase text-stone-500 tracking-wider flex items-center gap-1.5">
                                 ⚡ Plantillas Rápidas de Horario:
@@ -928,7 +951,7 @@ export default function AgendaCalendar({
                             <button
                                 type="button"
                                 onClick={() => setHorariosConfigSel([])}
-                                className="w-full sm:w-auto text-xs font-bold px-3.5 py-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 transition flex items-center justify-center gap-1.5 shadow-2xs"
+                                className="w-full sm:w-auto text-xs font-bold px-3.5 py-2 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 transition flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer"
                                 title="Desmarcar todos los turnos para indicar que el día no tendrá atención"
                             >
                                 <X className="w-3.5 h-3.5 text-rose-600" />
@@ -939,28 +962,28 @@ export default function AgendaCalendar({
                             <button
                                 type="button"
                                 onClick={() => setHorariosConfigSel([...HORARIOS_ESTANDAR_HABITUALES])}
-                                className="text-xs font-bold px-3 py-1.5 rounded-xl border border-stone-200 bg-white hover:bg-rose-50 hover:border-rose-300 text-stone-700 transition shadow-2xs"
+                                className="text-xs font-bold px-3 py-1.5 rounded-xl border border-stone-200 bg-white hover:bg-rose-50 hover:border-rose-300 text-stone-700 transition shadow-2xs cursor-pointer"
                             >
                                 🌿 Semana Completa (08:30 a 18:00)
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setHorariosConfigSel([...HORARIOS_DOMINGO_DICIEMBRE])}
-                                className="text-xs font-bold px-3 py-1.5 rounded-xl border border-stone-200 bg-white hover:bg-rose-50 hover:border-rose-300 text-stone-700 transition shadow-2xs"
+                                className="text-xs font-bold px-3 py-1.5 rounded-xl border border-stone-200 bg-white hover:bg-rose-50 hover:border-rose-300 text-stone-700 transition shadow-2xs cursor-pointer"
                             >
                                 ☀️ Horario Domingo (11:00 a 16:00)
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setHorariosConfigSel(['08:30', '10:00'])}
-                                className="text-xs font-bold px-3 py-1.5 rounded-xl border border-stone-200 bg-white hover:bg-rose-50 hover:border-rose-300 text-stone-700 transition shadow-2xs"
+                                className="text-xs font-bold px-3 py-1.5 rounded-xl border border-stone-200 bg-white hover:bg-rose-50 hover:border-rose-300 text-stone-700 transition shadow-2xs cursor-pointer"
                             >
                                 🌅 Solo Mañana
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setHorariosConfigSel(['13:30', '15:00', '16:30', '18:00'])}
-                                className="text-xs font-bold px-3 py-1.5 rounded-xl border border-stone-200 bg-white hover:bg-rose-50 hover:border-rose-300 text-stone-700 transition shadow-2xs"
+                                className="text-xs font-bold px-3 py-1.5 rounded-xl border border-stone-200 bg-white hover:bg-rose-50 hover:border-rose-300 text-stone-700 transition shadow-2xs cursor-pointer"
                             >
                                 🌆 Solo Tarde
                             </button>
@@ -971,7 +994,7 @@ export default function AgendaCalendar({
                                         prev.includes('21:00') ? prev : [...prev, '21:00'].sort()
                                     )
                                 }
-                                className="text-xs font-bold px-3 py-1.5 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-900 transition shadow-2xs"
+                                className="text-xs font-bold px-3 py-1.5 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-900 transition shadow-2xs cursor-pointer"
                             >
                                 🌙 + Turno Noche (21:00)
                             </button>
@@ -979,14 +1002,14 @@ export default function AgendaCalendar({
                     </div>
 
                     {/* Bloques de turnos organizados */}
-                    <div className="space-y-4 mb-5">
+                    <div className="space-y-4">
                         {/* Bloques de Semana */}
                         <div>
                             <p className="text-[11px] font-bold text-stone-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                                 <Sun className="w-3.5 h-3.5 text-amber-500" />
                                 Turnos de Semana y Sábados (Turnos de 1h 30m):
                             </p>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                 {HORARIOS_ESTANDAR_HABITUALES.map(h => {
                                     const activo = horariosConfigSel.includes(h)
                                     const fin = formatearFin(h)
@@ -995,7 +1018,7 @@ export default function AgendaCalendar({
                                             key={h}
                                             type="button"
                                             onClick={() => toggleSlot(h)}
-                                            className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between ${
+                                            className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between cursor-pointer ${
                                                 activo
                                                     ? 'bg-emerald-500 text-white border-emerald-600 shadow-sm'
                                                     : 'bg-white hover:bg-stone-50 text-stone-600 border-stone-200'
@@ -1035,7 +1058,7 @@ export default function AgendaCalendar({
                                             key={h}
                                             type="button"
                                             onClick={() => toggleSlot(h)}
-                                            className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between ${
+                                            className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between cursor-pointer ${
                                                 activo
                                                     ? 'bg-emerald-500 text-white border-emerald-600 shadow-sm'
                                                     : 'bg-white hover:bg-stone-50 text-stone-600 border-stone-200'
@@ -1066,7 +1089,7 @@ export default function AgendaCalendar({
                                 <Moon className="w-3.5 h-3.5 text-indigo-500" />
                                 Turno Nocturno Extra:
                             </p>
-                            <div className="w-full sm:w-1/3">
+                            <div className="w-full sm:w-1/2">
                                 {(() => {
                                     const h = '21:00'
                                     const activo = horariosConfigSel.includes(h)
@@ -1076,7 +1099,7 @@ export default function AgendaCalendar({
                                             key={h}
                                             type="button"
                                             onClick={() => toggleSlot(h)}
-                                            className={`w-full p-3 rounded-2xl border text-left transition flex flex-col justify-between ${
+                                            className={`w-full p-3 rounded-2xl border text-left transition flex flex-col justify-between cursor-pointer ${
                                                 activo
                                                     ? 'bg-amber-500 text-stone-950 border-amber-600 shadow-sm font-bold'
                                                     : 'bg-white hover:bg-stone-50 text-stone-600 border-stone-200'
@@ -1103,7 +1126,7 @@ export default function AgendaCalendar({
                     </div>
 
                     {/* Motivo o detalle visible para el cliente */}
-                    <div className="mb-4">
+                    <div>
                         <label className="block text-[11px] font-bold text-stone-600 uppercase mb-1">
                             Motivo / Aclaración (visible para clientas al consultar o reservar):
                         </label>
@@ -1112,85 +1135,77 @@ export default function AgendaCalendar({
                             value={motivoConfigDia}
                             onChange={e => setMotivoConfigDia(e.target.value)}
                             placeholder="Ej: Horario especial de domingo / Feriado / Atención reducida"
-                            className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3.5 py-2 text-xs text-stone-800"
+                            className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs text-stone-800"
                         />
                     </div>
 
                     {/* Resumen del resultado */}
-                    <div className="p-3.5 rounded-2xl mb-5 bg-stone-50 border border-stone-200 flex items-center justify-between">
+                    <div className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200 flex items-center justify-between">
                         <div className="flex items-center gap-2">
                             {horariosConfigSel.length > 0 ? (
                                 <span className="text-xs font-bold text-emerald-800 flex items-center gap-1.5">
-                                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                                    {horariosConfigSel.length}{' '}
-                                    {horariosConfigSel.length === 1 ? 'turno habilitado' : 'turnos habilitados'}:{' '}
-                                    <span className="font-semibold text-stone-700">
-                                        {[...horariosConfigSel].sort().join(', ')} hs
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                                    <span>
+                                        {horariosConfigSel.length}{' '}
+                                        {horariosConfigSel.length === 1
+                                            ? 'turno habilitado'
+                                            : 'turnos habilitados'}
+                                        :{' '}
+                                        <span className="font-semibold text-stone-700">
+                                            {[...horariosConfigSel].sort().join(', ')} hs
+                                        </span>
                                     </span>
                                 </span>
                             ) : (
                                 <span className="text-xs font-bold text-rose-700 flex items-center gap-1.5">
-                                    <AlertCircle className="w-4 h-4 text-rose-600" />
+                                    <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
                                     Día CERRADO (no habrá turnos disponibles para clientas en esta fecha)
                                 </span>
                             )}
                         </div>
                     </div>
-
-                    {/* Botones de acción */}
-                    <div className="flex flex-wrap items-center gap-2">
-                        <button
-                            type="button"
-                            disabled={guardandoConfigDia}
-                            onClick={guardarHorariosDia}
-                            className="bg-stone-900 hover:bg-stone-800 text-white text-xs font-black px-6 py-2.5 rounded-xl shadow-sm disabled:opacity-50 flex items-center gap-2"
-                        >
-                            {guardandoConfigDia ? 'Guardando...' : 'Aplicar y Guardar Horarios'}
-                        </button>
-                        {jornadaEspecialDelDia && (
-                            <button
-                                type="button"
-                                onClick={restaurarDiaNormal}
-                                className="bg-white border border-stone-200 hover:bg-stone-50 text-stone-700 text-xs font-bold px-4 py-2.5 rounded-xl"
-                            >
-                                Restaurar Horario Habitual
-                            </button>
-                        )}
-                        <button
-                            type="button"
-                            onClick={() => setShowConfigHorarios(false)}
-                            className="text-stone-500 hover:text-stone-800 text-xs font-semibold px-4 py-2.5 ml-auto"
-                        >
-                            Cancelar
-                        </button>
-                    </div>
                 </div>
-            )}
+            </BottomSheetModal>
 
-            {/* Panel de Reprogramación Masiva por Imprevisto */}
-            {showReprogramarImprevisto && (
-                <div className="mb-6 bg-indigo-50/80 border-2 border-indigo-300 rounded-3xl p-5 sm:p-6 shadow-md animate-in fade-in">
-                    <div className="flex items-start justify-between gap-4 mb-4 pb-4 border-b border-indigo-200/60">
-                        <div>
-                            <h4 className="text-base font-black text-indigo-950 flex items-center gap-2">
-                                <RefreshCw className="w-5 h-5 text-indigo-600" />
-                                Reprogramación Masiva por Imprevisto ({selectedDateLabel})
-                            </h4>
-                            <p className="text-xs text-indigo-700/80 mt-0.5">
-                                Gestioná avisos urgentes o traslado en lote para clientas con turnos tomados en esta fecha.
-                            </p>
-                        </div>
+            {/* Modal Slide-Up 2: Reprogramación Masiva por Imprevisto */}
+            <BottomSheetModal
+                isOpen={showReprogramarImprevisto}
+                onClose={() => setShowReprogramarImprevisto(false)}
+                maxWidthClass="max-w-xl"
+                headerClassName="bg-gradient-to-r from-indigo-50/80 via-blue-50/40 to-white"
+                icon={
+                    <div className="w-10 h-10 rounded-2xl bg-indigo-100 text-indigo-600 border border-indigo-200 flex items-center justify-center shadow-2xs">
+                        <RefreshCw className="w-5 h-5" />
+                    </div>
+                }
+                badge={<span className="text-indigo-600">Gestión de Imprevistos</span>}
+                title={`Reprogramación Masiva (${selectedDateLabel})`}
+                subtitle="Gestioná avisos urgentes o traslado en lote para clientas con turnos tomados en esta fecha."
+                footer={
+                    <div className="flex items-center gap-2.5 w-full">
                         <button
                             type="button"
                             onClick={() => setShowReprogramarImprevisto(false)}
-                            className="text-indigo-400 hover:text-indigo-700 p-1 rounded-lg"
+                            className="flex-1 sm:flex-initial px-4 py-3 rounded-xl border border-stone-300 bg-white hover:bg-stone-100 text-stone-700 text-xs sm:text-sm font-bold transition cursor-pointer"
                         >
-                            <X className="w-5 h-5" />
+                            Cerrar
                         </button>
+                        {dayReservas.length > 0 && (
+                            <button
+                                type="button"
+                                disabled={procesandoMasivo}
+                                onClick={ejecutarReprogramacionMasiva}
+                                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-bold px-5 py-3 rounded-xl shadow-md shadow-indigo-200 disabled:opacity-50 transition cursor-pointer"
+                            >
+                                {procesandoMasivo ? 'Procesando...' : 'Aplicar Reprogramación'}
+                            </button>
+                        )}
                     </div>
-
+                }
+            >
+                <div className="space-y-4">
                     {dayReservas.length === 0 ? (
-                        <div className="bg-white/80 border border-indigo-100 rounded-2xl p-6 text-center">
+                        <div className="bg-indigo-50/60 border border-indigo-100 rounded-2xl p-6 text-center">
                             <AlertCircle className="w-8 h-8 text-indigo-400 mx-auto mb-2" />
                             <p className="text-xs font-bold text-indigo-900 mb-1">
                                 No hay turnos registrados en este día
@@ -1201,11 +1216,11 @@ export default function AgendaCalendar({
                         </div>
                     ) : (
                         <>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 <button
                                     type="button"
                                     onClick={() => setModoMasivo('cliente_elige')}
-                                    className={`p-3 rounded-2xl text-xs font-bold border text-left transition ${
+                                    className={`p-3 rounded-2xl text-xs font-bold border text-left transition cursor-pointer ${
                                         modoMasivo === 'cliente_elige'
                                             ? 'bg-indigo-600 text-white border-indigo-700 shadow-sm'
                                             : 'bg-white text-stone-700 border-stone-200'
@@ -1219,7 +1234,7 @@ export default function AgendaCalendar({
                                 <button
                                     type="button"
                                     onClick={() => setModoMasivo('mover_dia')}
-                                    className={`p-3 rounded-2xl text-xs font-bold border text-left transition ${
+                                    className={`p-3 rounded-2xl text-xs font-bold border text-left transition cursor-pointer ${
                                         modoMasivo === 'mover_dia'
                                             ? 'bg-indigo-600 text-white border-indigo-700 shadow-sm'
                                             : 'bg-white text-stone-700 border-stone-200'
@@ -1232,7 +1247,7 @@ export default function AgendaCalendar({
                                 </button>
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
                                     <label className="block text-[11px] font-bold text-stone-600 uppercase mb-1">
                                         Motivo (visible para la clienta en el mensaje)
@@ -1242,7 +1257,7 @@ export default function AgendaCalendar({
                                         value={motivoImprevisto}
                                         onChange={e => setMotivoImprevisto(e.target.value)}
                                         placeholder="Ej: Imprevisto de fuerza mayor / Problema edilicio"
-                                        className="w-full bg-white border border-indigo-200 rounded-xl px-3 py-2 text-xs text-stone-800"
+                                        className="w-full bg-white border border-indigo-200 rounded-xl px-3 py-2.5 text-xs text-stone-800"
                                     />
                                 </div>
 
@@ -1253,7 +1268,7 @@ export default function AgendaCalendar({
                                     <select
                                         value={desdeHoraFiltro}
                                         onChange={e => setDesdeHoraFiltro(e.target.value)}
-                                        className="w-full bg-white border border-indigo-200 rounded-xl px-3 py-2 text-xs text-stone-800"
+                                        className="w-full bg-white border border-indigo-200 rounded-xl px-3 py-2.5 text-xs text-stone-800"
                                     >
                                         <option value="">Todo el día ({dayReservas.length} turnos)</option>
                                         {dayReservas.map(r => (
@@ -1266,7 +1281,7 @@ export default function AgendaCalendar({
                             </div>
 
                             {modoMasivo === 'mover_dia' && (
-                                <div className="mb-4">
+                                <div>
                                     <label className="block text-[11px] font-bold text-stone-600 uppercase mb-1">
                                         Nueva fecha de destino para todos los turnos
                                     </label>
@@ -1275,12 +1290,12 @@ export default function AgendaCalendar({
                                         min={getHoyUTC3()}
                                         value={fechaDestinoMasiva}
                                         onChange={e => setFechaDestinoMasiva(e.target.value)}
-                                        className="bg-white border border-indigo-200 rounded-xl px-3 py-2 text-xs font-bold text-stone-800"
+                                        className="w-full bg-white border border-indigo-200 rounded-xl px-3 py-2.5 text-xs font-bold text-stone-800"
                                     />
                                 </div>
                             )}
 
-                            <label className="flex items-center gap-2 text-xs font-semibold text-stone-700 mb-4 cursor-pointer">
+                            <label className="flex items-center gap-2.5 text-xs font-semibold text-stone-700 p-3 rounded-xl bg-indigo-50/70 border border-indigo-200/70 cursor-pointer">
                                 <input
                                     type="checkbox"
                                     checked={bloquearDiaCheck}
@@ -1289,30 +1304,12 @@ export default function AgendaCalendar({
                                 />
                                 Cerrar este día en el calendario público para que nadie más reserve
                             </label>
-
-                            <div className="flex items-center gap-2">
-                                <button
-                                    type="button"
-                                    disabled={procesandoMasivo}
-                                    onClick={ejecutarReprogramacionMasiva}
-                                    className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-sm disabled:opacity-50"
-                                >
-                                    {procesandoMasivo ? 'Procesando...' : 'Aplicar Reprogramación'}
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setShowReprogramarImprevisto(false)}
-                                    className="bg-white border border-stone-200 text-stone-600 text-xs font-semibold px-4 py-2.5 rounded-xl"
-                                >
-                                    Cerrar
-                                </button>
-                            </div>
                         </>
                     )}
 
                     {/* Cola de avisos por WhatsApp generada tras aplicar reprogramación masiva */}
                     {avisosCola.length > 0 && (
-                        <div className="mt-5 pt-4 border-t border-indigo-200">
+                        <div className="pt-4 border-t border-indigo-200">
                             <p className="text-xs font-black uppercase tracking-wider text-indigo-900 mb-2">
                                 📲 Cola de avisos por WhatsApp ({avisosCola.length} clientes)
                             </p>
@@ -1320,7 +1317,7 @@ export default function AgendaCalendar({
                                 {avisosCola.map(a => (
                                     <div
                                         key={a.id}
-                                        className="bg-white rounded-xl p-3 border border-indigo-100 flex items-center justify-between gap-2"
+                                        className="bg-stone-50 rounded-xl p-3 border border-indigo-100 flex items-center justify-between gap-2"
                                     >
                                         <div>
                                             <p className="text-xs font-bold text-stone-800">
@@ -1363,48 +1360,81 @@ export default function AgendaCalendar({
                         </div>
                     )}
                 </div>
-            )}
+            </BottomSheetModal>
 
-            {/* Formulario rápido para asignar turno cuando se hace clic en un horario libre */}
-            {slotLibreElegido && (
-                <form
-                    onSubmit={handleCrearTurnoManual}
-                    className="mb-6 bg-emerald-50/90 border border-emerald-300 rounded-2xl p-4 sm:p-5 shadow-sm animate-in fade-in"
-                >
-                    <div className="flex items-center justify-between mb-3">
-                        <h4 className="text-sm font-black text-emerald-950 flex items-center gap-2">
-                            <Plus className="w-4 h-4 text-emerald-600" />
-                            Asignar turno en {selectedDateLabel} a las {slotLibreElegido} hs
-                        </h4>
+            {/* Modal Slide-Up 3: Asignar turno cuando se hace clic en un horario libre */}
+            <BottomSheetModal
+                isOpen={!!slotLibreElegido}
+                onClose={() => setSlotLibreElegido(null)}
+                maxWidthClass="max-w-md"
+                headerClassName="bg-gradient-to-r from-emerald-50/80 via-teal-50/40 to-white"
+                icon={
+                    <div className="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center justify-center shadow-2xs">
+                        <Plus className="w-5 h-5" />
+                    </div>
+                }
+                badge={<span className="text-emerald-600">Horario Disponible</span>}
+                title={`Asignar turno a las ${slotLibreElegido || ''} hs`}
+                subtitle={selectedDateLabel}
+                footer={
+                    <div className="flex items-center gap-2.5 w-full">
                         <button
                             type="button"
                             onClick={() => setSlotLibreElegido(null)}
-                            className="text-stone-400 hover:text-stone-700"
+                            className="px-4 py-3 rounded-xl border border-stone-300 bg-white hover:bg-stone-100 text-stone-700 text-xs sm:text-sm font-bold transition cursor-pointer"
                         >
-                            <X className="w-4 h-4" />
+                            Cancelar
+                        </button>
+                        <button
+                            type="submit"
+                            form="form-turno-manual-agenda"
+                            disabled={guardandoManual}
+                            className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold px-5 py-3 rounded-xl shadow-md shadow-emerald-200 disabled:opacity-50 transition cursor-pointer"
+                        >
+                            {guardandoManual ? 'Guardando...' : 'Guardar y Confirmar Turno'}
                         </button>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+                }
+            >
+                <form
+                    id="form-turno-manual-agenda"
+                    onSubmit={handleCrearTurnoManual}
+                    className="space-y-3.5"
+                >
+                    <div>
+                        <label className="block text-xs font-bold text-stone-600 uppercase mb-1">
+                            Nombre y Apellido de la Clienta *
+                        </label>
                         <input
                             type="text"
                             required
                             value={nuevoNombre}
                             onChange={e => setNuevoNombre(e.target.value)}
-                            placeholder="Nombre del cliente *"
-                            className="bg-white border border-emerald-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-stone-800"
+                            placeholder="Ej: Sofía González"
+                            className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-3 text-sm font-semibold text-stone-800"
                         />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-stone-600 uppercase mb-1">
+                            WhatsApp (sin 0 ni 15)
+                        </label>
                         <input
                             type="tel"
                             value={nuevoCelular}
                             onChange={e => setNuevoCelular(e.target.value.replace(/\D/g, ''))}
-                            placeholder="WhatsApp (ej: 3814556677)"
-                            className="bg-white border border-emerald-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-stone-800"
+                            placeholder="Ej: 3814556677"
+                            className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-3 text-sm font-semibold text-stone-800"
                         />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-stone-600 uppercase mb-1">
+                            Servicio a Realizar *
+                        </label>
                         <select
                             required
                             value={nuevoServicio}
                             onChange={e => setNuevoServicio(e.target.value)}
-                            className="bg-white border border-emerald-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-stone-800"
+                            className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-3 text-sm font-semibold text-stone-800"
                         >
                             <option value="">Seleccionar servicio *</option>
                             {serviciosLista.map(s => (
@@ -1417,24 +1447,8 @@ export default function AgendaCalendar({
                             ))}
                         </select>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <button
-                            type="submit"
-                            disabled={guardandoManual}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-sm disabled:opacity-50"
-                        >
-                            {guardandoManual ? 'Guardando...' : 'Guardar y Confirmar Turno'}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setSlotLibreElegido(null)}
-                            className="bg-white border border-stone-200 text-stone-600 text-xs font-semibold px-4 py-2.5 rounded-xl"
-                        >
-                            Cancelar
-                        </button>
-                    </div>
                 </form>
-            )}
+            </BottomSheetModal>
 
             <EventGrid
                 dayReservas={dayReservas}

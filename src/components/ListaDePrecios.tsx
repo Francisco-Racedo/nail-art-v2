@@ -132,7 +132,7 @@ export default function ListaDePrecios() {
                     id="servicios"
                     className="py-20 md:py-24 relative bg-gradient-to-b from-[#FAF6F2] via-[#FDF8F5] to-[#F7ECE6]"
                 >
-                    <div className="container mx-auto px-5 sm:px-6 max-w-6xl">
+                    <div className="container mx-auto px-3.5 sm:px-6 max-w-6xl">
                         {/* Cabecera Editorial */}
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}
@@ -229,7 +229,7 @@ export default function ListaDePrecios() {
                                                 whileInView={{ opacity: 1, y: 0 }}
                                                 viewport={{ once: true }}
                                                 whileHover={{ y: -4 }}
-                                                className="bg-gradient-to-br from-[#231C19] via-[#332622] to-[#231C19] text-[#FDF8F5] p-7 sm:p-9 rounded-[2.5rem] shadow-2xl relative overflow-hidden border border-rose-300/20 flex flex-col justify-between"
+                                                className="bg-gradient-to-br from-[#231C19] via-[#332622] to-[#231C19] text-[#FDF8F5] p-4 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] shadow-2xl relative overflow-hidden border border-rose-300/20 flex flex-col justify-between"
                                             >
                                                 <div className="absolute -top-16 -right-16 w-48 h-48 bg-rose-500/25 rounded-full blur-[60px] pointer-events-none" />
 
@@ -261,25 +261,25 @@ export default function ListaDePrecios() {
                                                             return (
                                                                 <div
                                                                     key={s.id}
-                                                                    className="flex justify-between items-start sm:items-center gap-3 py-3.5 px-3.5 sm:px-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition-colors"
+                                                                    className="flex justify-between items-center gap-2.5 sm:gap-3.5 py-2.5 px-3 sm:py-3.5 sm:px-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition-colors"
                                                                 >
-                                                                    <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
-                                                                        <span className="text-lg bg-white/10 rounded-full w-9 h-9 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
+                                                                    <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
+                                                                        <span className="text-base sm:text-lg bg-white/10 rounded-full w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center shrink-0">
                                                                             {s.icono || '✨'}
                                                                         </span>
                                                                         <div className="min-w-0 flex-1">
-                                                                            <span className="font-semibold text-white text-sm sm:text-base block leading-snug break-words">
+                                                                            <span className="font-bold text-white text-[13px] sm:text-base block leading-tight">
                                                                                 {s.nombre}
                                                                             </span>
                                                                             {s.subtitulo && (
-                                                                                <span className="text-xs text-stone-200/95 block leading-relaxed mt-0.5 break-words">
+                                                                                <span className="text-[11px] sm:text-xs text-stone-200/95 font-medium block leading-snug mt-0.5">
                                                                                     {s.subtitulo}
                                                                                 </span>
                                                                             )}
                                                                             {s.descripcion &&
                                                                                 s.descripcion !==
                                                                                     s.subtitulo && (
-                                                                                    <span className="text-[11px] text-stone-300/85 block leading-relaxed mt-0.5 break-words">
+                                                                                    <span className="text-[10.5px] sm:text-[11px] text-stone-300/80 block leading-snug mt-0.5">
                                                                                         {
                                                                                             s.descripcion
                                                                                         }
@@ -287,7 +287,13 @@ export default function ListaDePrecios() {
                                                                                 )}
                                                                         </div>
                                                                     </div>
-                                                                    <span className="font-editorial font-bold text-amber-300 text-lg sm:text-2xl shrink-0 whitespace-nowrap bg-white/5 border border-amber-300/20 px-2.5 py-0.5 rounded-xl self-center">
+                                                                    <span
+                                                                        className={`font-editorial font-bold text-amber-300 shrink-0 whitespace-nowrap bg-white/5 border border-amber-300/20 px-2.5 py-1 sm:px-3 sm:py-1 rounded-xl self-center ${
+                                                                            esRangoDibujo
+                                                                                ? 'text-xs sm:text-lg'
+                                                                                : 'text-sm sm:text-xl'
+                                                                        }`}
+                                                                    >
                                                                         {esRangoDibujo
                                                                             ? '$2.000 - $3.000'
                                                                             : `$${Number(

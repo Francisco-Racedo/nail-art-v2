@@ -66,7 +66,8 @@ export default function TabNegocio({
     guardandoConfig,
     handleSaveConfig
 }: TabNegocioProps) {
-    // Estado para Gestión de Cuentas Administradoras (Dueña & Soporte Técnico)
+    // Estado para Gestión de Cuentas Administradoras (EXCLUSIVO SOPORTE TÉCNICO)
+    const [esSoporteTecnico, setEsSoporteTecnico] = useState(false)
     const [admins, setAdmins] = useState<AdminAutorizado[]>([])
     const [actualEmail, setActualEmail] = useState<string>('')
     const [adminEmailInput, setAdminEmailInput] = useState('')
@@ -81,9 +82,12 @@ export default function TabNegocio({
     useEffect(() => {
         obtenerEstadoAdminsAction()
             .then(res => {
-                if (res?.success && Array.isArray(res.admins)) {
-                    setAdmins(res.admins)
-                    setActualEmail(res.actualEmail || '')
+                if (res?.success) {
+                    setEsSoporteTecnico(!!res.esSoporte)
+                    if (res.esSoporte && Array.isArray(res.admins)) {
+                        setAdmins(res.admins)
+                        setActualEmail(res.actualEmail || '')
+                    }
                 }
             })
             .catch(() => {})
@@ -435,7 +439,9 @@ export default function TabNegocio({
                 </div>
             </form>
 
-            {/* 4. Gestión de Accesos Administrativos (Dueña del Salón & Soporte Técnico) */}
+            {/* 4. Gestión de Accesos Administrativos — VISIBLE ÚNICAMENTE PARA SOPORTE TÉCNICO */}
+            {esSoporteTecnico && (
+            <>
             <div className="bg-white border border-stone-200/90 rounded-3xl p-6 sm:p-8 shadow-xs">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 pb-4 border-b border-stone-100">
                     <div className="flex items-center gap-3">
@@ -443,11 +449,16 @@ export default function TabNegocio({
                             <ShieldCheck className="w-5 h-5" />
                         </div>
                         <div>
-                            <h3 className="text-base font-black text-stone-900">
-                                Accesos al Panel (Dueña &amp; Soporte Técnico)
-                            </h3>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <h3 className="text-base font-black text-stone-900">
+                                    Accesos al Panel (Dueña &amp; Soporte Técnico)
+                                </h3>
+                                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200">
+                                    🛠️ Vista Exclusiva Soporte Técnico
+                                </span>
+                            </div>
                             <p className="text-xs text-stone-500">
-                                Solo los correos registrados en esta lista blanca pueden iniciar sesión en el panel de administración.
+                                Esta sección solo es visible desde tu cuenta de Soporte Técnico. La dueña solo verá los ajustes normales del negocio.
                             </p>
                         </div>
                     </div>
@@ -641,6 +652,8 @@ export default function TabNegocio({
                 cancelLabel="Cancelar"
                 variant="danger"
             />
+            </>
+            )}
         </div>
     )
 }

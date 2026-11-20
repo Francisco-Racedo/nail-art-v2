@@ -35,14 +35,25 @@ export async function obtenerAdminsAutorizados(): Promise<AdminAutorizado[]> {
                 if (Array.isArray(parsed)) {
                     list = parsed
                         .filter(item => item && typeof item.email === 'string')
-                        .map(item => ({
-                            email: item.email.trim().toLowerCase(),
-                            rol: item.rol === 'duena' ? 'duena' : 'soporte',
-                            nombre:
-                                item.nombre ||
-                                (item.rol === 'duena' ? 'Dueña del Salón' : 'Soporte Técnico'),
-                            updatedAt: item.updatedAt || new Date().toISOString()
-                        }))
+                        .map(item => {
+                            const em = item.email.trim().toLowerCase()
+                            const forcedRol =
+                                em === DEFAULT_SOPORTE_EMAIL
+                                    ? 'soporte'
+                                    : item.rol === 'duena'
+                                      ? 'duena'
+                                      : 'soporte'
+                            return {
+                                email: em,
+                                rol: forcedRol,
+                                nombre:
+                                    item.nombre ||
+                                    (forcedRol === 'duena'
+                                        ? 'Dueña del Salón'
+                                        : 'Soporte Técnico'),
+                                updatedAt: item.updatedAt || new Date().toISOString()
+                            }
+                        })
                 }
             } catch {}
         }

@@ -1,11 +1,11 @@
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
 import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
     try {
-        const supabase = await createClient()
+        const supabase = createServiceClient()
         // Obtener archivos de almacenamiento
         const { data, error } = await supabase.storage.from('carousel').list('', {
             limit: 100,

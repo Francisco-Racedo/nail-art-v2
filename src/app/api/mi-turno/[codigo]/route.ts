@@ -41,24 +41,43 @@ async function buscarReservaPorCodigo(codigo: string) {
     const codigoLimpio = (codigo || '').trim()
 
     // Validación estricta alfanumérica: impide inyección de comodines (%, _) o sintaxis PostgREST
-    if (!/^[A-Za-z0-9]{6,28}$/.test(codigoLimpio)) {
+    if (!/^[A-Za-z0-9]{2,28}$/.test(codigoLimpio)) {
         return null
     }
 
-    // Búsqueda indexada por código exacto en el JSON de mp_preference_id
-    const { data: directa } = await supabase
-        .from('reservas')
-        .select('*')
-        .ilike('mp_preference_id', `%"codigo":"${codigoLimpio}"%`)
-        .order('id', { ascending: false })
-        .limit(1)
-        .maybeSingle()
+    // 1. Búsqueda principal indexada por código aleatorio secreto en mp_preference_id
+    if (codigoLimpio.length >= 6) {
+        const { data: directa } = await supabase
+            .from('reservas')
+            .select('*')
+            .ilike('mp_preference_id', `%"codigo":"${codigoLimpio}"%`)
+            .order('id', { ascending: false })
+            .limit(1)
+            .maybeSingle()
 
-    if (directa) {
-        const meta = parseReservaMeta(directa.mp_preference_id, directa.id)
-        // Verificación criptográfica estricta en memoria: el código debe coincidir exactamente
-        if (meta.codigo === codigoLimpio) {
-            return { reserva: directa, meta }
+        if (directa) {
+            const meta = parseReservaMeta(directa.mp_preference_id, directa.id)
+            if (meta.codigo === codigoLimpio) {
+                return { reserva: directa, meta }
+            }
+        }
+    }
+
+    // 2. Fallback exclusivo para registros históricos antiguos que no poseían JSON con código secreto
+    if (/^T\d+$/.test(codigoLimpio)) {
+        const legacyId = parseInt(codigoLimpio.slice(1), 10)
+        if (!isNaN(legacyId) && legacyId > 0) {
+            const { data: porId } = await supabase
+                .from('reservas')
+                .select('*')
+                .eq('id', legacyId)
+                .maybeSingle()
+
+            // Solo se permite acceder con T{id} si el registro realmente no tenía un código aleatorio propio asignado
+            if (porId && (!porId.mp_preference_id || !porId.mp_preference_id.includes('"codigo":'))) {
+                const meta = parseReservaMeta(porId.mp_preference_id, porId.id)
+                return { reserva: porId, meta }
+            }
         }
     }
 

@@ -224,11 +224,24 @@ export async function obtenerEstadoAdminsAction() {
         return { error: 'No autorizado' }
     }
 
+    const esSoporte = adminInfo?.rol === 'soporte'
+    if (!esSoporte) {
+        // Si ingresa la Dueña del salón, solo visualiza las opciones normales de Ajustes
+        return {
+            success: true,
+            esSoporte: false,
+            actualEmail: (user.email || '').toLowerCase(),
+            actualRol: 'duena' as const,
+            admins: []
+        }
+    }
+
     const lista = await obtenerAdminsAutorizados()
     return {
         success: true,
+        esSoporte: true,
         actualEmail: (user.email || '').toLowerCase(),
-        actualRol: adminInfo?.rol || 'soporte',
+        actualRol: 'soporte' as const,
         admins: lista
     }
 }
@@ -239,9 +252,11 @@ export async function guardarAdminCuentaAction(input: {
     rol: 'duena' | 'soporte'
     nombre?: string
 }) {
-    const { authorized } = await requireAdminUser()
-    if (!authorized) {
-        return { error: 'No autorizado' }
+    const { authorized, adminInfo } = await requireAdminUser()
+    if (!authorized || adminInfo?.rol !== 'soporte') {
+        return {
+            error: 'Acción reservada exclusivamente para el Administrador de Soporte Técnico.'
+        }
     }
 
     const emailClean = (input.email || '').trim().toLowerCase()
@@ -331,9 +346,11 @@ export async function guardarAdminCuentaAction(input: {
 }
 
 export async function revocarAdminCuentaAction(emailTarget: string) {
-    const { authorized, user } = await requireAdminUser()
-    if (!authorized || !user) {
-        return { error: 'No autorizado' }
+    const { authorized, user, adminInfo } = await requireAdminUser()
+    if (!authorized || !user || adminInfo?.rol !== 'soporte') {
+        return {
+            error: 'Acción reservada exclusivamente para el Administrador de Soporte Técnico.'
+        }
     }
 
     const targetClean = (emailTarget || '').trim().toLowerCase()

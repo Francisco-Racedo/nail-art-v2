@@ -1,17 +1,15 @@
-import { createClient as createServerClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
 import { redirect } from 'next/navigation'
+import { requireAdminUser } from '@/lib/auth-admin'
 import CMSGalleryClient from '@/components/CMSGalleryClient'
 
 export const dynamic = 'force-dynamic'
 
 export default async function CMSCarouselPage() {
-    const supabase = await createServerClient()
+    const { authorized } = await requireAdminUser()
+    if (!authorized) redirect('/admin/login')
 
-    // Auth
-    const {
-        data: { user }
-    } = await supabase.auth.getUser()
-    if (!user) redirect('/admin/login')
+    const supabase = createServiceClient()
 
     // Fetch files from bucket
     const { data, error } = await supabase.storage.from('carousel').list('', {

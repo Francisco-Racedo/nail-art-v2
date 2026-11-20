@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { requireAdminUser, extractClientIp } from '@/lib/auth-admin'
 import { notificarCambioServidor } from '@/lib/realtime-server'
 import { z } from 'zod'
 import {
@@ -57,10 +57,7 @@ const ReservaSchema = z.object({
 
 export async function POST(request: Request) {
     try {
-        const ip =
-            request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-            request.headers.get('x-real-ip') ||
-            'local'
+        const ip = extractClientIp(request)
 
         if (ip !== 'local' && ip !== '127.0.0.1' && !checkRateLimit(ip)) {
             return NextResponse.json(
@@ -306,10 +303,12 @@ export async function GET(request: Request) {
     const cfg = await getConfigCompleta()
     await autoConfirmarPendientesVencidos(cfg.minutos_autoconfirmacion)
 
-    const supabase = await createClient()
+    const supabaseAdmin = createServiceClient()
 
     if (dateStr) {
-        const supabaseAdmin = createServiceClient()
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+            return NextResponse.json({ error: 'Formato de fecha inválido' }, { status: 400 })
+        }
         const { data, error } = await supabaseAdmin
             .from('reservas')
             .select('id, horario, estado, mp_preference_id')
@@ -322,15 +321,13 @@ export async function GET(request: Request) {
         return NextResponse.json({ ocupados: disp.ocupados })
     }
 
-    const {
-        data: { user },
-        error: authError
-    } = await supabase.auth.getUser()
-    if (authError || !user) {
+    // Listado completo de reservas: EXCLUSIVO para administradores autorizados (Dueña / Soporte Técnico)
+    const { authorized } = await requireAdminUser()
+    if (!authorized) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
         .from('reservas')
         .select('*')
         .order('fecha', { ascending: true })

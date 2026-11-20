@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
-import { createClient as createServerClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { requireAdminUser } from '@/lib/auth-admin'
 import { notificarCambioServidor } from '@/lib/realtime-server'
 import { z } from 'zod'
 import {
@@ -50,12 +50,8 @@ export async function DELETE(
     _request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
-    const supabase = await createServerClient()
-
-    const {
-        data: { user }
-    } = await supabase.auth.getUser()
-    if (!user) {
+    const { authorized } = await requireAdminUser()
+    if (!authorized) {
         return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
@@ -84,12 +80,8 @@ export async function PATCH(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
-    const supabase = await createServerClient()
-
-    const {
-        data: { user }
-    } = await supabase.auth.getUser()
-    if (!user) {
+    const { authorized } = await requireAdminUser()
+    if (!authorized) {
         return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 

@@ -1,11 +1,16 @@
 'use server'
 
-import { createClient as createServerClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { guardarKvConfig, getConfigCompleta } from '@/lib/reservas-server'
 import { CMSContenido, mergeCMSContenido } from '@/lib/cms-types'
+import {
+    requireAdminUser,
+    obtenerAdminsAutorizados,
+    guardarAdminsAutorizados,
+    AdminAutorizado
+} from '@/lib/auth-admin'
 
 const ConfigSchema = z
     .object({
@@ -66,11 +71,8 @@ const ServicioSchema = z.object({
 })
 
 export async function updateConfig(formData: FormData) {
-    const supabaseAuth = await createServerClient()
-    const {
-        data: { user }
-    } = await supabaseAuth.auth.getUser()
-    if (!user) throw new Error('No autorizado')
+    const { authorized } = await requireAdminUser()
+    if (!authorized) throw new Error('No autorizado')
 
     const parsed = ConfigSchema.safeParse({
         intervalo_minutos: formData.get('intervalo_minutos'),
@@ -123,11 +125,8 @@ export async function updateConfig(formData: FormData) {
 }
 
 export async function addServicio(formData: FormData) {
-    const supabaseAuth = await createServerClient()
-    const {
-        data: { user }
-    } = await supabaseAuth.auth.getUser()
-    if (!user) throw new Error('No autorizado')
+    const { authorized } = await requireAdminUser()
+    if (!authorized) throw new Error('No autorizado')
 
     const parsed = ServicioSchema.safeParse({
         categoria: formData.get('categoria'),
@@ -155,11 +154,8 @@ export async function addServicio(formData: FormData) {
 }
 
 export async function deleteServicio(id: number) {
-    const supabaseAuth = await createServerClient()
-    const {
-        data: { user }
-    } = await supabaseAuth.auth.getUser()
-    if (!user) throw new Error('No autorizado')
+    const { authorized } = await requireAdminUser()
+    if (!authorized) throw new Error('No autorizado')
 
     const parsedId = z.number().int().positive().safeParse(id)
     if (!parsedId.success) throw new Error('ID de servicio inválido')
@@ -178,11 +174,8 @@ export async function deleteServicio(id: number) {
 }
 
 export async function editServicio(id: number, formData: FormData) {
-    const supabaseAuth = await createServerClient()
-    const {
-        data: { user }
-    } = await supabaseAuth.auth.getUser()
-    if (!user) throw new Error('No autorizado')
+    const { authorized } = await requireAdminUser()
+    if (!authorized) throw new Error('No autorizado')
 
     const parsedId = z.number().int().positive().safeParse(id)
     if (!parsedId.success) throw new Error('ID de servicio inválido')
@@ -214,11 +207,8 @@ export async function editServicio(id: number, formData: FormData) {
 }
 
 export async function guardarCMSContenido(cmsData: CMSContenido) {
-    const supabaseAuth = await createServerClient()
-    const {
-        data: { user }
-    } = await supabaseAuth.auth.getUser()
-    if (!user) throw new Error('No autorizado')
+    const { authorized } = await requireAdminUser()
+    if (!authorized) throw new Error('No autorizado')
 
     const merged = mergeCMSContenido(cmsData)
     await guardarKvConfig([{ clave: 'cms_contenido', valor: JSON.stringify(merged) }])
@@ -226,5 +216,147 @@ export async function guardarCMSContenido(cmsData: CMSContenido) {
     revalidatePath('/', 'layout')
     revalidatePath('/admin/dashboard/ajustes')
     return { success: true, cms: merged }
+}
+
+export async function obtenerEstadoAdminsAction() {
+    const { authorized, user, adminInfo } = await requireAdminUser()
+    if (!authorized || !user) {
+        return { error: 'No autorizado' }
+    }
+
+    const lista = await obtenerAdminsAutorizados()
+    return {
+        success: true,
+        actualEmail: (user.email || '').toLowerCase(),
+        actualRol: adminInfo?.rol || 'soporte',
+        admins: lista
+    }
+}
+
+export async function guardarAdminCuentaAction(input: {
+    email: string
+    password?: string
+    rol: 'duena' | 'soporte'
+    nombre?: string
+}) {
+    const { authorized } = await requireAdminUser()
+    if (!authorized) {
+        return { error: 'No autorizado' }
+    }
+
+    const emailClean = (input.email || '').trim().toLowerCase()
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailClean)) {
+        return { error: 'Ingresá un correo electrónico válido.' }
+    }
+
+    const pwd = (input.password || '').trim()
+    if (pwd && pwd.length < 6) {
+        return { error: 'La contraseña debe tener al menos 6 caracteres.' }
+    }
+
+    try {
+        const supabaseAdmin = createServiceClient()
+        const { data: usersData, error: listError } =
+            await supabaseAdmin.auth.admin.listUsers()
+
+        if (listError) {
+            return { error: 'Error al consultar usuarios en Supabase Auth.' }
+        }
+
+        const existingUser = (usersData?.users || []).find(
+            u => (u.email || '').toLowerCase() === emailClean
+        )
+
+        if (existingUser) {
+            if (pwd) {
+                const { error: updErr } =
+                    await supabaseAdmin.auth.admin.updateUserById(existingUser.id, {
+                        password: pwd,
+                        email_confirm: true
+                    })
+                if (updErr) {
+                    return {
+                        error: `No se pudo actualizar la contraseña: ${updErr.message}`
+                    }
+                }
+            }
+        } else {
+            if (!pwd) {
+                return {
+                    error: 'Para registrar un nuevo administrador debés asignarle una contraseña inicial (mín. 6 caracteres).'
+                }
+            }
+            const { error: createErr } =
+                await supabaseAdmin.auth.admin.createUser({
+                    email: emailClean,
+                    password: pwd,
+                    email_confirm: true
+                })
+            if (createErr) {
+                return {
+                    error: `No se pudo crear la cuenta en Supabase: ${createErr.message}`
+                }
+            }
+        }
+
+        const listaActual = await obtenerAdminsAutorizados()
+        const nuevoItem: AdminAutorizado = {
+            email: emailClean,
+            rol: input.rol === 'duena' ? 'duena' : 'soporte',
+            nombre:
+                (input.nombre || '').trim() ||
+                (input.rol === 'duena'
+                    ? 'Dueña del Salón'
+                    : 'Administrador de Soporte Técnico'),
+            updatedAt: new Date().toISOString()
+        }
+
+        const resto = listaActual.filter(a => a.email !== emailClean)
+        const nuevaLista = [...resto, nuevoItem]
+        await guardarAdminsAutorizados(nuevaLista)
+
+        revalidatePath('/admin/dashboard/ajustes')
+        return {
+            success: true,
+            admins: nuevaLista,
+            mensaje: existingUser
+                ? `Cuenta de ${emailClean} actualizada en la lista de administradores autorizados.`
+                : `Cuenta de ${emailClean} creada y habilitada para ingresar al panel.`
+        }
+    } catch (e: any) {
+        return {
+            error: e?.message || 'Error al gestionar la cuenta de administrador.'
+        }
+    }
+}
+
+export async function revocarAdminCuentaAction(emailTarget: string) {
+    const { authorized, user } = await requireAdminUser()
+    if (!authorized || !user) {
+        return { error: 'No autorizado' }
+    }
+
+    const targetClean = (emailTarget || '').trim().toLowerCase()
+    const currentClean = (user.email || '').trim().toLowerCase()
+
+    if (targetClean === currentClean) {
+        return {
+            error: 'Por seguridad no podés revocar el acceso de la cuenta con la que tenés la sesión iniciada actualmente.'
+        }
+    }
+
+    const listaActual = await obtenerAdminsAutorizados()
+    const nuevaLista = listaActual.filter(a => a.email !== targetClean)
+
+    if (nuevaLista.length === 0) {
+        return { error: 'Debe quedar al menos 1 administrador autorizado en el sistema.' }
+    }
+
+    await guardarAdminsAutorizados(nuevaLista)
+    revalidatePath('/admin/dashboard/ajustes')
+    return {
+        success: true,
+        admins: nuevaLista
+    }
 }
 

@@ -1,8 +1,8 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createClient as createServerClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { requireAdminUser } from '@/lib/auth-admin'
 import {
     obtenerFichasCRM,
     guardarKvConfig,
@@ -20,11 +20,8 @@ export async function guardarFichaClienteAction(input: {
     etiqueta?: EtiquetaCliente
     reservaIds?: number[]
 }) {
-    const supabaseAuth = await createServerClient()
-    const {
-        data: { user }
-    } = await supabaseAuth.auth.getUser()
-    if (!user) return { error: 'No autorizado' }
+    const { authorized } = await requireAdminUser()
+    if (!authorized) return { error: 'No autorizado' }
 
     const nombre = (input.nombre || '').trim()
     if (nombre.length < 2) {
@@ -82,11 +79,8 @@ export async function eliminarFichaClienteAction(input: {
     reservaIds?: number[]
     borrarReservas?: boolean
 }) {
-    const supabaseAuth = await createServerClient()
-    const {
-        data: { user }
-    } = await supabaseAuth.auth.getUser()
-    if (!user) return { error: 'No autorizado' }
+    const { authorized } = await requireAdminUser()
+    if (!authorized) return { error: 'No autorizado' }
 
     const fichas = await obtenerFichasCRM()
 

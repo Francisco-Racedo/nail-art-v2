@@ -48,28 +48,6 @@ function initSharedConnection() {
         sharedChannel = supabase.channel(REALTIME_CHANNEL_NAME)
 
         sharedChannel
-            .on(
-                'postgres_changes',
-                { event: '*', schema: 'public', table: 'reservas' },
-                (payload: any) => {
-                    notifySubscribers({
-                        tipo: 'reservas',
-                        detalle: payload,
-                        ts: Date.now()
-                    })
-                }
-            )
-            .on(
-                'postgres_changes',
-                { event: '*', schema: 'public', table: 'configuracion' },
-                (payload: any) => {
-                    notifySubscribers({
-                        tipo: 'config',
-                        detalle: payload,
-                        ts: Date.now()
-                    })
-                }
-            )
             .on('broadcast', { event: 'cambio_datos' }, ({ payload }: any) => {
                 if (payload) {
                     notifySubscribers(payload as RealtimeSyncEvent)
@@ -77,7 +55,7 @@ function initSharedConnection() {
             })
             .subscribe((status: string) => {
                 if (status === 'SUBSCRIBED') {
-                    // Conexión exitosa sin duplicar canales
+                    // Conexión exitosa sin exponer filas de base de datos por postgres_changes
                 }
             })
     } catch (err) {

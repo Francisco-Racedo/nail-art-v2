@@ -2,20 +2,17 @@ import { Toaster } from 'sonner'
 import { redirect } from 'next/navigation'
 import AdminNav from '@/components/AdminNav'
 import RealtimeAdminListener from '@/components/admin/RealtimeAdminListener'
-import { createClient as createServerClient } from '@/lib/supabase/server'
+import { requireAdminUser } from '@/lib/auth-admin'
 
 export default async function AdminDashboardLayout({
     children
 }: {
     children: React.ReactNode
 }) {
-    // Defensa en profundidad: además de src/proxy.ts, verificamos sesión activa en el layout del servidor
-    const supabase = await createServerClient()
-    const {
-        data: { user }
-    } = await supabase.auth.getUser()
+    // Defensa en profundidad: además de src/proxy.ts, verificamos identidad de administrador autorizado en el layout del servidor
+    const { authorized } = await requireAdminUser()
 
-    if (!user) {
+    if (!authorized) {
         redirect('/admin/login')
     }
 

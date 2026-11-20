@@ -1,11 +1,18 @@
-import { createClient as createServerClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
+import { createServiceClient } from '@/lib/supabase/service'
+import { requireAdminUser } from '@/lib/auth-admin'
 import AgendaCalendar from '@/components/AgendaCalendar'
 import { getConfigCompleta, autoConfirmarPendientesVencidos } from '@/lib/reservas-server'
 
 export const dynamic = 'force-dynamic'
 
 export default async function AdminAgendaPage() {
-    const supabase = await createServerClient()
+    const { authorized } = await requireAdminUser()
+    if (!authorized) {
+        redirect('/admin/login')
+    }
+
+    const supabase = createServiceClient()
     const configData = await getConfigCompleta()
 
     // Ejecutar auto-confirmación de turnos pendientes que hayan superado la ventana máxima (10 min)

@@ -5,6 +5,10 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import {
+    esUsuarioAdminAutorizado,
+    requireAdminUser
+} from '@/lib/auth-admin'
+import {
     parseReservaMeta,
     serializeReservaMeta,
     esTurnoActivoEnGrilla,
@@ -17,20 +21,50 @@ import {
     JornadaEspecial
 } from '@/lib/reservas-server'
 
-export async function login(formData: FormData) {
-    const supabase = await createClient()
+const loginAttemptMap = new Map<string, { fails: number; lockUntil: number }>()
 
-    const credentials = {
-        email: formData.get('email') as string,
-        password: formData.get('password') as string
+export async function login(formData: FormData) {
+    const emailRaw = ((formData.get('email') as string) || '').trim().toLowerCase()
+    const password = (formData.get('password') as string) || ''
+
+    if (!emailRaw || !password) {
+        return { error: 'Ingresá tu email y contraseña.' }
     }
 
-    const { error } = await supabase.auth.signInWithPassword(credentials)
+    const now = Date.now()
+    const attempt = loginAttemptMap.get(emailRaw)
+    if (attempt && now < attempt.lockUntil) {
+        const secs = Math.ceil((attempt.lockUntil - now) / 1000)
+        return {
+            error: `Demasiados intentos fallidos. Por seguridad, aguardá ${secs} segundos antes de reintentar.`
+        }
+    }
 
-    if (error) {
+    const supabase = await createClient()
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+        email: emailRaw,
+        password
+    })
+
+    if (error || !data?.user) {
+        const fails = (attempt?.fails || 0) + 1
+        // Bloqueo progresivo tras 5 intentos fallidos (2 minutos)
+        const lockUntil = fails >= 5 ? now + 2 * 60 * 1000 : 0
+        loginAttemptMap.set(emailRaw, { fails, lockUntil })
         return { error: 'Credenciales incorrectas. Verificá tu email y contraseña.' }
     }
 
+    // Verificar estrictamente que la cuenta pertenezca a la Dueña o al Administrador de Soporte Técnico
+    const { autorizado } = await esUsuarioAdminAutorizado(data.user)
+    if (!autorizado) {
+        await supabase.auth.signOut()
+        return {
+            error: 'Acceso denegado: Esta cuenta no figura en la lista de administradores autorizados del salón.'
+        }
+    }
+
+    loginAttemptMap.delete(emailRaw)
     revalidatePath('/', 'layout')
     return { success: true }
 }
@@ -48,11 +82,8 @@ export async function reprogramarTurno(
     nuevaHora: string
 ) {
     try {
-        const supabase = await createClient()
-        const {
-            data: { user }
-        } = await supabase.auth.getUser()
-        if (!user) {
+        const { authorized } = await requireAdminUser()
+        if (!authorized) {
             return { error: 'No autorizado' }
         }
 
@@ -146,11 +177,8 @@ export async function reprogramarMasivoImprevisto(input: {
     bloquearDia?: boolean
 }) {
     try {
-        const supabase = await createClient()
-        const {
-            data: { user }
-        } = await supabase.auth.getUser()
-        if (!user) return { error: 'No autorizado' }
+        const { authorized } = await requireAdminUser()
+        if (!authorized) return { error: 'No autorizado' }
 
         const supabaseAdmin = createServiceClient()
         const fechaOrigen = input.fecha.substring(0, 10)
@@ -316,11 +344,8 @@ export async function reprogramarMasivoImprevisto(input: {
 }
 
 export async function guardarJornadaEspecialAction(jornada: JornadaEspecial) {
-    const supabase = await createClient()
-    const {
-        data: { user }
-    } = await supabase.auth.getUser()
-    if (!user) return { error: 'No autorizado' }
+    const { authorized } = await requireAdminUser()
+    if (!authorized) return { error: 'No autorizado' }
 
     const cfg = await getConfigCompleta()
     const resto = cfg.jornadas_especiales.filter(j => j.fecha !== jornada.fecha)
@@ -332,11 +357,8 @@ export async function guardarJornadaEspecialAction(jornada: JornadaEspecial) {
 }
 
 export async function eliminarJornadaEspecialAction(fecha: string) {
-    const supabase = await createClient()
-    const {
-        data: { user }
-    } = await supabase.auth.getUser()
-    if (!user) return { error: 'No autorizado' }
+    const { authorized } = await requireAdminUser()
+    if (!authorized) return { error: 'No autorizado' }
 
     const cfg = await getConfigCompleta()
     const nuevas = cfg.jornadas_especiales.filter(j => j.fecha !== fecha)
@@ -346,11 +368,8 @@ export async function eliminarJornadaEspecialAction(fecha: string) {
 }
 
 export async function toggleTurnoNocturnoAction(fecha: string, habilitar?: boolean) {
-    const supabase = await createClient()
-    const {
-        data: { user }
-    } = await supabase.auth.getUser()
-    if (!user) return { error: 'No autorizado' }
+    const { authorized } = await requireAdminUser()
+    if (!authorized) return { error: 'No autorizado' }
 
     const cfg = await getConfigCompleta()
     const current = new Set(cfg.fechas_nocturno_habilitado || [])
@@ -375,11 +394,8 @@ export async function toggleTurnoNocturnoAction(fecha: string, habilitar?: boole
 }
 
 export async function actualizarMesesVisiblesAction(meses: number) {
-    const supabase = await createClient()
-    const {
-        data: { user }
-    } = await supabase.auth.getUser()
-    if (!user) return { error: 'No autorizado' }
+    const { authorized } = await requireAdminUser()
+    if (!authorized) return { error: 'No autorizado' }
 
     const valorLimpio = Math.max(1, Math.min(12, Number(meses) || 3))
     await guardarKvConfig([{ clave: 'meses_visibles_cliente', valor: String(valorLimpio) }])
@@ -398,11 +414,8 @@ export async function crearTurnoManualAdmin(input: {
     estado?: 'pendiente' | 'confirmado'
 }) {
     try {
-        const supabase = await createClient()
-        const {
-            data: { user }
-        } = await supabase.auth.getUser()
-        if (!user) return { error: 'No autorizado' }
+        const { authorized } = await requireAdminUser()
+        if (!authorized) return { error: 'No autorizado' }
 
         const nombre = (input.nombre || '').trim()
         const servicio = (input.servicio || '').trim()

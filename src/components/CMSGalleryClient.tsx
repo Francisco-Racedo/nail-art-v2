@@ -18,7 +18,6 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
-import { createClient as createBrowserClient } from '@/lib/supabase/client'
 import { processVideoForUpload } from '@/lib/video-processor'
 import { emitirCambioRealtime } from '@/lib/realtime'
 import BottomSheetModal, { ConfirmBottomSheetModal } from './ui/BottomSheetModal'
@@ -50,8 +49,6 @@ export default function CMSGalleryClient({
     const [fileToDelete, setFileToDelete] = useState<string | null>(null)
     const [deletingFile, setDeletingFile] = useState(false)
 
-    const supabase = createBrowserClient()
-
     // Normalizar items para compatibilidad
     const items: MediaItem[] =
         initialItems ||
@@ -76,11 +73,6 @@ export default function CMSGalleryClient({
         const toastId = toast.loading(`Iniciando subida de ${files.length} archivo(s)...`)
 
         try {
-            const {
-                data: { session }
-            } = await supabase.auth.getSession()
-            if (!session) throw new Error('Sesión no válida. Por favor, reingresá al panel.')
-
             let successCount = 0
 
             for (let i = 0; i < files.length; i++) {
@@ -115,18 +107,27 @@ export default function CMSGalleryClient({
 
                 setProgressStatus(`Subiendo archivo ${i + 1} de ${files.length}...`)
 
-                // Subir a Supabase Storage bucket 'carousel'
-                const { error } = await supabase.storage
-                    .from('carousel')
-                    .upload(fileName, fileToUpload, {
-                        cacheControl: '3600',
-                        upsert: true,
-                        contentType: originalFile.type || 'application/octet-stream'
-                    })
+                const fd = new FormData()
+                const blobAsFile =
+                    fileToUpload instanceof File
+                        ? fileToUpload
+                        : new File([fileToUpload], fileName, {
+                              type: originalFile.type || 'video/webm'
+                          })
+                fd.set('file', blobAsFile)
+                fd.set('fileName', fileName)
 
-                if (error) {
-                    console.error('Error subiendo archivo:', error)
-                    toast.error(`Error al subir ${originalFile.name}: ${error.message}`)
+                const res = await fetch('/api/admin/upload', {
+                    method: 'POST',
+                    body: fd
+                })
+                const data = await res.json()
+
+                if (!res.ok) {
+                    console.error('Error subiendo archivo:', data.error)
+                    toast.error(
+                        `Error al subir ${originalFile.name}: ${data.error || 'Fallo del servidor'}`
+                    )
                 } else {
                     successCount++
                 }
@@ -162,11 +163,15 @@ export default function CMSGalleryClient({
         setDeletingFile(true)
         const toastId = toast.loading('Eliminando archivo...')
         try {
-            const { error } = await supabase.storage
-                .from('carousel')
-                .remove([fileName])
-
-            if (error) throw error
+            const res = await fetch('/api/admin/upload', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fileName })
+            })
+            const data = await res.json()
+            if (!res.ok) {
+                throw new Error(data.error || 'No se pudo eliminar el archivo')
+            }
 
             toast.success('Eliminado correctamente', { id: toastId })
             await emitirCambioRealtime('media_actualizado', { deleted: fileName })

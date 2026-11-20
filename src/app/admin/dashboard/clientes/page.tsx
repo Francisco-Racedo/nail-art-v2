@@ -1,4 +1,6 @@
+import { redirect } from 'next/navigation'
 import { createServiceClient } from '@/lib/supabase/service'
+import { requireAdminUser } from '@/lib/auth-admin'
 import {
     construirFichasClientes,
     getConfigCompleta,
@@ -10,6 +12,11 @@ import ClientesPanel from '@/components/admin/ClientesPanel'
 export const dynamic = 'force-dynamic'
 
 export default async function AdminClientesPage() {
+    const { authorized } = await requireAdminUser()
+    if (!authorized) {
+        redirect('/admin/login')
+    }
+
     const supabase = createServiceClient()
     const [cfg, reservasRes, fichasCRM, serviciosRes] = await Promise.all([
         getConfigCompleta(),

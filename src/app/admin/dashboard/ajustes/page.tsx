@@ -1,10 +1,17 @@
+import { redirect } from 'next/navigation'
 import { createServiceClient } from '@/lib/supabase/service'
+import { requireAdminUser } from '@/lib/auth-admin'
 import AjustesClient from '@/components/AjustesClient'
 import { getConfigCompleta } from '@/lib/reservas-server'
 
 export const dynamic = 'force-dynamic'
 
 export default async function AdminAjustesPage() {
+    const { authorized } = await requireAdminUser()
+    if (!authorized) {
+        redirect('/admin/login')
+    }
+
     const supabaseAdmin = createServiceClient()
     const [configData, serviciosRes] = await Promise.all([
         getConfigCompleta(),

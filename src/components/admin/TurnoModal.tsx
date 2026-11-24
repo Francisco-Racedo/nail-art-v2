@@ -21,7 +21,8 @@ import {
     RefreshCw,
     History,
     Gift,
-    Lock
+    Lock,
+    X
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
@@ -723,7 +724,6 @@ export default function TurnoModal({
                         </h2>
                         <p className="text-stone-600 text-sm font-medium mt-0.5">
                             📱 {celularCliente || 'Sin WhatsApp cargado'}
-                            {emailCliente ? ` • ✉️ ${emailCliente}` : ''}
                             {nacimientoCliente
                                 ? ` • 🎂 Nac.: ${nacimientoCliente.split('-').reverse().join('/')}`
                                 : ''}
@@ -888,40 +888,87 @@ export default function TurnoModal({
                             </select>
                         </div>
 
-                        {/* Adicionales / Nail Art / Retirado (Chips interactivos) */}
+                        {/* Adicionales / Nail Art / Retirado (Select desplegable + chips activos) */}
                         <div className="mb-4">
                             <label className="block text-xs font-bold uppercase tracking-wider text-stone-600 mb-1.5">
                                 Sumar Adicionales / Nail Art / Retirado al turno
                             </label>
-                            <div className="flex flex-wrap gap-2">
+                            <select
+                                value=""
+                                onChange={e => {
+                                    const val = e.target.value
+                                    if (!val) return
+                                    if (val === '__clear__') {
+                                        setAdicionalesSel([])
+                                        setPrecioPersonalizado('')
+                                        return
+                                    }
+                                    setAdicionalesSel(prev =>
+                                        prev.includes(val)
+                                            ? prev.filter(x => x !== val)
+                                            : [...prev, val]
+                                    )
+                                    setPrecioPersonalizado('')
+                                }}
+                                className="w-full bg-stone-50 border border-stone-200 focus:bg-white focus:border-rose-400 rounded-xl px-3.5 py-3 text-sm font-bold text-stone-900 transition"
+                            >
+                                <option value="">
+                                    {adicionalesSel.length === 0
+                                        ? 'Sin adicionales (Seleccionar para agregar...)'
+                                        : `✓ ${adicionalesSel.length} ${
+                                              adicionalesSel.length === 1
+                                                  ? 'adicional seleccionado'
+                                                  : 'adicionales seleccionados'
+                                          } (Sumar otro o quitar)`}
+                                </option>
+                                {adicionalesSel.length > 0 && (
+                                    <option value="__clear__">
+                                        ✕ Quitar todos los adicionales
+                                    </option>
+                                )}
                                 {ADICIONALES_RAPIDOS.filter(
                                     ad => ad.id !== 'retirado_otro'
                                 ).map(ad => {
                                     const activo = adicionalesSel.includes(ad.id)
                                     return (
-                                        <button
-                                            key={ad.id}
-                                            type="button"
-                                            onClick={() => {
-                                                setAdicionalesSel(prev =>
-                                                    prev.includes(ad.id)
-                                                        ? prev.filter(x => x !== ad.id)
-                                                        : [...prev, ad.id]
-                                                )
-                                                setPrecioPersonalizado('')
-                                            }}
-                                            className={`px-3 py-2 rounded-xl text-xs font-bold border transition cursor-pointer ${
-                                                activo
-                                                    ? 'bg-rose-500 text-white border-rose-600 shadow-sm'
-                                                    : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-rose-50 hover:border-rose-200'
-                                            }`}
-                                        >
+                                        <option key={ad.id} value={ad.id}>
                                             {activo ? '✓ ' : '+ '}
                                             {ad.label} (+${ad.precio.toLocaleString('es-AR')})
-                                        </button>
+                                            {activo ? ' — (Agregado)' : ''}
+                                        </option>
                                     )
                                 })}
-                            </div>
+                            </select>
+
+                            {adicionalesSel.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5 mt-2">
+                                    {ADICIONALES_RAPIDOS.filter(ad =>
+                                        adicionalesSel.includes(ad.id)
+                                    ).map(ad => (
+                                        <span
+                                            key={ad.id}
+                                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold bg-rose-500 text-white shadow-2xs"
+                                        >
+                                            <span>
+                                                {ad.label} (+${ad.precio.toLocaleString('es-AR')})
+                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setAdicionalesSel(prev =>
+                                                        prev.filter(x => x !== ad.id)
+                                                    )
+                                                    setPrecioPersonalizado('')
+                                                }}
+                                                title="Quitar adicional"
+                                                className="hover:bg-black/15 rounded-full p-0.5 transition cursor-pointer"
+                                            >
+                                                <X className="w-3 h-3" />
+                                            </button>
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
                         </div>
 
                         {/* Alerta inteligente: 10% OFF en 12° Servicio (Fidelidad) */}
@@ -1381,7 +1428,7 @@ export default function TurnoModal({
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
                             <div>
                                 <label className="block text-[11px] font-bold uppercase text-stone-600 mb-1">
                                     Nombre y Apellido
@@ -1415,17 +1462,6 @@ export default function TurnoModal({
                                     type="date"
                                     value={nacimientoCliente}
                                     onChange={e => setNacimientoCliente(e.target.value)}
-                                    className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-xs font-bold text-stone-900"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-[11px] font-bold uppercase text-stone-600 mb-1">
-                                    Email (Opcional)
-                                </label>
-                                <input
-                                    type="email"
-                                    value={emailCliente}
-                                    onChange={e => setEmailCliente(e.target.value)}
                                     className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-xs font-bold text-stone-900"
                                 />
                             </div>

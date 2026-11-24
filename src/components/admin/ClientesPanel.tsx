@@ -1395,36 +1395,22 @@ export default function ClientesPanel({
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                            <label className="block text-xs font-bold text-stone-600 uppercase mb-1">
-                                Categoría de Clienta
-                            </label>
-                            <select
-                                value={formEtiqueta}
-                                onChange={e =>
-                                    setFormEtiqueta(e.target.value as EtiquetaCliente)
-                                }
-                                className="w-full p-3 rounded-xl border border-stone-200 text-sm text-stone-900 bg-white"
-                            >
-                                <option value="vip">👑 Clienta VIP</option>
-                                <option value="frecuente">💖 Clienta Frecuente</option>
-                                <option value="nueva">🆕 Clienta Nueva</option>
-                                <option value="atencion">⚠️ Revisar por ausencias</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-stone-600 uppercase mb-1">
-                                Email (opcional)
-                            </label>
-                            <input
-                                type="email"
-                                value={formEmail}
-                                onChange={e => setFormEmail(e.target.value)}
-                                placeholder="correo@ejemplo.com"
-                                className="w-full p-3 rounded-xl border border-stone-200 text-sm text-stone-900"
-                            />
-                        </div>
+                    <div>
+                        <label className="block text-xs font-bold text-stone-600 uppercase mb-1">
+                            Categoría de Clienta
+                        </label>
+                        <select
+                            value={formEtiqueta}
+                            onChange={e =>
+                                setFormEtiqueta(e.target.value as EtiquetaCliente)
+                            }
+                            className="w-full p-3 rounded-xl border border-stone-200 text-sm text-stone-900 bg-white"
+                        >
+                            <option value="vip">👑 Clienta VIP</option>
+                            <option value="frecuente">💖 Clienta Frecuente</option>
+                            <option value="nueva">🆕 Clienta Nueva</option>
+                            <option value="atencion">⚠️ Revisar por ausencias</option>
+                        </select>
                     </div>
 
                     <div>

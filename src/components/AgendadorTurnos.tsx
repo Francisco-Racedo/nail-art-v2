@@ -8,7 +8,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast, Toaster } from 'sonner'
 import Link from 'next/link'
-import { Sparkles, Calendar, User, Cake, Phone, Mail, CheckCircle2 } from 'lucide-react'
+import { Sparkles, Calendar, User, Cake, Phone, CheckCircle2, X } from 'lucide-react'
 import CalendarioReserva from './CalendarioReserva'
 import {
     generarHorariosDisponibles,
@@ -31,7 +31,6 @@ const FormVisitanteSchema = z.object({
         .max(50, 'Máximo 50 caracteres')
         .regex(/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/, 'Solo se permiten letras y espacios'),
     celular: z.string().min(8, 'El número de WhatsApp es muy corto'),
-    email: z.string().email('Correo inválido').or(z.literal('')),
     fechaNacimiento: z
         .string()
         .regex(/^\d{4}-\d{2}-\d{2}$/, 'Completá tu fecha de nacimiento (día, mes y año)'),
@@ -144,7 +143,6 @@ export default function AgendadorTurnos() {
         defaultValues: {
             nombre: '',
             celular: '',
-            email: '',
             fechaNacimiento: '',
             servicio: '',
             metodoPago: 'local'
@@ -255,7 +253,6 @@ export default function AgendadorTurnos() {
                     fecha,
                     horario,
                     celular: data.celular,
-                    email: data.email,
                     fecha_nacimiento: data.fechaNacimiento,
                     metodo_pago: config.pagos_habilitados ? data.metodoPago || 'mp' : 'local'
                 })
@@ -724,54 +721,31 @@ export default function AgendadorTurnos() {
                                     )}
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <label htmlFor="celular" className="flex items-center gap-1.5 text-[#231C19] text-xs uppercase tracking-wider mb-1.5 font-bold">
-                                            <Phone className="w-3.5 h-3.5 text-rose-500" /> WhatsApp (sin 0 ni 15)
-                                        </label>
-                                        <input
-                                            id="celular"
-                                            type="tel"
-                                            autoComplete="tel"
-                                            inputMode="numeric"
-                                            {...register('celular', {
-                                                onChange: e =>
-                                                    setValue(
-                                                        'celular',
-                                                        e.target.value.replace(/\D/g, '')
-                                                    )
-                                            })}
-                                            placeholder="Ej: 3814556677"
-                                            minLength={8}
-                                            className="w-full p-3.5 text-base bg-white/95 text-stone-800 border border-rose-200/80 rounded-xl placeholder-stone-400 focus:bg-white focus:outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-200/40 transition-all shadow-sm"
-                                        />
-                                        {errors.celular && (
-                                            <p className="text-red-600 font-bold text-xs mt-1">
-                                                {errors.celular.message}
-                                            </p>
-                                        )}
-                                    </div>
-                                    <div>
-                                        <label htmlFor="email" className="flex items-center gap-1.5 text-[#231C19] text-xs uppercase tracking-wider mb-1.5 font-bold">
-                                            <Mail className="w-3.5 h-3.5 text-rose-500" /> Email{' '}
-                                            <span className="text-stone-400 font-normal text-[11px] normal-case">
-                                                (Opcional)
-                                            </span>
-                                        </label>
-                                        <input
-                                            id="email"
-                                            type="email"
-                                            autoComplete="email"
-                                            {...register('email')}
-                                            placeholder="correo@ejemplo.com"
-                                            className="w-full p-3.5 text-base bg-white/95 text-stone-800 border border-rose-200/80 rounded-xl placeholder-stone-400 focus:bg-white focus:outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-200/40 transition-all shadow-sm"
-                                        />
-                                        {errors.email && (
-                                            <p className="text-red-600 font-bold text-xs mt-1">
-                                                {errors.email.message}
-                                            </p>
-                                        )}
-                                    </div>
+                                <div>
+                                    <label htmlFor="celular" className="flex items-center gap-1.5 text-[#231C19] text-xs uppercase tracking-wider mb-1.5 font-bold">
+                                        <Phone className="w-3.5 h-3.5 text-rose-500" /> WhatsApp (sin 0 ni 15)
+                                    </label>
+                                    <input
+                                        id="celular"
+                                        type="tel"
+                                        autoComplete="tel"
+                                        inputMode="numeric"
+                                        {...register('celular', {
+                                            onChange: e =>
+                                                setValue(
+                                                    'celular',
+                                                    e.target.value.replace(/\D/g, '')
+                                                )
+                                        })}
+                                        placeholder="Ej: 3814556677"
+                                        minLength={8}
+                                        className="w-full p-3.5 text-base bg-white/95 text-stone-800 border border-rose-200/80 rounded-xl placeholder-stone-400 focus:bg-white focus:outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-200/40 transition-all shadow-sm"
+                                    />
+                                    {errors.celular && (
+                                        <p className="text-red-600 font-bold text-xs mt-1">
+                                            {errors.celular.message}
+                                        </p>
+                                    )}
                                 </div>
 
                                 <div>
@@ -826,47 +800,89 @@ export default function AgendadorTurnos() {
 
                                 {/* Selector opcional de Adicionales / Nail Art / Retirado para la clienta */}
                                 <div className="bg-white/80 border border-rose-200/70 rounded-2xl p-4 shadow-sm">
-                                    <div className="flex items-center justify-between gap-2 mb-2">
-                                        <h4 className="text-[#231C19] text-xs uppercase tracking-wider font-bold flex items-center gap-1.5">
+                                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                                        <label htmlFor="adicionales-select" className="text-[#231C19] text-xs uppercase tracking-wider font-bold flex items-center gap-1.5">
                                             <Sparkles className="w-3.5 h-3.5 text-amber-500" />
                                             ¿Deseás agregar algún Adicional o Retirado?
-                                        </h4>
+                                        </label>
                                         <span className="text-[11px] font-semibold text-stone-400">
                                             Opcional
                                         </span>
                                     </div>
-                                    <p className="text-xs text-stone-500 mb-3">
-                                        Podés sumar efectos, decoración extra o retirado de otro salón a tu servicio principal:
-                                    </p>
-                                    <div className="flex flex-wrap gap-2">
+                                    <select
+                                        id="adicionales-select"
+                                        value=""
+                                        onChange={e => {
+                                            const val = e.target.value
+                                            if (!val) return
+                                            if (val === '__clear__') {
+                                                setAdicionalesCliente([])
+                                                return
+                                            }
+                                            setAdicionalesCliente(prev =>
+                                                prev.includes(val)
+                                                    ? prev.filter(x => x !== val)
+                                                    : [...prev, val]
+                                            )
+                                        }}
+                                        className="w-full p-3.5 text-base bg-white/95 text-stone-800 border border-rose-200/80 rounded-xl focus:bg-white focus:outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-200/40 transition-all shadow-sm min-h-[48px]"
+                                    >
+                                        <option value="">
+                                            {adicionalesCliente.length === 0
+                                                ? 'Sin adicionales (Tocá para elegir...)'
+                                                : `✓ ${
+                                                      adicionalesCliente.length === 1
+                                                          ? labelsAdicionalesElegidos[0]
+                                                          : `${adicionalesCliente.length} adicionales agregados`
+                                                  } (Tocá para sumar o quitar)`}
+                                        </option>
+                                        {adicionalesCliente.length > 0 && (
+                                            <option value="__clear__" className="text-rose-600 font-bold">
+                                                ✕ Sin adicionales (Quitar selección)
+                                            </option>
+                                        )}
                                         {ADICIONALES_CATALOGO.filter(
                                             ad => ad.id !== 'retirado_otro'
                                         ).map(ad => {
                                             const activo = adicionalesCliente.includes(ad.id)
                                             return (
-                                                <button
-                                                    key={ad.id}
-                                                    type="button"
-                                                    onClick={() =>
-                                                        setAdicionalesCliente(prev =>
-                                                            prev.includes(ad.id)
-                                                                ? prev.filter(x => x !== ad.id)
-                                                                : [...prev, ad.id]
-                                                        )
-                                                    }
-                                                    className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                                                        activo
-                                                            ? 'bg-gradient-to-r from-rose-500 to-orange-500 text-white border-transparent shadow-sm scale-[1.02]'
-                                                            : 'bg-white text-stone-700 border-rose-200/80 hover:bg-rose-50'
-                                                    }`}
-                                                >
+                                                <option key={ad.id} value={ad.id}>
                                                     {activo ? '✓ ' : '+ '}
-                                                    {ad.label} (+$
-                                                    {ad.precio.toLocaleString('es-AR')})
-                                                </button>
+                                                    {ad.label} (+${ad.precio.toLocaleString('es-AR')})
+                                                    {activo ? ' — (Agregado)' : ''}
+                                                </option>
                                             )
                                         })}
-                                    </div>
+                                    </select>
+
+                                    {adicionalesCliente.length > 0 && (
+                                        <div className="flex flex-wrap gap-1.5 mt-2.5">
+                                            {ADICIONALES_CATALOGO.filter(ad =>
+                                                adicionalesCliente.includes(ad.id)
+                                            ).map(ad => (
+                                                <span
+                                                    key={ad.id}
+                                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold bg-gradient-to-r from-rose-500 to-orange-500 text-white shadow-2xs"
+                                                >
+                                                    <span>
+                                                        {ad.label} (+${ad.precio.toLocaleString('es-AR')})
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            setAdicionalesCliente(prev =>
+                                                                prev.filter(x => x !== ad.id)
+                                                            )
+                                                        }
+                                                        title="Quitar adicional"
+                                                        className="hover:bg-black/15 rounded-full p-0.5 transition cursor-pointer"
+                                                    >
+                                                        <X className="w-3 h-3" />
+                                                    </button>
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
 
                                     {/* Resumen en vivo del importe total estimado */}
                                     {(precioBaseElegido > 0 ||

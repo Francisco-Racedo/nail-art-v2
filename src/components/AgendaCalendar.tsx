@@ -20,6 +20,7 @@ import WeekNavigator from './admin/WeekNavigator'
 import EventGrid from './admin/EventGrid'
 import TurnoModal from './admin/TurnoModal'
 import RecordatoriosMananaPanel from './admin/RecordatoriosMananaPanel'
+import PanoramaTurnosPanel from './admin/PanoramaTurnosPanel'
 import BottomSheetModal from './ui/BottomSheetModal'
 import {
     Reserva,
@@ -120,7 +121,7 @@ export default function AgendaCalendar({
     const [mounted, setMounted] = useState(false)
     const [modalData, setModalData] = useState<ModalData | null>(null)
     const [vistaActiva, setVistaActiva] = useState<
-        'calendario' | 'recordatorios_manana' | 'detalle_turno'
+        'calendario' | 'recordatorios_manana' | 'panorama_turnos' | 'detalle_turno'
     >('calendario')
     const [mesesCliente, setMesesCliente] = useState<number>(
         Number(config?.meses_visibles_cliente) || 3
@@ -153,6 +154,41 @@ export default function AgendaCalendar({
             avisados: activos.length - sinAvisar
         }
     }, [reservasList, mananaStr])
+
+    const turnosSemanaActual = useMemo(() => {
+        const now = getAhoraArgentina()
+        const day = now.getDay()
+        const diffLunes = day === 0 ? -6 : 1 - day
+        const lunes = new Date(
+            now.getFullYear(),
+            now.getMonth(),
+            now.getDate() + diffLunes,
+            12,
+            0,
+            0
+        )
+        const domingo = new Date(
+            lunes.getFullYear(),
+            lunes.getMonth(),
+            lunes.getDate() + 6,
+            12,
+            0,
+            0
+        )
+        const inicioStr = formatDateStr(lunes)
+        const finStr = formatDateStr(domingo)
+
+        return reservasList.filter(r => {
+            if (!r.fecha || r.fecha < inicioStr || r.fecha > finStr) return false
+            const ef = getEstadoEfectivo(r)
+            return (
+                ef === 'pendiente' ||
+                ef === 'confirmado' ||
+                ef === 'completado' ||
+                ef === 'reprogramar'
+            )
+        }).length
+    }, [reservasList])
 
     useEffect(() => {
         setReservasList(initialReservas)
@@ -695,6 +731,27 @@ export default function AgendaCalendar({
                         )}
                     </button>
 
+                    <button
+                        type="button"
+                        onClick={() => setVistaActiva('panorama_turnos')}
+                        className={`px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-black transition flex items-center gap-2 cursor-pointer ${
+                            vistaActiva === 'panorama_turnos'
+                                ? 'bg-stone-900 text-white shadow-sm'
+                                : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
+                        }`}
+                    >
+                        <span>📊 Panorama (Semana / Quincena / Mes)</span>
+                        <span
+                            className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
+                                vistaActiva === 'panorama_turnos'
+                                    ? 'bg-rose-500 text-white'
+                                    : 'bg-rose-100 text-rose-800'
+                            }`}
+                        >
+                            {turnosSemanaActual} esta sem.
+                        </span>
+                    </button>
+
                     {modalData && (
                         <div
                             className={`inline-flex items-center rounded-2xl border transition overflow-hidden ${
@@ -749,6 +806,21 @@ export default function AgendaCalendar({
                             setReservasList(prev =>
                                 prev.map(r => (r.id === id ? { ...r, ...changes } : r))
                             )
+                        }}
+                    />
+                ) : vistaActiva === 'panorama_turnos' ? (
+                    <PanoramaTurnosPanel
+                        reservas={reservasList}
+                        config={config}
+                        localJornadas={localJornadas}
+                        historialPorCliente={historialPorCliente}
+                        onOpenTurno={r => handleEventClick(r)}
+                        onIrAGrillaFecha={fechaStr => {
+                            const [y, m, d] = (fechaStr || '').split('-').map(Number)
+                            if (y && m && d) {
+                                handleSelectDate(new Date(y, m - 1, d, 12, 0, 0))
+                            }
+                            setVistaActiva('calendario')
                         }}
                     />
                 ) : modalData && vistaActiva === 'detalle_turno' ? (

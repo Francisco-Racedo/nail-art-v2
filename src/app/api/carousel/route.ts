@@ -12,10 +12,11 @@ export async function GET() {
         if (error) throw error
 
         const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-        // Filter out placeholder and video files so only images go to the photo carousel
+        // Filter out placeholder, CMS-only files (Hero / custom sections), and video files so only gallery images go to the photo carousel
         const urls = (data ?? [])
             .filter(f => f.name !== '.emptyFolderPlaceholder')
-            .filter(f => !/\.(mp4|webm|mov|m4v|ogg)$/i.test(f.name))
+            .filter(f => !f.name.startsWith('cms-'))
+            .filter(f => /\.(jpg|jpeg|png|webp|gif)$/i.test(f.name))
             .map(f => `${supabaseUrl}/storage/v1/object/public/carousel/${f.name}`)
 
         return NextResponse.json(urls)

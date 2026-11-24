@@ -210,6 +210,7 @@ export default function AjustesClient({
         try {
             const fd = new FormData()
             fd.set('file', file)
+            fd.set('scope', 'cms')
             const res = await fetch('/api/admin/upload', {
                 method: 'POST',
                 body: fd

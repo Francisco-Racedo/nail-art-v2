@@ -25,6 +25,7 @@ export async function POST(request: Request) {
         const formData = await request.formData()
         const file = formData.get('file') as File | null
         const customName = (formData.get('fileName') as string | null)?.trim()
+        const scope = (formData.get('scope') as string | null)?.trim()
 
         if (!file) {
             return NextResponse.json({ error: 'Archivo requerido' }, { status: 400 })
@@ -54,7 +55,9 @@ export async function POST(request: Request) {
             ? customName.replace(/[^a-zA-Z0-9.\-_]/g, '')
             : null
         const fileName =
-            safeCustom && /\.(jpg|jpeg|png|webp|gif|mp4|webm|mov)$/i.test(safeCustom)
+            scope !== 'cms' &&
+            safeCustom &&
+            /\.(jpg|jpeg|png|webp|gif|mp4|webm|mov)$/i.test(safeCustom)
                 ? safeCustom
                 : `cms-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${allowedExt}`
 

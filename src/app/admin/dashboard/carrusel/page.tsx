@@ -28,6 +28,8 @@ export default async function CMSCarouselPage() {
 
     const validItems = (data || [])
         .filter(f => f.name !== '.emptyFolderPlaceholder')
+        .filter(f => !f.name.startsWith('cms-'))
+        .filter(f => /\.(jpg|jpeg|png|webp|gif|mp4|webm|mov|m4v|ogg)$/i.test(f.name))
         .sort((a, b) => {
             const isVideoA = /\.(mp4|webm|mov|m4v|ogg)$/i.test(a.name)
             const isVideoB = /\.(mp4|webm|mov|m4v|ogg)$/i.test(b.name)

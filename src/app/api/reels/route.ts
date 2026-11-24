@@ -16,9 +16,10 @@ export async function GET() {
 
         const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 
-        // Filtrar únicamente archivos de video y ordenar de forma ascendente (el más viejo primero, los nuevos al final)
+        // Filtrar únicamente archivos de video de la galería (excluyendo videos de portada Hero / secciones CMS que inician con cms-)
         const reels = (data ?? [])
             .filter(f => f.name !== '.emptyFolderPlaceholder')
+            .filter(f => !f.name.startsWith('cms-'))
             .filter(f => /\.(mp4|webm|mov|m4v|ogg)$/i.test(f.name))
             .sort((a, b) => {
                 // Orden cronológico: fecha de creación o timestamp en el nombre

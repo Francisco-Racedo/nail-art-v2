@@ -261,34 +261,78 @@ export default function TabCMSVisual({
                                 </div>
                             </div>
 
-                            {/* Columna Derecha: Arco Multimedia y Badge de Confianza */}
-                            <div className="lg:col-span-5 relative flex justify-center">
-                                <div className="relative w-48 sm:w-56 h-64 sm:h-72 rounded-t-full rounded-b-[2rem] border-4 border-white shadow-xl overflow-hidden bg-stone-100">
-                                    {cms.hero.media_principal_tipo === 'video' && cms.hero.imagen_principal ? (
-                                        <video
-                                            src={cms.hero.imagen_principal}
-                                            autoPlay
-                                            muted
-                                            loop
-                                            playsInline
-                                            className="w-full h-full object-cover"
-                                        />
-                                    ) : (
-                                        <img
-                                            src={cms.hero.imagen_principal || '/img/nail-1.png'}
-                                            alt="Preview Portada"
-                                            className="w-full h-full object-cover"
-                                            onError={e => {
-                                                e.currentTarget.src =
-                                                    'https://images.unsplash.com/photo-1519014816548-bf5fe059c98b?auto=format&fit=crop&w=800&q=85'
-                                            }}
-                                        />
+                            {/* Columna Derecha: Arco Multimedia Principal + Retrato Secundario + Badge de Confianza */}
+                            <div className="lg:col-span-5 relative flex justify-center py-4">
+                                <div className="relative w-48 sm:w-56 h-64 sm:h-72">
+                                    {/* 1. Marco Principal en Arco (Imagen o Video) */}
+                                    <div className="w-full h-full rounded-t-full rounded-b-[2rem] border-4 border-white shadow-xl overflow-hidden bg-stone-100 relative">
+                                        {(cms.hero.media_principal_tipo === 'video' ||
+                                            /\.(mp4|webm|mov)(\?.*)?$/i.test(
+                                                cms.hero.imagen_principal || ''
+                                            )) &&
+                                        cms.hero.imagen_principal ? (
+                                            <video
+                                                src={cms.hero.imagen_principal}
+                                                autoPlay
+                                                muted
+                                                loop
+                                                playsInline
+                                                className="w-full h-full object-cover"
+                                            />
+                                        ) : (
+                                            <img
+                                                src={cms.hero.imagen_principal || '/img/nail-1.png'}
+                                                alt="Preview Portada Principal"
+                                                className="w-full h-full object-cover"
+                                                onError={e => {
+                                                    e.currentTarget.src =
+                                                        'https://images.unsplash.com/photo-1519014816548-bf5fe059c98b?auto=format&fit=crop&w=800&q=85'
+                                                }}
+                                            />
+                                        )}
+                                        <span className="absolute top-2.5 left-1/2 -translate-x-1/2 bg-black/55 backdrop-blur-xs text-white text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full">
+                                            Tarjeta 1 (Arco)
+                                        </span>
+                                    </div>
+
+                                    {/* 2. Retrato Secundario Superpuesto (Imagen o Video) */}
+                                    {cms.hero.imagen_secundaria && (
+                                        <div className="absolute -bottom-4 -right-3 sm:-left-7 sm:right-auto w-24 sm:w-28 aspect-[3/4] rounded-2xl border-4 border-white overflow-hidden shadow-2xl z-20 bg-stone-100">
+                                            {cms.hero.media_secundaria_tipo === 'video' ||
+                                            /\.(mp4|webm|mov)(\?.*)?$/i.test(
+                                                cms.hero.imagen_secundaria || ''
+                                            ) ? (
+                                                <video
+                                                    src={cms.hero.imagen_secundaria}
+                                                    autoPlay
+                                                    muted
+                                                    loop
+                                                    playsInline
+                                                    className="w-full h-full object-cover"
+                                                />
+                                            ) : (
+                                                <img
+                                                    src={cms.hero.imagen_secundaria}
+                                                    alt="Preview Retrato Secundario"
+                                                    className="w-full h-full object-cover"
+                                                    onError={e => {
+                                                        e.currentTarget.src =
+                                                            'https://images.unsplash.com/photo-1604654894610-df63bc536371?auto=format&fit=crop&w=600&q=85'
+                                                    }}
+                                                />
+                                            )}
+                                            <span className="absolute bottom-1.5 left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur-xs text-white text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                                                Tarjeta 2
+                                            </span>
+                                        </div>
                                     )}
 
-                                    {/* Badge flotante en el arco */}
+                                    {/* 3. Badge flotante en el arco */}
                                     {cms.hero.badge_flotante_titulo && (
-                                        <div className="absolute top-3 right-2 bg-white/95 backdrop-blur-md border border-rose-200 rounded-xl px-2.5 py-1.5 shadow-md flex items-center gap-1.5">
-                                            <span className="text-sm">{cms.hero.badge_flotante_icono || '💅'}</span>
+                                        <div className="absolute top-4 -right-2 sm:-right-4 z-30 bg-white/95 backdrop-blur-md border border-rose-200 rounded-xl px-2.5 py-1.5 shadow-md flex items-center gap-1.5">
+                                            <span className="text-sm">
+                                                {cms.hero.badge_flotante_icono || '💅'}
+                                            </span>
                                             <div>
                                                 <p className="text-[10px] font-black text-stone-900 leading-tight">
                                                     {cms.hero.badge_flotante_titulo}
@@ -569,85 +613,307 @@ export default function TabCMSVisual({
                             </div>
                         </div>
 
-                        {/* Multimedia en Arco Romano (Imagen o Video) */}
+                        {/* Multimedia de la Portada: 2 Tarjetas en Arco (Imagen o Video en ambas) */}
                         <div className="pt-4 border-t border-stone-100 space-y-4">
-                            <div className="flex items-center justify-between">
+                            <div>
                                 <label className={labelCls}>
-                                    Multimedia Principal del Arco (Imagen o Video)
+                                    Multimedia de la Portada: 2 Tarjetas Visuales (Imagen o Video)
                                 </label>
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            setCms(p => ({
-                                                ...p,
-                                                hero: { ...p.hero, media_principal_tipo: 'imagen' }
-                                            }))
-                                        }
-                                        className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition ${
-                                            cms.hero.media_principal_tipo === 'imagen'
-                                                ? 'bg-rose-500 text-white shadow-xs'
-                                                : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-                                        }`}
-                                    >
-                                        <ImageIcon className="w-3.5 h-3.5" /> Imagen
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            setCms(p => ({
-                                                ...p,
-                                                hero: { ...p.hero, media_principal_tipo: 'video' }
-                                            }))
-                                        }
-                                        className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition ${
-                                            cms.hero.media_principal_tipo === 'video'
-                                                ? 'bg-rose-500 text-white shadow-xs'
-                                                : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-                                        }`}
-                                    >
-                                        <Film className="w-3.5 h-3.5" /> Video (MP4)
-                                    </button>
-                                </div>
+                                <p className="text-xs text-stone-500">
+                                    Podés subir una foto o un video corto (MP4, WebM, MOV) tanto en el arco principal como en la tarjeta secundaria superpuesta.
+                                </p>
                             </div>
 
-                            <div className="flex gap-2">
-                                <input
-                                    type="text"
-                                    value={cms.hero.imagen_principal}
-                                    onChange={e =>
-                                        setCms(p => ({
-                                            ...p,
-                                            hero: { ...p.hero, imagen_principal: e.target.value }
-                                        }))
-                                    }
-                                    placeholder="https://... o subí un archivo desde tu dispositivo"
-                                    className={inputCls}
-                                />
-                                <label className="inline-flex items-center gap-1.5 px-4 py-2 bg-stone-900 hover:bg-black text-white text-xs font-bold rounded-xl cursor-pointer transition shrink-0 shadow-xs">
-                                    <Upload className="w-4 h-4 text-rose-400" />
-                                    {subiendoArchivo ? 'Subiendo...' : 'Subir Archivo'}
-                                    <input
-                                        type="file"
-                                        accept="image/*,video/*"
-                                        className="hidden"
-                                        disabled={subiendoArchivo}
-                                        onChange={e => {
-                                            const f = e.target.files?.[0]
-                                            if (f) {
-                                                subirArchivoMultimedia(f, url =>
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                {/* TARJETA 1: MARCO PRINCIPAL EN ARCO */}
+                                <div className="p-4 rounded-2xl bg-stone-50/90 border border-stone-200/90 space-y-3">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <div>
+                                            <span className="text-xs font-black text-stone-900 block">
+                                                1. Tarjeta Principal del Arco (Grande)
+                                            </span>
+                                            <span className="text-[11px] text-stone-500">
+                                                Marco central en arco romano
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                            <button
+                                                type="button"
+                                                onClick={() =>
                                                     setCms(p => ({
                                                         ...p,
                                                         hero: {
                                                             ...p.hero,
-                                                            imagen_principal: url
+                                                            media_principal_tipo: 'imagen'
                                                         }
                                                     }))
-                                                )
-                                            }
-                                        }}
-                                    />
-                                </label>
+                                                }
+                                                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition cursor-pointer ${
+                                                    (cms.hero.media_principal_tipo || 'imagen') ===
+                                                    'imagen'
+                                                        ? 'bg-rose-500 text-white shadow-2xs'
+                                                        : 'bg-white text-stone-600 border border-stone-200 hover:bg-stone-100'
+                                                }`}
+                                            >
+                                                <ImageIcon className="w-3 h-3" /> Imagen
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setCms(p => ({
+                                                        ...p,
+                                                        hero: {
+                                                            ...p.hero,
+                                                            media_principal_tipo: 'video'
+                                                        }
+                                                    }))
+                                                }
+                                                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition cursor-pointer ${
+                                                    cms.hero.media_principal_tipo === 'video'
+                                                        ? 'bg-rose-500 text-white shadow-2xs'
+                                                        : 'bg-white text-stone-600 border border-stone-200 hover:bg-stone-100'
+                                                }`}
+                                            >
+                                                <Film className="w-3 h-3" /> Video
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Mini vista previa de la Tarjeta 1 */}
+                                    <div className="flex items-center gap-3 bg-white p-2.5 rounded-xl border border-stone-200/80">
+                                        <div className="w-16 h-20 rounded-t-full rounded-b-xl overflow-hidden bg-stone-100 border border-stone-200 shrink-0">
+                                            {(cms.hero.media_principal_tipo === 'video' ||
+                                                /\.(mp4|webm|mov)(\?.*)?$/i.test(
+                                                    cms.hero.imagen_principal || ''
+                                                )) &&
+                                            cms.hero.imagen_principal ? (
+                                                <video
+                                                    src={cms.hero.imagen_principal}
+                                                    autoPlay
+                                                    muted
+                                                    loop
+                                                    playsInline
+                                                    className="w-full h-full object-cover"
+                                                />
+                                            ) : (
+                                                <img
+                                                    src={
+                                                        cms.hero.imagen_principal || '/img/nail-1.png'
+                                                    }
+                                                    alt="Miniatura Tarjeta 1"
+                                                    className="w-full h-full object-cover"
+                                                    onError={e => {
+                                                        e.currentTarget.src =
+                                                            'https://images.unsplash.com/photo-1519014816548-bf5fe059c98b?auto=format&fit=crop&w=400&q=80'
+                                                    }}
+                                                />
+                                            )}
+                                        </div>
+                                        <div className="flex-1 min-w-0 space-y-2">
+                                            <input
+                                                type="text"
+                                                value={cms.hero.imagen_principal}
+                                                onChange={e => {
+                                                    const val = e.target.value
+                                                    const esVideo = /\.(mp4|webm|mov)(\?.*)?$/i.test(
+                                                        val
+                                                    )
+                                                    setCms(p => ({
+                                                        ...p,
+                                                        hero: {
+                                                            ...p.hero,
+                                                            imagen_principal: val,
+                                                            media_principal_tipo: esVideo
+                                                                ? 'video'
+                                                                : p.hero.media_principal_tipo
+                                                        }
+                                                    }))
+                                                }}
+                                                placeholder="URL o subí imagen/video..."
+                                                className={inputCls}
+                                            />
+                                            <label className="inline-flex items-center justify-center gap-1.5 w-full px-3 py-2 bg-stone-900 hover:bg-black text-white text-xs font-bold rounded-xl cursor-pointer transition shadow-2xs">
+                                                <Upload className="w-3.5 h-3.5 text-rose-400" />
+                                                {subiendoArchivo
+                                                    ? 'Subiendo archivo...'
+                                                    : 'Subir Imagen o Video (Tarjeta 1)'}
+                                                <input
+                                                    type="file"
+                                                    accept="image/*,video/*"
+                                                    className="hidden"
+                                                    disabled={subiendoArchivo}
+                                                    onChange={e => {
+                                                        const f = e.target.files?.[0]
+                                                        if (f) {
+                                                            const esVideo =
+                                                                f.type.startsWith('video/') ||
+                                                                /\.(mp4|webm|mov)$/i.test(f.name)
+                                                            subirArchivoMultimedia(f, url =>
+                                                                setCms(p => ({
+                                                                    ...p,
+                                                                    hero: {
+                                                                        ...p.hero,
+                                                                        imagen_principal: url,
+                                                                        media_principal_tipo: esVideo
+                                                                            ? 'video'
+                                                                            : 'imagen'
+                                                                    }
+                                                                }))
+                                                            )
+                                                        }
+                                                        e.target.value = ''
+                                                    }}
+                                                />
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* TARJETA 2: RETRATO SECUNDARIO SUPERPUESTO */}
+                                <div className="p-4 rounded-2xl bg-stone-50/90 border border-stone-200/90 space-y-3">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <div>
+                                            <span className="text-xs font-black text-stone-900 block">
+                                                2. Tarjeta Secundaria Superpuesta (Chica)
+                                            </span>
+                                            <span className="text-[11px] text-stone-500">
+                                                Recuadro flotante en la esquina inferior
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setCms(p => ({
+                                                        ...p,
+                                                        hero: {
+                                                            ...p.hero,
+                                                            media_secundaria_tipo: 'imagen'
+                                                        }
+                                                    }))
+                                                }
+                                                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition cursor-pointer ${
+                                                    (cms.hero.media_secundaria_tipo || 'imagen') ===
+                                                    'imagen'
+                                                        ? 'bg-rose-500 text-white shadow-2xs'
+                                                        : 'bg-white text-stone-600 border border-stone-200 hover:bg-stone-100'
+                                                }`}
+                                            >
+                                                <ImageIcon className="w-3 h-3" /> Imagen
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setCms(p => ({
+                                                        ...p,
+                                                        hero: {
+                                                            ...p.hero,
+                                                            media_secundaria_tipo: 'video'
+                                                        }
+                                                    }))
+                                                }
+                                                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition cursor-pointer ${
+                                                    cms.hero.media_secundaria_tipo === 'video'
+                                                        ? 'bg-rose-500 text-white shadow-2xs'
+                                                        : 'bg-white text-stone-600 border border-stone-200 hover:bg-stone-100'
+                                                }`}
+                                            >
+                                                <Film className="w-3 h-3" /> Video
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Mini vista previa de la Tarjeta 2 */}
+                                    <div className="flex items-center gap-3 bg-white p-2.5 rounded-xl border border-stone-200/80">
+                                        <div className="w-16 h-20 rounded-2xl overflow-hidden bg-stone-100 border border-stone-200 shrink-0">
+                                            {(cms.hero.media_secundaria_tipo === 'video' ||
+                                                /\.(mp4|webm|mov)(\?.*)?$/i.test(
+                                                    cms.hero.imagen_secundaria || ''
+                                                )) &&
+                                            cms.hero.imagen_secundaria ? (
+                                                <video
+                                                    src={cms.hero.imagen_secundaria}
+                                                    autoPlay
+                                                    muted
+                                                    loop
+                                                    playsInline
+                                                    className="w-full h-full object-cover"
+                                                />
+                                            ) : (
+                                                <img
+                                                    src={
+                                                        cms.hero.imagen_secundaria ||
+                                                        '/img/hero-secondary.png'
+                                                    }
+                                                    alt="Miniatura Tarjeta 2"
+                                                    className="w-full h-full object-cover"
+                                                    onError={e => {
+                                                        e.currentTarget.src =
+                                                            'https://images.unsplash.com/photo-1604654894610-df63bc536371?auto=format&fit=crop&w=400&q=80'
+                                                    }}
+                                                />
+                                            )}
+                                        </div>
+                                        <div className="flex-1 min-w-0 space-y-2">
+                                            <input
+                                                type="text"
+                                                value={cms.hero.imagen_secundaria || ''}
+                                                onChange={e => {
+                                                    const val = e.target.value
+                                                    const esVideo = /\.(mp4|webm|mov)(\?.*)?$/i.test(
+                                                        val
+                                                    )
+                                                    setCms(p => ({
+                                                        ...p,
+                                                        hero: {
+                                                            ...p.hero,
+                                                            imagen_secundaria: val,
+                                                            media_secundaria_tipo: esVideo
+                                                                ? 'video'
+                                                                : p.hero.media_secundaria_tipo ||
+                                                                  'imagen'
+                                                        }
+                                                    }))
+                                                }}
+                                                placeholder="URL o subí imagen/video..."
+                                                className={inputCls}
+                                            />
+                                            <label className="inline-flex items-center justify-center gap-1.5 w-full px-3 py-2 bg-stone-900 hover:bg-black text-white text-xs font-bold rounded-xl cursor-pointer transition shadow-2xs">
+                                                <Upload className="w-3.5 h-3.5 text-rose-400" />
+                                                {subiendoArchivo
+                                                    ? 'Subiendo archivo...'
+                                                    : 'Subir Imagen o Video (Tarjeta 2)'}
+                                                <input
+                                                    type="file"
+                                                    accept="image/*,video/*"
+                                                    className="hidden"
+                                                    disabled={subiendoArchivo}
+                                                    onChange={e => {
+                                                        const f = e.target.files?.[0]
+                                                        if (f) {
+                                                            const esVideo =
+                                                                f.type.startsWith('video/') ||
+                                                                /\.(mp4|webm|mov)$/i.test(f.name)
+                                                            subirArchivoMultimedia(f, url =>
+                                                                setCms(p => ({
+                                                                    ...p,
+                                                                    hero: {
+                                                                        ...p.hero,
+                                                                        imagen_secundaria: url,
+                                                                        media_secundaria_tipo: esVideo
+                                                                            ? 'video'
+                                                                            : 'imagen'
+                                                                    }
+                                                                }))
+                                                            )
+                                                        }
+                                                        e.target.value = ''
+                                                    }}
+                                                />
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 

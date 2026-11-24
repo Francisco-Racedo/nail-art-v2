@@ -190,7 +190,9 @@ export default function HeroSection({ initialNombre }: { initialNombre?: string 
                             transition={{ repeat: Infinity, duration: 7, ease: 'easeInOut' }}
                             className="absolute inset-0 w-full h-full rounded-t-full rounded-b-[3rem] border-[8px] border-white overflow-hidden shadow-[0_25px_60px_rgba(130,60,75,0.18)] bg-stone-100"
                         >
-                            {h.media_principal_tipo === 'video' && h.imagen_principal ? (
+                            {(h.media_principal_tipo === 'video' ||
+                                /\.(mp4|webm|mov)(\?.*)?$/i.test(h.imagen_principal || '')) &&
+                            h.imagen_principal ? (
                                 <video
                                     src={h.imagen_principal}
                                     autoPlay
@@ -213,22 +215,34 @@ export default function HeroSection({ initialNombre }: { initialNombre?: string 
                             <div className="absolute inset-0 bg-gradient-to-t from-[#231C19]/35 via-transparent to-transparent" />
                         </motion.div>
 
-                        {/* Retrato Secundario Superpuesto */}
+                        {/* Retrato Secundario Superpuesto (Imagen o Video) */}
                         {h.imagen_secundaria && (
                             <motion.div
                                 animate={{ y: [0, 10, 0] }}
                                 transition={{ repeat: Infinity, duration: 5.5, ease: 'easeInOut' }}
                                 className="absolute -bottom-6 -right-3 sm:-left-8 sm:right-auto w-[48%] aspect-[3/4] rounded-[2rem] border-[6px] border-white overflow-hidden shadow-2xl z-20 bg-stone-100"
                             >
-                                <img
-                                    src={h.imagen_secundaria}
-                                    alt="Detalle de manicuría premium"
-                                    className="w-full h-full object-cover"
-                                    onError={e => {
-                                        e.currentTarget.src =
-                                            'https://images.unsplash.com/photo-1604654894610-df63bc536371?auto=format&fit=crop&w=600&q=85'
-                                    }}
-                                />
+                                {h.media_secundaria_tipo === 'video' ||
+                                /\.(mp4|webm|mov)(\?.*)?$/i.test(h.imagen_secundaria || '') ? (
+                                    <video
+                                        src={h.imagen_secundaria}
+                                        autoPlay
+                                        muted
+                                        loop
+                                        playsInline
+                                        className="w-full h-full object-cover"
+                                    />
+                                ) : (
+                                    <img
+                                        src={h.imagen_secundaria}
+                                        alt="Detalle de manicuría premium"
+                                        className="w-full h-full object-cover"
+                                        onError={e => {
+                                            e.currentTarget.src =
+                                                'https://images.unsplash.com/photo-1604654894610-df63bc536371?auto=format&fit=crop&w=600&q=85'
+                                        }}
+                                    />
+                                )}
                             </motion.div>
                         )}
 

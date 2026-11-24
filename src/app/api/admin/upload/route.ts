@@ -12,7 +12,7 @@ const ALLOWED_MIME_TYPES: Record<string, string> = {
     'video/quicktime': 'mov'
 }
 
-const MAX_FILE_SIZE = 25 * 1024 * 1024 // 25 MB máximo
+const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50 MB máximo
 
 export async function POST(request: Request) {
     try {

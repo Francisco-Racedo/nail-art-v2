@@ -75,6 +75,7 @@ export interface CMSContenido {
         boton_secundario: string
         media_principal_tipo: 'imagen' | 'video'
         imagen_principal: string
+        media_secundaria_tipo?: 'imagen' | 'video'
         imagen_secundaria: string
         badge_flotante_icono: string
         badge_flotante_titulo: string
@@ -155,6 +156,7 @@ export const DEFAULT_CMS_CONTENIDO: CMSContenido = {
         boton_secundario: 'Descubrir Servicios',
         media_principal_tipo: 'imagen',
         imagen_principal: '/img/nail-1.png',
+        media_secundaria_tipo: 'imagen',
         imagen_secundaria: '/img/hero-secondary.png',
         badge_flotante_icono: '💅',
         badge_flotante_titulo: 'Acabado Mirror & Gel',

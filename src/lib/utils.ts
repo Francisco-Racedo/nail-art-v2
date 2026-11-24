@@ -428,6 +428,69 @@ export function parsePrecioServicioBase(servicioStr?: string | null): number {
     return m ? parseInt(m[1].replace(/[.,]/g, ''), 10) || 0 : 0
 }
 
+export function formatearMilesARS(valor: number | string): string {
+    const num = Math.round(Number(valor) || 0)
+    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+}
+
+export function formatearOpcionServicio(
+    nombre: string,
+    precio: number | string
+): string {
+    return `${(nombre || '').trim()} ($${formatearMilesARS(precio)})`
+}
+
+/**
+ * Determina si un ítem del catálogo corresponde a un Servicio Principal (turnos de manicuría o solo retiro)
+ * y NO a un adicional/deco suelto que ya se encuentra en el selector de Adicionales.
+ */
+export function esServicioPrincipal(item: {
+    nombre?: string | null
+    categoria?: string | null
+}): boolean {
+    const cat = (item.categoria || '').toLowerCase().trim()
+    if (cat.includes('adicional')) return false
+
+    const nom = (item.nombre || '').toLowerCase().trim()
+    const nombresExclusivosAdicionales = [
+        'francesitas (french)',
+        'francesas (10 uñas)',
+        'efecto cat eye',
+        'pigmentos',
+        'pigmentos / efecto aurora',
+        'dibujos / diseños complejos',
+        'dibujos / nail art',
+        'strass y piedrería',
+        'strass / piedrería',
+        'arreglo de uña quebrada'
+    ]
+    if (nombresExclusivosAdicionales.includes(nom)) return false
+    return true
+}
+
+/**
+ * Compara el string de servicio guardado en una reserva (ej. "Capping Gel Liso ($20000)" o "Capping Gel Liso ($20.000)")
+ * contra un ítem del catálogo para identificarlo sin importar si el precio se guardó con o sin punto de miles.
+ */
+export function coincideServicioConCatalogo(
+    servicioGuardado: string | undefined | null,
+    item: { nombre: string; precio: number | string }
+): boolean {
+    if (!servicioGuardado) return false
+    const guardadoTrim = servicioGuardado.trim()
+    const opcionConPunto = formatearOpcionServicio(item.nombre, item.precio)
+    const opcionSinPunto = `${item.nombre.trim()} ($${Math.round(Number(item.precio) || 0)})`
+    if (guardadoTrim === opcionConPunto || guardadoTrim === opcionSinPunto) {
+        return true
+    }
+    const nombreLimpioGuardado = guardadoTrim.split('(')[0].trim().toLowerCase()
+    const nombreLimpioCatalogo = (item.nombre || '').trim().toLowerCase()
+    return (
+        nombreLimpioGuardado.length > 0 &&
+        nombreLimpioGuardado === nombreLimpioCatalogo
+    )
+}
+
 export function calcularTotalAdicionales(ids?: string[] | null): number {
     if (!Array.isArray(ids) || ids.length === 0) return 0
     return ids.reduce((acc, id) => {

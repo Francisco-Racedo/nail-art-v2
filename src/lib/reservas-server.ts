@@ -14,6 +14,7 @@ import {
 } from '@/lib/utils'
 import { isPagosHabilitadosEnv } from '@/lib/payments/mercadopago'
 import { CMSContenido, DEFAULT_CMS_CONTENIDO, mergeCMSContenido } from '@/lib/cms-types'
+import { notificarCambioServidor } from '@/lib/realtime-server'
 
 export interface JornadaEspecial {
     fecha: string // YYYY-MM-DD
@@ -156,7 +157,7 @@ let lastAutoConfirmTimestamp = 0
 export async function autoConfirmarPendientesVencidos(minutosMax = 10): Promise<number> {
     try {
         const nowMs = Date.now()
-        if (nowMs - lastAutoConfirmTimestamp < 60_000) {
+        if (nowMs - lastAutoConfirmTimestamp < 2_000) {
             return 0
         }
         lastAutoConfirmTimestamp = nowMs
@@ -212,6 +213,12 @@ export async function autoConfirmarPendientesVencidos(minutosMax = 10): Promise<
 
                 if (!updErr) confirmadosCount++
             }
+        }
+
+        if (confirmadosCount > 0) {
+            notificarCambioServidor('reserva_actualizada', {
+                autoConfirmados: confirmadosCount
+            }).catch(() => {})
         }
 
         return confirmadosCount

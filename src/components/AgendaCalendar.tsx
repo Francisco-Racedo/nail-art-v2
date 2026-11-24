@@ -37,7 +37,9 @@ import {
     HORARIOS_DOMINGO_DICIEMBRE,
     normalizarCelular,
     celularParaWhatsapp,
-    getAhoraArgentina
+    getAhoraArgentina,
+    esServicioPrincipal,
+    formatearOpcionServicio
 } from '@/lib/utils'
 import {
     toggleTurnoNocturnoAction,
@@ -159,13 +161,50 @@ export default function AgendaCalendar({
         setReservasList(initialReservas)
     }, [initialReservas])
 
-    // Sincronización instantánea en tiempo real ante cualquier cambio (reservas creadas/modificadas/eliminadas)
+    // Mantener la Pestaña del Turno (`modalData`) sincronizada en tiempo real cuando una reserva cambia de estado (ej. auto-confirmación a los 10 min)
+    useEffect(() => {
+        if (!modalData) return
+        const actualizada = reservasList.find(r => r.id === modalData.id)
+        if (!actualizada) return
+        const nuevoEstadoEfectivo = getEstadoEfectivo(actualizada)
+        const meta = parseReservaMeta(actualizada.mp_preference_id, actualizada.id)
+        if (
+            nuevoEstadoEfectivo !== modalData.estado ||
+            actualizada.notificacion_enviada !== modalData.notificacion_enviada ||
+            actualizada.mp_preference_id !== modalData.mp_preference_id
+        ) {
+            setModalData(prev =>
+                prev
+                    ? {
+                          ...prev,
+                          estado: nuevoEstadoEfectivo,
+                          notificacion_enviada: actualizada.notificacion_enviada,
+                          reprogramado: actualizada.reprogramado,
+                          service_recordado: !!meta.serviceRecordado,
+                          historial_eventos: meta.historial || prev.historial_eventos,
+                          mp_preference_id: actualizada.mp_preference_id
+                      }
+                    : null
+            )
+        }
+    }, [reservasList, modalData])
+
+    const hayTurnosPendientesActivos = useMemo(() => {
+        const hoyStr = getHoyUTC3()
+        return reservasList.some(
+            r => r.fecha >= hoyStr && getEstadoEfectivo(r) === 'pendiente'
+        )
+    }, [reservasList])
+
+    // Sincronización instantánea en tiempo real ante cualquier cambio (reservas creadas/modificadas/eliminadas y auto-confirmación)
     useEffect(() => {
         let isMounted = true
 
         const refrescarTurnos = async () => {
             try {
-                const res = await fetch('/api/reservas', { cache: 'no-store' })
+                const res = await fetch(`/api/reservas?t=${Date.now()}`, {
+                    cache: 'no-store'
+                })
                 if (res.ok && isMounted) {
                     const data = await res.json()
                     if (Array.isArray(data.reservas)) {
@@ -180,11 +219,23 @@ export default function AgendaCalendar({
         }
 
         window.addEventListener('nail_art_sync_event', handleSyncEvent)
+
+        // Si hay al menos un turno en estado PENDIENTE, verificar cada 4 segundos para reflejar la auto-confirmación en tiempo real
+        let pollId: ReturnType<typeof setInterval> | null = null
+        if (hayTurnosPendientesActivos) {
+            pollId = setInterval(() => {
+                if (typeof document !== 'undefined' && !document.hidden) {
+                    refrescarTurnos()
+                }
+            }, 4000)
+        }
+
         return () => {
             isMounted = false
             window.removeEventListener('nail_art_sync_event', handleSyncEvent)
+            if (pollId) clearInterval(pollId)
         }
-    }, [])
+    }, [hayTurnosPendientesActivos])
 
     // Asignación manual de turno desde un bloque libre de la grilla
     const [slotLibreElegido, setSlotLibreElegido] = useState<string | null>(null)
@@ -1558,14 +1609,19 @@ export default function AgendaCalendar({
                             className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-3 text-sm font-semibold text-stone-800"
                         >
                             <option value="">Seleccionar servicio *</option>
-                            {serviciosLista.map(s => (
-                                <option
-                                    key={s.id}
-                                    value={`${s.nombre} ($${Number(s.precio).toLocaleString('es-AR')})`}
-                                >
-                                    {s.nombre} (${Number(s.precio).toLocaleString('es-AR')})
-                                </option>
-                            ))}
+                            {serviciosLista
+                                .filter(s => esServicioPrincipal(s))
+                                .map(s => {
+                                    const val = formatearOpcionServicio(
+                                        s.nombre,
+                                        s.precio
+                                    )
+                                    return (
+                                        <option key={s.id} value={val}>
+                                            {val}
+                                        </option>
+                                    )
+                                })}
                         </select>
                     </div>
                 </form>

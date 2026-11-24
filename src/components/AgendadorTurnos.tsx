@@ -18,7 +18,10 @@ import {
     ADICIONALES_CATALOGO,
     parsePrecioServicioBase,
     calcularTotalAdicionales,
-    obtenerLabelsAdicionales
+    obtenerLabelsAdicionales,
+    esServicioPrincipal,
+    formatearOpcionServicio,
+    formatearMilesARS
 } from '../lib/utils'
 import { DEFAULT_CMS_CONTENIDO, mergeCMSContenido } from '../lib/cms-types'
 import type { DisponibilidadDia } from '../lib/reservas-server'
@@ -336,10 +339,12 @@ export default function AgendadorTurnos() {
     }
 
     const grupos: Record<string, Servicio[]> = {}
-    servicios.forEach((s: Servicio) => {
-        if (!grupos[s.categoria]) grupos[s.categoria] = []
-        grupos[s.categoria].push(s)
-    })
+    servicios
+        .filter((s: Servicio) => esServicioPrincipal(s))
+        .forEach((s: Servicio) => {
+            if (!grupos[s.categoria]) grupos[s.categoria] = []
+            grupos[s.categoria].push(s)
+        })
 
     const aniosDisponibles: number[] = []
     const anioActual = new Date().getFullYear()
@@ -758,38 +763,29 @@ export default function AgendadorTurnos() {
                                         className="w-full p-3.5 text-base bg-white/95 text-stone-800 border border-pink-200 rounded-xl focus:bg-white focus:outline-none focus:border-pink-500 focus:ring-4 focus:ring-pink-200/50 transition-all shadow-sm min-h-[48px]"
                                     >
                                         <option value="">Elegí un servicio...</option>
-                                        {Object.keys(grupos)
-                                            .filter(
-                                                cat =>
-                                                    !cat
-                                                        .toLowerCase()
-                                                        .includes('adicional')
-                                            )
-                                            .concat(
-                                                Object.keys(grupos).filter(cat =>
-                                                    cat
-                                                        .toLowerCase()
-                                                        .includes('adicional')
-                                                )
-                                            )
-                                            .map(cat => (
-                                                <optgroup
-                                                    key={cat}
-                                                    label={cat.toUpperCase()}
-                                                    className="bg-white text-pink-500 font-bold"
-                                                >
-                                                    {grupos[cat].map(s => (
+                                        {Object.keys(grupos).map(cat => (
+                                            <optgroup
+                                                key={cat}
+                                                label={cat.toUpperCase()}
+                                                className="bg-white text-pink-500 font-bold"
+                                            >
+                                                {grupos[cat].map(s => {
+                                                    const val = formatearOpcionServicio(
+                                                        s.nombre,
+                                                        s.precio
+                                                    )
+                                                    return (
                                                         <option
                                                             key={s.id}
-                                                            value={`${s.nombre} ($${s.precio.toLocaleString('es-AR')})`}
+                                                            value={val}
                                                             className="text-stone-800 font-medium bg-white"
                                                         >
-                                                            {s.nombre} ($
-                                                            {s.precio.toLocaleString('es-AR')})
+                                                            {val}
                                                         </option>
-                                                    ))}
-                                                </optgroup>
-                                            ))}
+                                                    )
+                                                })}
+                                            </optgroup>
+                                        ))}
                                     </select>
                                     {errors.servicio && (
                                         <p className="text-red-600 font-bold text-xs mt-1">

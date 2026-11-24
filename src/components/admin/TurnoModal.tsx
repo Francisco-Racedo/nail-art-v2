@@ -40,7 +40,11 @@ import {
 import {
     generarHorariosDisponibles,
     celularParaWhatsapp,
-    ADICIONALES_CATALOGO
+    ADICIONALES_CATALOGO,
+    esServicioPrincipal,
+    formatearOpcionServicio,
+    coincideServicioConCatalogo,
+    parseReservaMeta
 } from '@/lib/utils'
 
 interface ServicioCatalogo {
@@ -247,16 +251,67 @@ export default function TurnoModal({
     const esCumple = checkCumple(nacimientoCliente || modalData.fecha_nacimiento)
     const nombreNegocio = config?.nombre_negocio || 'Pintaditas Nails'
 
-    // Agrupar catálogo de servicios por categoría para el selector
+    // Cuenta regresiva en tiempo real para auto-confirmación cuando el turno está PENDIENTE
+    const [segundosAutoConfirm, setSegundosAutoConfirm] = useState<number | null>(null)
+
+    useEffect(() => {
+        if (modalData.estado !== 'pendiente') {
+            setSegundosAutoConfirm(null)
+            return
+        }
+        const meta = parseReservaMeta(modalData.mp_preference_id, modalData.id)
+        if (!meta.createdAt || meta.createdAt.startsWith('1970-')) {
+            setSegundosAutoConfirm(null)
+            return
+        }
+        const createdMs = new Date(meta.createdAt).getTime()
+        if (isNaN(createdMs)) {
+            setSegundosAutoConfirm(null)
+            return
+        }
+        const minAuto = Number(config?.minutos_autoconfirmacion) || 10
+        const limitMs = minAuto * 60 * 1000
+
+        let yaDisparoSync = false
+        const actualizarReloj = () => {
+            const diffSec = Math.max(
+                0,
+                Math.ceil((createdMs + limitMs - Date.now()) / 1000)
+            )
+            setSegundosAutoConfirm(diffSec)
+            if (diffSec <= 0 && !yaDisparoSync) {
+                yaDisparoSync = true
+                if (typeof window !== 'undefined') {
+                    window.dispatchEvent(
+                        new CustomEvent('nail_art_sync_event', {
+                            detail: { tipo: 'auto_confirm_check' }
+                        })
+                    )
+                }
+            }
+        }
+
+        actualizarReloj()
+        const timer = setInterval(actualizarReloj, 1000)
+        return () => clearInterval(timer)
+    }, [modalData.id, modalData.estado, modalData.mp_preference_id, config?.minutos_autoconfirmacion])
+
+    // Filtrar únicamente Servicios Principales (excluyendo Adicionales & Nail Art para no duplicarlos)
+    const serviciosPrincipalesCatalogo = useMemo(
+        () => serviciosCatalogo.filter(s => esServicioPrincipal(s)),
+        [serviciosCatalogo]
+    )
+
+    // Agrupar catálogo de servicios principales por categoría para el selector
     const serviciosPorCategoria = useMemo(() => {
         const grupos: Record<string, ServicioCatalogo[]> = {}
-        for (const s of serviciosCatalogo) {
+        for (const s of serviciosPrincipalesCatalogo) {
             const cat = s.categoria || 'Servicios'
             if (!grupos[cat]) grupos[cat] = []
             grupos[cat].push(s)
         }
         return grupos
-    }, [serviciosCatalogo])
+    }, [serviciosPrincipalesCatalogo])
 
     // Cálculo en vivo de precios (Servicio base + Adicionales o Precio Manual - Descuento)
     const calculoPrecio = useMemo(() => {
@@ -700,6 +755,19 @@ export default function TurnoModal({
                                 <CircleDot className="w-3.5 h-3.5" />
                                 {estadoCfg.label}
                             </span>
+                            {modalData.estado === 'pendiente' &&
+                                segundosAutoConfirm !== null &&
+                                segundosAutoConfirm > 0 && (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-900 border border-amber-300">
+                                        <Clock className="w-3.5 h-3.5 text-amber-600" />
+                                        Auto-confirma en{' '}
+                                        {String(Math.floor(segundosAutoConfirm / 60)).padStart(
+                                            2,
+                                            '0'
+                                        )}
+                                        :{String(segundosAutoConfirm % 60).padStart(2, '0')}
+                                    </span>
+                                )}
                             <span className="bg-white text-stone-800 border border-stone-200 px-3 py-1 rounded-full text-xs font-bold">
                                 📅 {modalData.fecha.split('-').reverse().join('/')} • 🕒{' '}
                                 {modalData.hora} hs (ARG)
@@ -926,25 +994,32 @@ export default function TurnoModal({
                                 }}
                                 className="w-full bg-stone-50 border border-stone-200 focus:bg-white focus:border-rose-400 rounded-xl px-3.5 py-3 text-sm font-bold text-stone-900 transition"
                             >
-                                {/* Mantener opción actual si es histórica y no coincide con el catálogo nuevo */}
-                                {!serviciosCatalogo.some(
-                                    s =>
-                                        `${s.nombre} ($${Number(s.precio).toLocaleString('es-AR')})` ===
-                                            servicioElegido ||
-                                        `${s.nombre} ($${s.precio})` === servicioElegido
+                                {/* Mantener opción actual si es histórica y no coincide con ningún servicio principal del catálogo */}
+                                {!serviciosPrincipalesCatalogo.some(s =>
+                                    coincideServicioConCatalogo(servicioElegido, s)
                                 ) && (
                                     <option value={servicioElegido}>
-                                        {servicioElegido} (Servicio actual)
+                                        {servicioElegido} (Servicio elegido)
                                     </option>
                                 )}
                                 {Object.keys(serviciosPorCategoria).map(cat => (
                                     <optgroup key={cat} label={cat.toUpperCase()}>
                                         {serviciosPorCategoria[cat].map(s => {
-                                            const val = `${s.nombre} ($${Number(s.precio).toLocaleString('es-AR')})`
+                                            const valEstandar = formatearOpcionServicio(
+                                                s.nombre,
+                                                s.precio
+                                            )
+                                            const esSeleccionado =
+                                                coincideServicioConCatalogo(
+                                                    servicioElegido,
+                                                    s
+                                                )
+                                            const optionVal = esSeleccionado
+                                                ? servicioElegido
+                                                : valEstandar
                                             return (
-                                                <option key={s.id} value={val}>
-                                                    {s.nombre} ($
-                                                    {Number(s.precio).toLocaleString('es-AR')})
+                                                <option key={s.id} value={optionVal}>
+                                                    {valEstandar}
                                                 </option>
                                             )
                                         })}

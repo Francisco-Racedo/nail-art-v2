@@ -456,6 +456,10 @@ export default function TurnoModal({
                           fecha: nuevaFecha,
                           hora: horaElegida,
                           reprogramado: true,
+                          estado:
+                              prev.estado === 'reprogramar'
+                                  ? 'confirmado'
+                                  : prev.estado,
                           codigo: data.codigo || prev.codigo
                       }
                     : null
@@ -746,83 +750,144 @@ export default function TurnoModal({
                     </div>
                 </div>
 
-                {/* Centro de Mensajes WhatsApp en 1 Clic */}
-                {(celularCliente || modalData.celular) && (
-                    <div className="pt-4">
-                        <p className="text-[11px] font-black uppercase tracking-wider text-stone-500 mb-2.5">
-                            📲 Enviar aviso directo por WhatsApp a {nombreCliente}:
-                        </p>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-                            <a
-                                href={getWppLink('confirmacion')}
-                                onClick={() => {
-                                    if (modalData.estado === 'pendiente') {
-                                        actualizarEstado('confirmado')
-                                    }
-                                }}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20b857] text-white font-bold py-2.5 px-3.5 rounded-xl text-xs shadow-sm transition"
-                            >
-                                <Send className="w-3.5 h-3.5" />
-                                Confirmar Turno
-                            </a>
-                            <a
-                                href={getWppLink('recordatorio_24h')}
-                                onClick={() => {
-                                    if (!modalData.notificacion_enviada) {
-                                        patchTurno(
-                                            { notificacion_enviada: true },
-                                            'Recordatorio de turno marcado como enviado ✓'
-                                        )
-                                            .then(() => {
-                                                setModalData(prev =>
-                                                    prev
-                                                        ? {
-                                                              ...prev,
-                                                              notificacion_enviada: true
-                                                          }
-                                                        : null
+                {/* Centro de Mensajes WhatsApp en 1 Clic (Adaptado a la etapa actual del turno) */}
+                {(celularCliente || modalData.celular) &&
+                    !['cancelado', 'ausente', 'rechazado'].includes(modalData.estado) && (
+                        <div className="pt-4">
+                            <p className="text-[11px] font-black uppercase tracking-wider text-stone-500 mb-2.5">
+                                📲 Enviar aviso directo por WhatsApp a {nombreCliente}:
+                            </p>
+                            <div className="flex flex-wrap items-center gap-2.5">
+                                {/* 1. CONFIRMAR TURNO: Solo visible cuando el turno está PENDIENTE */}
+                                {modalData.estado === 'pendiente' && (
+                                    <a
+                                        href={getWppLink('confirmacion')}
+                                        onClick={() => {
+                                            actualizarEstado('confirmado')
+                                        }}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex-1 min-w-[180px] flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20b857] text-white font-bold py-2.5 px-4 rounded-xl text-xs shadow-sm transition"
+                                    >
+                                        <Send className="w-3.5 h-3.5" />
+                                        Confirmar Turno
+                                    </a>
+                                )}
+
+                                {/* 2. RECORDATORIO 24H: Visible en PENDIENTE y CONFIRMADO; se deshabilita una vez enviado */}
+                                {(modalData.estado === 'pendiente' ||
+                                    modalData.estado === 'confirmado') &&
+                                    (modalData.notificacion_enviada ? (
+                                        <button
+                                            type="button"
+                                            disabled
+                                            title="El recordatorio de 24 hs ya fue enviado a esta clienta"
+                                            className="flex-1 min-w-[180px] flex items-center justify-center gap-2 bg-emerald-100/90 text-emerald-800 border border-emerald-300 font-bold py-2.5 px-4 rounded-xl text-xs cursor-not-allowed select-none"
+                                        >
+                                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
+                                            Recordatorio Enviado ✓
+                                        </button>
+                                    ) : (
+                                        <a
+                                            href={getWppLink('recordatorio_24h')}
+                                            onClick={() => {
+                                                patchTurno(
+                                                    { notificacion_enviada: true },
+                                                    'Recordatorio de turno marcado como enviado ✓'
                                                 )
-                                            })
-                                            .catch(() => {})
-                                    }
-                                }}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-3.5 rounded-xl text-xs shadow-sm transition"
-                            >
-                                <Clock className="w-3.5 h-3.5" />
-                                {modalData.notificacion_enviada
-                                    ? 'Recordatorio Enviado ✓'
-                                    : 'Recordatorio de Turno'}
-                            </a>
-                            <a
-                                href={getWppLink('reprogramar')}
-                                onClick={() => {
-                                    if (modalData.estado !== 'reprogramar') {
-                                        actualizarEstado('reprogramar')
-                                    }
-                                }}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-3.5 rounded-xl text-xs shadow-sm transition"
-                            >
-                                <RefreshCw className="w-3.5 h-3.5" />
-                                Link para Reprogramar
-                            </a>
-                            <a
-                                href={getWppLink('proximo_service')}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center justify-center gap-2 bg-gradient-to-r from-rose-500 to-orange-500 hover:from-rose-600 hover:to-orange-600 text-white font-bold py-2.5 px-3.5 rounded-xl text-xs shadow-sm transition"
-                            >
-                                <Bell className="w-3.5 h-3.5" />
-                                Recordar Service ({diasService} d)
-                            </a>
+                                                    .then(() => {
+                                                        setModalData(prev =>
+                                                            prev
+                                                                ? {
+                                                                      ...prev,
+                                                                      notificacion_enviada: true
+                                                                  }
+                                                                : null
+                                                        )
+                                                    })
+                                                    .catch(() => {})
+                                            }}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex-1 min-w-[180px] flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-4 rounded-xl text-xs shadow-sm transition"
+                                        >
+                                            <Clock className="w-3.5 h-3.5" />
+                                            Recordatorio de Turno
+                                        </a>
+                                    ))}
+
+                                {/* 3. LINK PARA REPROGRAMAR: Visible en PENDIENTE, CONFIRMADO y REPROGRAMAR (bloqueado cuando ya está en reprogramar) */}
+                                {(modalData.estado === 'pendiente' ||
+                                    modalData.estado === 'confirmado' ||
+                                    modalData.estado === 'reprogramar') &&
+                                    (modalData.estado === 'reprogramar' ? (
+                                        <button
+                                            type="button"
+                                            disabled
+                                            title="Ya se envió el link de reprogramación a la clienta"
+                                            className="flex-1 min-w-[180px] flex items-center justify-center gap-2 bg-indigo-100/90 text-indigo-800 border border-indigo-300 font-bold py-2.5 px-4 rounded-xl text-xs cursor-not-allowed select-none"
+                                        >
+                                            <CheckCircle2 className="w-3.5 h-3.5 text-indigo-700" />
+                                            Link Reprogramar Enviado ✓
+                                        </button>
+                                    ) : (
+                                        <a
+                                            href={getWppLink('reprogramar')}
+                                            onClick={() => {
+                                                actualizarEstado('reprogramar')
+                                            }}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex-1 min-w-[180px] flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-4 rounded-xl text-xs shadow-sm transition"
+                                        >
+                                            <RefreshCw className="w-3.5 h-3.5" />
+                                            Link para Reprogramar
+                                        </a>
+                                    ))}
+
+                                {/* 4. RECORDAR SERVICE: Solo visible cuando el turno ya fue COMPLETADO; se deshabilita una vez enviado */}
+                                {modalData.estado === 'completado' &&
+                                    (modalData.service_recordado ? (
+                                        <button
+                                            type="button"
+                                            disabled
+                                            title="El recordatorio de próximo service ya fue enviado a esta clienta"
+                                            className="flex-1 min-w-[180px] flex items-center justify-center gap-2 bg-rose-100/90 text-rose-800 border border-rose-300 font-bold py-2.5 px-4 rounded-xl text-xs cursor-not-allowed select-none"
+                                        >
+                                            <CheckCircle2 className="w-3.5 h-3.5 text-rose-700" />
+                                            Service Recordado ({diasService} d) ✓
+                                        </button>
+                                    ) : (
+                                        <a
+                                            href={getWppLink('proximo_service')}
+                                            onClick={() => {
+                                                patchTurno(
+                                                    { service_recordado: true },
+                                                    'Aviso de próximo service marcado como enviado ✓'
+                                                )
+                                                    .then(() => {
+                                                        setModalData(prev =>
+                                                            prev
+                                                                ? {
+                                                                      ...prev,
+                                                                      service_recordado: true
+                                                                  }
+                                                                : null
+                                                        )
+                                                    })
+                                                    .catch(() => {})
+                                            }}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex-1 min-w-[180px] flex items-center justify-center gap-2 bg-gradient-to-r from-rose-500 to-orange-500 hover:from-rose-600 hover:to-orange-600 text-white font-bold py-2.5 px-4 rounded-xl text-xs shadow-sm transition"
+                                        >
+                                            <Bell className="w-3.5 h-3.5" />
+                                            Recordar Service ({diasService} d)
+                                        </a>
+                                    ))}
+                            </div>
                         </div>
-                    </div>
-                )}
+                    )}
             </div>
 
             {/* Grilla Principal de 2 Columnas con todas las herramientas de edición */}
@@ -1398,17 +1463,49 @@ export default function TurnoModal({
                                     📅 Alrededor del {fechaSugeridaService}
                                 </span>
                             </div>
-                            {(celularCliente || modalData.celular) && (
-                                <a
-                                    href={getWppLink('proximo_service')}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 shrink-0"
-                                >
-                                    <Send className="w-3.5 h-3.5" />
-                                    Avisar WhatsApp
-                                </a>
-                            )}
+                            {(celularCliente || modalData.celular) &&
+                                (modalData.estado !== 'completado' ? (
+                                    <span className="bg-stone-100 text-stone-500 border border-stone-200 text-[11px] font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 shrink-0 select-none">
+                                        <Lock className="w-3 h-3 text-stone-400" />
+                                        Disponible al completar
+                                    </span>
+                                ) : modalData.service_recordado ? (
+                                    <button
+                                        type="button"
+                                        disabled
+                                        className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 shrink-0 cursor-not-allowed select-none"
+                                    >
+                                        <CheckCircle2 className="w-3.5 h-3.5" />
+                                        Service Recordado ✓
+                                    </button>
+                                ) : (
+                                    <a
+                                        href={getWppLink('proximo_service')}
+                                        onClick={() => {
+                                            patchTurno(
+                                                { service_recordado: true },
+                                                'Aviso de próximo service marcado como enviado ✓'
+                                            )
+                                                .then(() => {
+                                                    setModalData(prev =>
+                                                        prev
+                                                            ? {
+                                                                  ...prev,
+                                                                  service_recordado: true
+                                                              }
+                                                            : null
+                                                    )
+                                                })
+                                                .catch(() => {})
+                                        }}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 shrink-0"
+                                    >
+                                        <Send className="w-3.5 h-3.5" />
+                                        Avisar WhatsApp
+                                    </a>
+                                ))}
                         </div>
                     </div>
 

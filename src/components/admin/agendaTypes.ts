@@ -119,6 +119,7 @@ export interface ModalData {
     codigo?: string
     ocupa_bloque_siguiente?: boolean
     dias_recordatorio_service?: number
+    service_recordado?: boolean
     notas_turno?: string
     precio_personalizado?: number
     adicionales?: string[]

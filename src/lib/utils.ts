@@ -333,6 +333,7 @@ export interface ReservaMeta {
     ocupaBloqueSiguiente?: boolean
     descuentoMotivo?: string
     diasRecordatorioService?: number
+    serviceRecordado?: boolean
     notasTurno?: string
     precioPersonalizado?: number
     adicionalesSeleccionados?: string[]

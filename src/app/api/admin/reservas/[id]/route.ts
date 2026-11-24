@@ -41,6 +41,7 @@ const UpdateReservaSchema = z.object({
     ocupa_bloque_siguiente: z.boolean().optional(),
     motivo_reprogramacion: z.string().max(160).optional(),
     dias_recordatorio_service: z.number().min(5).max(90).optional(),
+    service_recordado: z.boolean().optional(),
     notas_turno: z.string().max(600).optional(),
     precio_personalizado: z.number().min(0).max(1000000).optional().nullable(),
     adicionales: z.array(z.string()).optional()
@@ -241,6 +242,12 @@ export async function PATCH(
             cambiosDetalle.push(
                 `Recordatorio de service configurado a ${d.dias_recordatorio_service} días`
             )
+        }
+        if (d.service_recordado !== undefined) {
+            meta.serviceRecordado = d.service_recordado
+            if (d.service_recordado) {
+                cambiosDetalle.push('Recordatorio de próximo service enviado por WhatsApp')
+            }
         }
         if (d.notas_turno !== undefined) {
             meta.notasTurno = d.notas_turno

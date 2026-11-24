@@ -326,6 +326,7 @@ export default function AgendaCalendar({
             codigo: meta.codigo,
             ocupa_bloque_siguiente: meta.ocupaBloqueSiguiente,
             dias_recordatorio_service: meta.diasRecordatorioService || 18,
+            service_recordado: !!meta.serviceRecordado,
             notas_turno: meta.notasTurno || '',
             precio_personalizado: meta.precioPersonalizado,
             adicionales: meta.adicionalesSeleccionados || [],

@@ -216,10 +216,10 @@ export default function AgendaCalendar({
     const [localJornadas, setLocalJornadas] = useState<any[]>(() => config?.jornadas_especiales || [])
 
     useEffect(() => {
-        if (config?.jornadas_especiales) {
+        if (!showConfigHorarios && config?.jornadas_especiales) {
             setLocalJornadas(config.jornadas_especiales)
         }
-    }, [config?.jornadas_especiales])
+    }, [config?.jornadas_especiales, showConfigHorarios])
 
     useEffect(() => {
         setMounted(true)

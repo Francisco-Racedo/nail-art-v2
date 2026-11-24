@@ -90,6 +90,9 @@ export default function AjustesClient({
     const formRef = useRef<HTMLFormElement>(null)
 
     // 3. Estado de Personalización Visual CMS
+    // IMPORTANTE: No sobrescribir `cms` ni los inputs del formulario en un useEffect([config])
+    // ante refrescos en segundo plano del servidor, para que los textos que el administrador
+    // está escribiendo nunca se borren ni se reinicien solos antes de guardar.
     const [cms, setCms] = useState<CMSContenido>(() =>
         mergeCMSContenido(config?.cms || DEFAULT_CMS_CONTENIDO)
     )
@@ -98,22 +101,10 @@ export default function AjustesClient({
     const [seccionIdAEliminar, setSeccionIdAEliminar] = useState<string | null>(null)
 
     useEffect(() => {
-        setNombreNegocio(config?.nombre_negocio || 'Pintaditas Nails')
-        setWhatsappNumero(config?.whatsapp_numero || '5493813013850')
-        setIntervaloMinutos(Number(config?.intervalo_minutos) || 90)
-        setHoraInicio(config?.hora_inicio || '08:30')
-        setHoraFin(config?.hora_fin || '20:00')
-        setMesesVisibles(Number(config?.meses_visibles_cliente) || 3)
-        setMinutosAuto(config?.minutos_autoconfirmacion ?? 10)
-        setPagosHabilitados(!!config?.pagos_habilitados)
-        if (config?.cms) {
-            setCms(mergeCMSContenido(config.cms))
+        if (!isModalOpen && Array.isArray(servicios)) {
+            setListaServicios(servicios)
         }
-    }, [config])
-
-    useEffect(() => {
-        setListaServicios(servicios || [])
-    }, [servicios])
+    }, [servicios, isModalOpen])
 
     const marcarSincronizado = async () => {
         const ahora = new Date().toLocaleTimeString('es-AR', {

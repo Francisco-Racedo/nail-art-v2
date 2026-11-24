@@ -155,41 +155,6 @@ export default function AgendaCalendar({
         }
     }, [reservasList, mananaStr])
 
-    const turnosSemanaActual = useMemo(() => {
-        const now = getAhoraArgentina()
-        const day = now.getDay()
-        const diffLunes = day === 0 ? -6 : 1 - day
-        const lunes = new Date(
-            now.getFullYear(),
-            now.getMonth(),
-            now.getDate() + diffLunes,
-            12,
-            0,
-            0
-        )
-        const domingo = new Date(
-            lunes.getFullYear(),
-            lunes.getMonth(),
-            lunes.getDate() + 6,
-            12,
-            0,
-            0
-        )
-        const inicioStr = formatDateStr(lunes)
-        const finStr = formatDateStr(domingo)
-
-        return reservasList.filter(r => {
-            if (!r.fecha || r.fecha < inicioStr || r.fecha > finStr) return false
-            const ef = getEstadoEfectivo(r)
-            return (
-                ef === 'pendiente' ||
-                ef === 'confirmado' ||
-                ef === 'completado' ||
-                ef === 'reprogramar'
-            )
-        }).length
-    }, [reservasList])
-
     useEffect(() => {
         setReservasList(initialReservas)
     }, [initialReservas])
@@ -690,29 +655,31 @@ export default function AgendaCalendar({
                     <button
                         type="button"
                         onClick={() => setVistaActiva('calendario')}
-                        className={`px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-black transition flex items-center gap-2 cursor-pointer ${
+                        className={`px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-black transition flex items-center justify-start gap-2 text-left cursor-pointer ${
                             vistaActiva === 'calendario' ||
                             (vistaActiva === 'detalle_turno' && !modalData)
                                 ? 'bg-stone-900 text-white shadow-sm'
                                 : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
                         }`}
                     >
-                        <span>📅 Calendario y Grilla del Día</span>
+                        <span className="shrink-0 leading-none">📅</span>
+                        <span className="text-left">Calendario y Grilla del Día</span>
                     </button>
 
                     <button
                         type="button"
                         onClick={() => setVistaActiva('recordatorios_manana')}
-                        className={`px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-black transition flex items-center gap-2 cursor-pointer ${
+                        className={`px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-black transition flex items-center justify-start gap-2 text-left cursor-pointer ${
                             vistaActiva === 'recordatorios_manana'
                                 ? 'bg-stone-900 text-white shadow-sm'
                                 : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
                         }`}
                     >
-                        <span>🔔 Turnos de Mañana</span>
+                        <span className="shrink-0 leading-none">🔔</span>
+                        <span className="text-left">Turnos de Mañana</span>
                         {resumenManana.total === 0 ? (
                             <span
-                                className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
+                                className={`text-[10px] px-2 py-0.5 rounded-full font-black shrink-0 ${
                                     vistaActiva === 'recordatorios_manana'
                                         ? 'bg-stone-700 text-stone-200'
                                         : 'bg-stone-200 text-stone-600'
@@ -721,11 +688,11 @@ export default function AgendaCalendar({
                                 0
                             </span>
                         ) : resumenManana.sinAvisar > 0 ? (
-                            <span className="text-[10px] px-2 py-0.5 rounded-full font-black bg-amber-400 text-stone-950 shadow-2xs">
+                            <span className="text-[10px] px-2 py-0.5 rounded-full font-black bg-amber-400 text-stone-950 shadow-2xs shrink-0">
                                 {resumenManana.sinAvisar} por avisar
                             </span>
                         ) : (
-                            <span className="text-[10px] px-2 py-0.5 rounded-full font-black bg-emerald-500 text-white shadow-2xs">
+                            <span className="text-[10px] px-2 py-0.5 rounded-full font-black bg-emerald-500 text-white shadow-2xs shrink-0">
                                 ✓ {resumenManana.total}/{resumenManana.total} avisadas
                             </span>
                         )}
@@ -734,22 +701,14 @@ export default function AgendaCalendar({
                     <button
                         type="button"
                         onClick={() => setVistaActiva('panorama_turnos')}
-                        className={`px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-black transition flex items-center gap-2 cursor-pointer ${
+                        className={`px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-black transition flex items-center justify-start gap-2 text-left cursor-pointer ${
                             vistaActiva === 'panorama_turnos'
                                 ? 'bg-stone-900 text-white shadow-sm'
                                 : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
                         }`}
                     >
-                        <span>📊 Panorama (Semana / Quincena / Mes)</span>
-                        <span
-                            className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
-                                vistaActiva === 'panorama_turnos'
-                                    ? 'bg-rose-500 text-white'
-                                    : 'bg-rose-100 text-rose-800'
-                            }`}
-                        >
-                            {turnosSemanaActual} esta sem.
-                        </span>
+                        <span className="shrink-0 leading-none">📊</span>
+                        <span className="text-left">Panorama (Semana / Quincena / Mes)</span>
                     </button>
 
                     {modalData && (
